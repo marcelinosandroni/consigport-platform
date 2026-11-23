@@ -1,62 +1,68 @@
-# 🎯 PLAN (the brain of the project)
+# 🎯 PLAN — a task em voo
 
-> 🛑 **FIXED RULE (AI agent, READ THIS BEFORE YOU CODE):**
-> The developer has ADHD, time blindness, and zero patience for junk.
-> The tasks HERE must be **microscopic**.
-> If a task takes more than 1 hour, **SPLIT IT IN TWO**.
-> Never skip a step. Never start step 2 without testing and committing step 1.
-> Update statuses rigorously at the end of every prompt: `[ ]` (To Do), `[-]` (In
-> Progress), `[x]` (Done).
-
-> **There is exactly ONE task `[-]` at any moment.** If there are two, the agent stopped
-> wrong.
-
-> **The first task is not a feature.** It is replacing the placeholders with the real
-> product: `APP.md`, the `DESIGN.md` tokens, and the first vertical slice. A scaffold
-> with `[YOUR APP NAME]` still in it is a placeholder with a build script.
+> 🛑 **Regra fixa (agente de IA, leia antes de codar):**
+> Existe **exatamente uma** task `[-]` neste arquivo. Se houver duas, o agente parou no
+> lugar errado.
+> Task maior que uma hora **é dividida antes de começar**. Nunca pule etapa: implemente,
+> teste, cole a evidência, commite.
+> Estados: `[ ]` a fazer, `[-]` em andamento, `[x]` feito.
+>
+> Catálogo completo: [`BACKLOG.md`](./BACKLOG.md). Visão macro:
+> [`ROADMAP.md`](./ROADMAP.md). Regras: [`../AGENTS.md`](../AGENTS.md).
 
 ---
 
-## Current phase: 0 — Bootstrap
+## Fase atual: 0 — Fundação
 
-> Status: 🔲 not started. A brand-new project: the phase history is empty (see
-> `history/README.md`).
+> Objetivo: projeto executável em Docker, contratos antes do código, CI/CD real e
+> governança de branch. Saída: tag `v0.1.0`.
 
 ### Tasks
 
-- [ ] No tasks yet. Create the first one:
-      `node SDD/SKILLS/create-task/create-task.mjs 0 1 "<what you are building>"`
+- [-] **0.1 — Refinamento SDD completo**
+      Specs em pt-BR, 6 ADRs, harness de IA, gates de qualidade, CI de documentação e
+      correção dos links do `AGENTS.md` raiz. Branch `docs/000-sdd-foundation`.
+- [ ] 0.2 — Gitflow, PR template, CODEOWNERS e proteção de branch documentada
+- [ ] 0.3 — `.gitignore`, `.env.example` e `compose.yaml` com PostgreSQL 16
+- [ ] 0.4 — Maven Wrapper e reactor raiz com `backend` e `central-convenios-mock`
+- [ ] 0.5 — Contratos `consigport-api.yaml`, `central-api.yaml` e vetor HMAC
+- [ ] 0.6 — Scaffold do backend (pom, aplicação, `application.yml`)
+- [ ] 0.7 — Scaffold do mock (pom, aplicação, `application.yml`)
+- [ ] 0.8 — Base do frontend RSC (package, Vite, TypeScript, Tailwind)
+- [ ] 0.9 — Shell RSC, tema Matrix e fontes locais
+- [ ] 0.10 — `ci.yml` completo e `nightly.yml`
+- [ ] 0.11 — `release-please`, `release.yml`, `cd-staging.yml` e imagens GHCR
 
-### Phase exit criteria
-- [ ] Every task `[x]` with the test evidence pasted
-- [ ] `npm run typecheck && npm run lint && npm run test && npm run build` green
-- [ ] `npm run test:e2e` green against the production build
-- [ ] `docs/CHANGELOG.md` updated
-- [ ] `specs/history/phases/phase-0-<name>.md` written
-- [ ] SemVer tag created
+### Critérios de saída da fase
 
-### How to use this file
+- [ ] Todas as tasks `[x]` com evidência colada
+- [ ] `docker compose config -q` verde
+- [ ] `./mvnw -N validate` e scaffolds compilando
+- [ ] `npm ci --prefix frontend && npm run --prefix frontend build` verde
+- [ ] Contratos válidos no Spectral
+- [ ] Job de documentação verde no PR
+- [ ] `SDD/docs/EVIDENCE.md` atualizado
+- [ ] Tag `v0.1.0`
 
-1. Create the phase block when the phase changes: `## Current phase: N — NAME`.
-2. Tasks live under `### Tasks`, one per line, `[ ]` / `[-]` / `[x]`.
-3. Mark `[-]` **before** starting. Mark `[x]` **after** you paste the green output.
-4. When the phase closes, archive it in `history/phases/`, delete the finished task
-   files, and tag the release.
+### Como usar este arquivo
+
+1. Copie a próxima task do [`BACKLOG.md`](./BACKLOG.md) para cá, com o ID e o objetivo.
+2. Marque `[-]` **antes** de começar e crie a branch da task.
+3. Marque `[x]` **depois** de colar a saída verde dos comandos.
+4. Ao fechar a fase, arquive em `specs/history/phases/` e crie a tag.
 
 ---
 
-## 📋 Delivery checklist (paste at the end of every task)
+## 📋 Checklist de entrega (colar ao fim de cada task)
 
 ```markdown
-**Evidence:**
-- `npm run typecheck` → exit 0
-- `npm run lint` → 0 errors
-- `npm run test` → N passed
-- `npm run build` → ✓ Compiled successfully
-- `npm run test:e2e` → N passed
+**Evidência:**
+- `node scripts/check-specs.mjs` → exit 0
+- `node SDD/SKILLS/check-docs/check-docs.mjs` → exit 0
+- (comando da task) → exit 0
 
-**Files touched:** (list them — max 5 per step)
-**Commit:** `type(scope): description. (Agent: <Tool> - <Model>)`
+**Arquivos tocados:** (lista, no máximo 5)
+**Commit:** `type(scope): descrição. (Agent: OpenCode - DeepSeek V4.1 Flash)`
 ```
 
-Full gate and what each command proves: [`PREFLIGHT.md`](../PREFLIGHT.md).
+Gate completo e o que cada comando prova: [`../../docs/quality/GATES.md`](../../docs/quality/GATES.md).
