@@ -12,11 +12,11 @@ Before reading code or executing any task, agents **MUST** read files in the fol
 1. [`SDD/AGENTS.md`](SDD/AGENTS.md) — Primary rules, system prompts, and operational constraints.
 2. [`SDD/APP.md`](SDD/APP.md) — Product domain, business objectives, and functional goals.
 3. [`SDD/APP-STACK.md`](SDD/APP-STACK.md) — Technology stack specifications and boundaries.
-4. [`SDD/clean-code.md`](SDD/clean-code.md) — General software engineering and clean code standards.
+4. [`SDD/stacks/clean-code.md`](SDD/stacks/clean-code.md) — General software engineering and clean code standards.
 
 ### Tier 2: Specs & Active Work (Task-Specific)
 1. [`SDD/specs/PLAN.md`](SDD/specs/PLAN.md) — Active roadmap, task checklists, and immediate steps.
-2. [`SDD/specs/ARCHITECTURE.md`](SDD/specs/ARCHITECTURE.md) — System architecture, hexagonal layers, and boundaries.
+2. [`SDD/ARCHITECTURE.md`](SDD/ARCHITECTURE.md) — System architecture, hexagonal layers, and boundaries.
 3. [`docs/spec/desafio-tecnico.md`](docs/spec/desafio-tecnico.md) — Core business challenge requirement specification.
 
 ### Tier 3: Stacks & Reference Specs (On-Demand)
@@ -40,7 +40,7 @@ This project is structured as a monorepo divided into three main execution modul
 
 1. **Strict Context Adherence:** Do not assume missing business requirements without consulting `docs/spec/desafio-tecnico.md` and `SDD/APP.md`.
 2. **Hexagonal Boundaries:** In the Java backend, keep Domain logic pure and uncoupled from Spring/persistence infrastructure (`inbound -> application -> domain <- outbound`).
-3. **Evidence Logging:** All non-trivial implementation steps must update `SDD/docs/EVIDENCE.md` with test output or verification logs.
+3. **Evidence Logging:** All non-trivial implementation steps must update [`SDD/docs/EVIDENCE.md`](SDD/docs/EVIDENCE.md) with test output or verification logs.
 4. **Idempotency & Auditability:** Every status change and portability request must maintain an immutable event trail as required by the technical challenge spec.
 
 ---

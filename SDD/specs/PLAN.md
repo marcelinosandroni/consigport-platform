@@ -19,7 +19,7 @@
 
 ### Tasks
 
-- [-] **0.1 — Refinamento SDD completo**
+- [x] **0.1 — Refinamento SDD completo**
       Specs em pt-BR, 6 ADRs, harness de IA, gates de qualidade, CI de documentação e
       correção dos links do `AGENTS.md` raiz. Branch `docs/000-sdd-foundation`.
 - [ ] 0.2 — Gitflow, PR template, CODEOWNERS e proteção de branch documentada
