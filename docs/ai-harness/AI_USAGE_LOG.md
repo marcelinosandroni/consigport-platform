@@ -55,3 +55,24 @@
 7. **Validação:**
    - Execução bem-sucedida de `node SDD/SKILLS/check-docs/check-docs.mjs .` (0 links quebrados).
    - Execução bem-sucedida de `node scripts/check-specs.mjs` (0 inconsistências de spec).
+
+---
+
+## Sessão #03 — Elaboração da Matriz de Rastreabilidade e Desenhos de Arquitetura
+
+- **Data:** 2026-11-24
+- **Agente / Modelo:** Antigravity — Gemini 3.8 Flash
+- **Branch:** `docs/001-traceability-architecture-matrix`
+- **Objetivo:** Refinar a documentação técnica com diagramas arquiteturais completos e matriz de rastreabilidade interativa (HTML/CSS) cobrindo requisitos funcionais, não-funcionais, restrições e ADRs.
+
+### Atividades Realizadas:
+1. **Rastreamento Integral de Requisitos:**
+   - Mapeamento de todos os Requisitos Funcionais (RF-01 a RF-06), Requisitos Não-Funcionais (RNF-01 a RNF-09) e Restrições Técnicas (REST-01 a REST-03) do desafio técnico.
+   - Vinculação com as Regras de Domínio (`BR-01` a `BR-16`), Decisões Arquiteturais ([ADR-0001](../adr/0001-hexagonal-ddd-acl-e-mock-isolado.md) a [ADR-0006](../adr/0006-gitflow-ci-cd-docker-e-performance.md)), componentes de software e critérios de teste.
+2. **Matriz de Rastreabilidade Interativa em HTML/CSS:**
+   - Criação de [`../architecture/traceability-matrix.html`](../architecture/traceability-matrix.html) com design system limpo, filtros dinâmicos em tempo real por texto e categoria, abas interativas e diagramas explicativos das camadas hexagonais.
+3. **Documentação Markdown com Diagramas:**
+   - Criação de [`../architecture/ARCHITECTURE_AND_TRACEABILITY.md`](../architecture/ARCHITECTURE_AND_TRACEABILITY.md) com diagramas Mermaid da topologia de execução Docker Compose, camadas da Arquitetura Hexagonal com Ports & Adapters, Camada Anticorrupção (ACL) e diagrama de sequência do fluxo assíncrono com polling e HMAC.
+4. **Validação:**
+   - Execução bem-sucedida de `node SDD/SKILLS/check-docs/check-docs.mjs .` (57 documentos com links resolvidos).
+   - Execução bem-sucedida de `node scripts/check-specs.mjs`.
