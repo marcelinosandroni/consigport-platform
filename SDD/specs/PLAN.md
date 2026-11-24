@@ -22,7 +22,8 @@
 - [x] **0.1 — Refinamento SDD completo**
       Specs em pt-BR, 6 ADRs, harness de IA, gates de qualidade, CI de documentação e
       correção dos links do `AGENTS.md` raiz. Branch `docs/000-sdd-foundation`.
-- [ ] 0.2 — Gitflow, PR template, CODEOWNERS e proteção de branch documentada
+- [x] **0.2 — Gitflow, PR template, CODEOWNERS e proteção de branch documentada**
+      Branch `feat/002-gitflow`. Template de PR, CODEOWNERS e docs/process/GITFLOW.md.
 - [ ] 0.3 — `.gitignore`, `.env.example` e `compose.yaml` com PostgreSQL 16
 - [ ] 0.4 — Maven Wrapper e reactor raiz com `backend` e `central-convenios-mock`
 - [ ] 0.5 — Contratos `consigport-api.yaml`, `central-api.yaml` e vetor HMAC
