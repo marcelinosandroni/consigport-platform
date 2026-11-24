@@ -24,7 +24,8 @@
       correção dos links do `AGENTS.md` raiz. Branch `docs/000-sdd-foundation`.
 - [x] **0.2 — Gitflow, PR template, CODEOWNERS e proteção de branch documentada**
       Branch `feat/002-gitflow`. Template de PR, CODEOWNERS e docs/process/GITFLOW.md.
-- [ ] 0.3 — `.gitignore`, `.env.example` e `compose.yaml` com PostgreSQL 16
+- [x] **0.3 — `.gitignore`, `.env.example` e `compose.yaml` com PostgreSQL 16**
+      Branch `feat/003-local-env`. Configuração de ambiente base e banco PostgreSQL 16 com volume e healthcheck.
 - [ ] 0.4 — Maven Wrapper e reactor raiz com `backend` e `central-convenios-mock`
 - [ ] 0.5 — Contratos `consigport-api.yaml`, `central-api.yaml` e vetor HMAC
 - [ ] 0.6 — Scaffold do backend (pom, aplicação, `application.yml`)
