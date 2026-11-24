@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ConsigPort — Matriz de Rastreabilidade & Arquitetura do Sistema</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --success: #3fb950;
+      --warning: #d29922;
+      --danger: #f85149;
+      --purple: #bc8cff;
+      --cyan: #39c5cf;
+      --matrix-green: #00ff66;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 24px;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 20px;
+      margin-bottom: 24px;
+    }
+
+    .badge-bar {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-primary { background: rgba(88, 166, 255, 0.15); color: var(--accent); border: 1px solid var(--accent); }
+    .badge-success { background: rgba(63, 185, 80, 0.15); color: var(--success); border: 1px solid var(--success); }
+    .badge-purple { background: rgba(188, 140, 255, 0.15); color: var(--purple); border: 1px solid var(--purple); }
+
+    h1 {
+      font-size: 1.8rem;
+      color: #f0f6fc;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    h2 {
+      font-size: 1.4rem;
+      color: var(--accent);
+      margin: 20px 0 12px 0;
+    }
+
+    p.subtitle {
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      background: none;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn:hover {
+      color: var(--text);
+      background-color: var(--card-bg);
+      border-color: var(--border);
+    }
+
+    .tab-btn.active {
+      color: #fff;
+      background: var(--card-bg);
+      border-color: var(--accent);
+      border-bottom: 2px solid var(--accent);
+    }
+
+    .tab-pane {
+      display: none;
+    }
+
+    .tab-pane.active {
+      display: block;
+      animation: fadeIn 0.2s ease-in;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .filters-container {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 18px;
+      background: var(--card-bg);
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .filter-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+    }
+
+    .search-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      min-width: 260px;
+    }
+
+    .search-box:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .table-responsive {
+      overflow-x: auto;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+
+    th, td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th {
+      background: #1c2128;
+      color: #f0f6fc;
+      font-weight: 600;
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+    }
+
+    tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .req-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      font-weight: bold;
+    }
+    .req-rf { background: rgba(57, 197, 207, 0.15); color: var(--cyan); border: 1px solid var(--cyan); }
+    .req-rnf { background: rgba(210, 153, 34, 0.15); color: var(--warning); border: 1px solid var(--warning); }
+    .req-adr { background: rgba(188, 140, 255, 0.15); color: var(--purple); border: 1px solid var(--purple); }
+
+    .status-pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .status-covered { background: rgba(63, 185, 80, 0.15); color: var(--success); border: 1px solid var(--success); }
+    .status-wip { background: rgba(88, 166, 255, 0.15); color: var(--accent); border: 1px solid var(--accent); }
+
+    .diagram-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    .diagram-title {
+      font-size: 1.15rem;
+      color: #fff;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .diagram-desc {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 16px;
+    }
+
+    /* Diagram visual styling */
+    .arch-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .arch-box {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+      background: #11151c;
+      position: relative;
+    }
+
+    .arch-box.frontend { border-top: 4px solid var(--cyan); }
+    .arch-box.backend { border-top: 4px solid var(--accent); }
+    .arch-box.mock { border-top: 4px solid var(--warning); }
+    .arch-box.database { border-top: 4px solid var(--purple); }
+
+    .arch-box h3 {
+      font-size: 1rem;
+      margin-bottom: 6px;
+      color: #fff;
+    }
+
+    .arch-box p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .arch-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .arch-tag {
+      font-size: 0.75rem;
+      padding: 2px 6px;
+      background: #21262d;
+      border-radius: 4px;
+      color: var(--text);
+    }
+
+    /* Interactive Hexagonal Layer Visualizer */
+    .hex-layer-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: #11151c;
+      padding: 20px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .hex-layer {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 16px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .hex-layer:hover {
+      border-color: var(--accent);
+      transform: scale(1.01);
+      box-shadow: 0 4px 12px rgba(88, 166, 255, 0.1);
+    }
+
+    .hex-layer.domain { background: rgba(63, 185, 80, 0.08); border-left: 5px solid var(--success); }
+    .hex-layer.app { background: rgba(88, 166, 255, 0.08); border-left: 5px solid var(--accent); }
+    .hex-layer.adapters-in { background: rgba(57, 197, 207, 0.08); border-left: 5px solid var(--cyan); }
+    .hex-layer.adapters-out { background: rgba(188, 140, 255, 0.08); border-left: 5px solid var(--purple); }
+    .hex-layer.acl { background: rgba(210, 153, 34, 0.08); border-left: 5px solid var(--warning); }
+
+    .hex-layer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .hex-layer-title {
+      font-weight: 600;
+      color: #fff;
+      font-size: 0.95rem;
+    }
+
+    .hex-layer-detail {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* Flow step visualizer */
+    .flow-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .flow-step {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      background: #11151c;
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    .flow-num {
+      background: var(--accent);
+      color: #0d1117;
+      font-weight: bold;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      flex-shrink: 0;
+    }
+
+    .flow-content h4 {
+      font-size: 0.9rem;
+      color: #f0f6fc;
+      margin-bottom: 4px;
+    }
+
+    .flow-content p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .legend {
+      display: flex;
+      gap: 16px;
+      margin-top: 14px;
+      font-size: 0.8rem;
+      flex-wrap: wrap;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>
+      <span>⚡ ConsigPort</span>
+      <span style="font-weight: 400; font-size: 1.2rem; color: var(--text-muted);">| Matriz de Rastreabilidade & Arquitetura</span>
+    </h1>
+    <p class="subtitle">
+      Rastreabilidade bidirecional completa: Desafio Técnico &rarr; Requisitos Funcionais &rarr; Requisitos Não-Funcionais &rarr; Regras de Domínio (BR) &rarr; Decisões Arquiteturais (ADRs) &rarr; Módulos &rarr; Testes & Gates.
+    </p>
+    <div class="badge-bar">
+      <span class="badge badge-primary">Java 21 + Spring Boot 3.5.x</span>
+      <span class="badge badge-primary">React 19.2 + Vite RSC</span>
+      <span class="badge badge-primary">PostgreSQL 16</span>
+      <span class="badge badge-success">Arquitetura Hexagonal + DDD + ACL</span>
+      <span class="badge badge-purple">HMAC-SHA256 + Idempotência</span>
+      <span class="badge badge-purple">Trilha Append-Only Imutável</span>
+    </div>
+  </header>
+
+  <nav class="nav-tabs">
+    <button class="tab-btn active" onclick="openTab('matrix')">📋 Matriz de Rastreabilidade Completa</button>
+    <button class="tab-btn" onclick="openTab('arch')">🏛️ Arquitetura do Sistema & Monorepo</button>
+    <button class="tab-btn" onclick="openTab('hex')">⬡ Camadas Hexagonais & ACL</button>
+    <button class="tab-btn" onclick="openTab('flows')">🔄 Fluxos Assíncronos & Idempotência</button>
+    <button class="tab-btn" onclick="openTab('gates')">🛡️ Portões de Qualidade & Testes</button>
+  </nav>
+
+  <!-- TAB 1: MATRIZ DE RASTREABILIDADE -->
+  <section id="matrix" class="tab-pane active">
+    <div class="filters-container">
+      <div class="filter-item">
+        <label for="search">🔍 Buscar:</label>
+        <input type="text" id="search" class="search-box" placeholder="Filtrar por ID, requisito, ADR, módulo..." onkeyup="filterTable()">
+      </div>
+      <div class="filter-item">
+        <label for="typeFilter">Tipo:</label>
+        <select id="typeFilter" class="search-box" style="min-width: 140px;" onchange="filterTable()">
+          <option value="ALL">Todos os Tipos</option>
+          <option value="RF">Funcionais (RF)</option>
+          <option value="RNF">Não-Funcionais (RNF)</option>
+          <option value="REST">Restrições / IA</option>
+        </select>
+      </div>
+      <div class="filter-item" style="color: var(--text-muted); font-size: 0.85rem; margin-left: auto;">
+        <span id="rowCount">Exibindo 18 requisitos rastreados</span>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table id="traceTable">
+        <thead>
+          <tr>
+            <th>ID Origem</th>
+            <th>Tipo</th>
+            <th>Descrição do Requisito (Desafio Técnico)</th>
+            <th>Regra de Negócio (SDD/APP.md)</th>
+            <th>ADR Associada</th>
+            <th>Componente / Camada</th>
+            <th>Critério de Aceite & Teste / Gate</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- RF-01 -->
+          <tr data-type="RF">
+            <td><strong>RF-01</strong></td>
+            <td><span class="req-tag req-rf">RF</span></td>
+            <td>Registrar a autorização (opt-in) de um beneficiário vinculado a identificador único.</td>
+            <td><code>BR-01, BR-02</code> (Autorização única por beneficiário + convênio)</td>
+            <td><a href="#adr1" style="color:var(--accent);">ADR-0001</a></td>
+            <td><code>backend/authorizations</code> + <code>ACL</code> + <code>central-mock</code></td>
+            <td><code>POST /api/v1/authorizations</code> &rarr; replica no Mock; teste unitário e de integração.</td>
+            <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
+          </tr>
+
+          <!-- RF-02 -->
+          <tr data-type="RF">
+            <td><strong>RF-02</strong></td>
+            <td><span class="req-tag req-rf">RF</span></td>
+            <td>Consultar agenda de descontos futuros de beneficiário autorizado (valor, data, convênio, status).</td>
+            <td><code>BR-01, BR-03</code> (Agenda somente para autorizados; parcelas OPEN)</td>
+            <td><a href="#adr1" style="color:var(--accent);">ADR-0001</a></td>
+            <td><code>backend/agenda</code> + <code>CentralAgendaAdapter</code></td>
+            <td><code>GET /api/v1/beneficiaries/{id}/agenda</code> &rarr; 403 se não autorizado; 200 com lista.</td>
+            <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
+          </tr>
+
+          <!-- RF-03 -->
+          <tr data-type="RF">
+            <td><strong>RF-03</strong></td>
+            <td><span class="req-tag req-rf">RF</span></td>
+            <td>Selecionar uma ou mais parcelas elegíveis e iniciar portabilidade com conta de recebimento.</td>
+            <td><code>BR-04, BR-05, BR-06</code> (Ao menos 1 parcela OPEN, snapshot imutável, conta obrigatória)</td>
+            <td><a href="#adr1" style="color:var(--accent);">ADR-0001</a></td>
+            <td><code>PortabilityOperation</code> (Agregado raiz) + Frontend RSC</td>
+            <td>Validação de domínio pura; persistência do snapshot das parcelas; conta de destino válida.</td>
+            <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
+          </tr>
+
+          <!-- RF-04 -->
+          <tr data-type="RF">
+            <td><strong>RF-04</strong></td>
+            <td><span class="req-tag req-rf">RF</span></td>
+            <td>Acompanhar status assíncrono da operação (CREATED &rarr; PENDING &rarr; CONFIRMED/REJECTED &rarr; COMPLETED).</td>
+            <td><code>BR-08, BR-09, BR-10</code> (202 Protocolo, polling com backoff, transição terminal)</td>
+            <td><a href="#adr3" style="color:var(--accent);">ADR-0003</a></td>
+            <td><code>OperationStatusPoller</code> + <code>Scheduler</code></td>
+            <td>Respeito ao <code>Retry-After: 2</code> retornado no 204 da Central; teste com MockMvc.</td>
+            <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
+          </tr>
+
+          <!-- RF-05 -->
+          <tr data-type="RF">
+            <td><strong>RF-05</strong></td>
+            <td><span class="req-tag req-rf">RF</span></td>
+            <td>Exibir trilha de eventos auditável por operação (quando solicitada, mudança de status, retorno).</td>
+            <td><code>BR-12, BR-13</code> (Toda transição gera OperationEvent imutável)</td>
+            <td><a href="#adr3" style="color:var(--accent);">ADR-0003</a></td>
+            <td><code>AuditTrail</code> + <code>operation_events</code></td>
+            <td>Tabela append-only; trigger SQL contra UPDATE/DELETE; linha do tempo visual no Frontend.</td>
+            <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
+          </tr>
+
+          <!-- RF-06 -->
+          <tr data-type="RF">
+            <td><strong>RF-06</strong></td>
+            <td><span class="req-tag req-rf">RF</span></td>
+            <td>Tratar e exibir cenários de rejeição da Central ou falha de integração (indisponibilidade, timeout).</td>
+            <td><code>BR-11, BR-14, BR-15</code> (REJECTED terminal com motivo; INTEGRATION_ERROR retomável)</td>
+            <td><a href="#adr3" style="color:var(--accent);">ADR-0003</a></td>
+            <td><code>CentralClient</code> + <code>GlobalExceptionHandler</code></td>
+            <td>Circuit breaker + retry; cenários <code>-REJ</code> (margem insuficiente) e <code>-TIMEOUT</code> no mock.</td>
+            <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
+          </tr>
+
+          <!-- RNF-01 -->
+          <tr data-type="RNF">
+            <td><strong>RNF-01</strong></td>
+            <td><span class="req-tag req-rnf">RNF</span></td>
+            <td>Assinatura e verificação de integridade das mensagens trocadas com a Central (HMAC-SHA256).</td>
+            <td><code>APP-STACK.md §3</code> (X-Signature com method, path, timestamp, body e secret)</td>
+            <td><a href="#adr2" style="color:var(--accent);">ADR-0002</a></td>
+            <td><code>HmacSignatureService</code> (backend + mock)</td>
+            <td>Vetor determinístico <code>contracts/hmac-vector.json</code> validado em CI; rejeita replay &plusmn;300s.</td>
+            <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
+          </tr>
+
+          <!-- RNF-02 -->
+          <tr data-type="RNF">
+            <td><strong>RNF-02</strong></td>
+            <td><span class="req-tag req-rnf">RNF</span></td>
+            <td>Idempotência rigorosa no registro da portabilidade (header <code>Idempotency-Key</code>).</td>
+            <td><code>BR-07, BR-15</code> (Mesma chave e payload &rarr; reentrega; payload divergente &rarr; 409)</td>
+            <td><a href="#adr2" style="color:var(--accent);">ADR-0002</a></td>
+            <td><code>IdempotencyFilter</code> + Tabela <code>idempotency_keys</code></td>
+            <td>Constraint única no banco; teste de concorrência com threads simultâneas enviando a mesma chave.</td>
+            <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
+          </tr>
+
+          <!-- RNF-03 -->
+          <tr data-type="RNF">
+            <td><strong>RNF-03</strong></td>
+            <td><span class="req-tag req-rnf">RNF</span></td>
+            <td>Padrão assíncrono com polling, backoff exponencial e circuit breaker para confirmação.</td>
+            <td><code>BR-08, BR-09</code> (Central responde 202 com protocolo; 204 indica processamento)</td>
+            <td><a href="#adr3" style="color:var(--accent);">ADR-0003</a></td>
+            <td><code>Resilience4j</code> (Retry + CircuitBreaker) + <code>Spring TaskScheduler</code></td>
+            <td>Polling honra header <code>Retry-After</code>; não sobrecarrega a Central; para em estado terminal.</td>
+            <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
+          </tr>
+
+          <!-- RNF-04 -->
+          <tr data-type="RNF">
+            <td><strong>RNF-04</strong></td>
+            <td><span class="req-tag req-rnf">RNF</span></td>
+            <td>Tratamento explícito de erros de integração com resiliência sem perda de estado.</td>
+            <td><code>BR-15</code> (INTEGRATION_ERROR mantém mesma idempotency-key para reenvio seguro)</td>
+            <td><a href="#adr1" style="color:var(--accent);">ADR-0001</a>, <a href="#adr3" style="color:var(--accent);">0003</a></td>
+            <td><code>CentralClientException</code> + <code>OperationStatus</code></td>
+            <td>Falhas de rede não geram nova operação; operação pode ser retomada sem gerar duplicidade.</td>
+            <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
+          </tr>
+
+          <!-- RNF-05 -->
+          <tr data-type="RNF">
+            <td><strong>RNF-05</strong></td>
+            <td><span class="req-tag req-rnf">RNF</span></td>
+            <td>Imutabilidade da trilha de eventos de auditoria (append-only estrito).</td>
+            <td><code>BR-12, BR-13</code> (Garantia no domínio, repositório sem update, trigger no PostgreSQL)</td>
+            <td><a href="#adr3" style="color:var(--accent);">ADR-0003</a></td>
+            <td><code>@Immutable</code> Hibernate + Trigger PostgreSQL <code>prevent_event_mutation</code></td>
+            <td>Testes de banco comprovam que <code>UPDATE</code> ou <code>DELETE</code> em <code>operation_events</code> lançam exceção SQL.</td>
+            <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
+          </tr>
+
+          <!-- RNF-06 -->
+          <tr data-type="RNF">
+            <td><strong>RNF-06</strong></td>
+            <td><span class="req-tag req-rnf">RNF</span></td>
+            <td>Código limpo, arquitetura hexagonal desacoplada e testabilidade.</td>
+            <td><code>SDD/stacks/clean-code.md</code>, <code>ARCHITECTURE.md</code></td>
+            <td><a href="#adr1" style="color:var(--accent);">ADR-0001</a></td>
+            <td>Pacotes <code>domain</code>, <code>application</code>, <code>adapters</code></td>
+            <td>Testes ArchUnit garantem: domínio 100% puro (sem Spring/JPA); sem ciclos de pacotes.</td>
+            <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
+          </tr>
+
+          <!-- RNF-07 -->
+          <tr data-type="RNF">
+            <td><strong>RNF-07</strong></td>
+            <td><span class="req-tag req-rnf">RNF</span></td>
+            <td>Testes automatizados cobrindo cenários críticos (idempotência, falha, transição).</td>
+            <td><code>docs/quality/GATES.md</code></td>
+            <td><a href="#adr6" style="color:var(--accent);">ADR-0006</a></td>
+            <td>JUnit 5, Testcontainers, Vitest, Playwright (E2E) e k6 (Performance)</td>
+            <td>Cobertura JaCoCo &ge; 80% no domínio; suite E2E e k6 validadas nos workflows de CI.</td>
+            <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
+          </tr>
+
+          <!-- RNF-08 -->
+          <tr data-type="RNF">
+            <td><strong>RNF-08</strong></td>
+            <td><span class="req-tag req-rnf">RNF</span></td>
+            <td>Contrato-first com OpenAPI 3.1, versionamento e suporte a internacionalização (i18n).</td>
+            <td><code>BR-16</code> (pt-BR padrão, en e es via Accept-Language; códigos de erro estáveis)</td>
+            <td><a href="#adr4" style="color:var(--accent);">ADR-0004</a></td>
+            <td><code>contracts/consigport-api.yaml</code> + <code>springdoc-openapi</code></td>
+            <td>Linter Spectral sem erros; oasdiff detecta quebras; Schemathesis valida endpoints.</td>
+            <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
+          </tr>
+
+          <!-- RNF-09 -->
+          <tr data-type="RNF">
+            <td><strong>RNF-09</strong></td>
+            <td><span class="req-tag req-rnf">RNF</span></td>
+            <td>Performance mensurável com SLAs claros e limites objetivos de latência.</td>
+            <td><code>docs/quality/GATES.md §3.6</code></td>
+            <td><a href="#adr6" style="color:var(--accent);">ADR-0006</a></td>
+            <td>k6 runner (CI smoke e Nightly load)</td>
+            <td>GET p95 &lt; 200ms; POST p95 &lt; 500ms; taxa de falha &lt; 0.1%; relatório HTML anexado.</td>
+            <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
+          </tr>
+
+          <!-- REST-01 -->
+          <tr data-type="REST">
+            <td><strong>REST-01</strong></td>
+            <td><span class="req-tag req-adr">REST</span></td>
+            <td>Simulação isolada da Central de Convênios com contrato externo em português.</td>
+            <td><code>central-convenios-mock</code> (Spring MVC simples, em memória, 8081)</td>
+            <td><a href="#adr1" style="color:var(--accent);">ADR-0001</a></td>
+            <td><code>central-convenios-mock/</code></td>
+            <td>Mock independente; sem banco; simula delay de 2s e cenários de margem/timeout determinísticos.</td>
+            <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
+          </tr>
+
+          <!-- REST-02 -->
+          <tr data-type="REST">
+            <td><strong>REST-02</strong></td>
+            <td><span class="req-tag req-adr">REST</span></td>
+            <td>Frontend React 19.2 com Vite RSC oficial, sem Next.js e design responsivo Matrix.</td>
+            <td><code>SDD/DESIGN.md</code>, <code>SDD/themes/matrix/</code></td>
+            <td><a href="#adr5" style="color:var(--accent);">ADR-0005</a></td>
+            <td><code>frontend/</code> (Vite RSC + Tailwind 4)</td>
+            <td>Shell estático, streaming SSR e hidratação seletiva; tema Matrix; acessibilidade WCAG AA.</td>
+            <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
+          </tr>
+
+          <!-- REST-03 -->
+          <tr data-type="REST">
+            <td><strong>REST-03</strong></td>
+            <td><span class="req-tag req-adr">REST</span></td>
+            <td>Governança e documentação completa do AI Harness utilizado no desenvolvimento.</td>
+            <td><code>AGENTS.md</code>, <code>SDD/AGENTS.md</code>, <code>docs/ai-harness/</code></td>
+            <td><a href="#adr6" style="color:var(--accent);">ADR-0006</a></td>
+            <td><code>HARNESS_OVERVIEW.md</code> + <code>AI_USAGE_LOG.md</code></td>
+            <td>Rastreamento de prompts, contexto em 3 tiers, sessões catalogadas e invariantes validadas por script.</td>
+            <td><span class="status-pill status-covered">Concluído / Task 0.1</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- TAB 2: ARQUITETURA DO SISTEMA -->
+  <section id="arch" class="tab-pane">
+    <div class="diagram-card">
+      <div class="diagram-title">📦 Visão do Monorepo e Topologia de Execução (Docker Compose)</div>
+      <div class="diagram-desc">Três processos desacoplados se comunicando via HTTP/JSON sobre rede bridge interna, isolando responsabilidades de negócio, simulação externa e interface.</div>
+      
+      <div class="arch-container">
+        <!-- Frontend -->
+        <div class="arch-box frontend">
+          <h3>🌐 Frontend (React 19.2 + Vite RSC)</h3>
+          <p>Interface do usuário com React Server Components, streaming de dados, design system Matrix e i18n cliente.</p>
+          <p><strong>Porta:</strong> <code>5173</code> | <strong>Stack:</strong> React 19, TypeScript, Tailwind 4</p>
+          <div class="arch-tags">
+            <span class="arch-tag">Shell Estático</span>
+            <span class="arch-tag">Streaming SSR</span>
+            <span class="arch-tag">Timeline Audit</span>
+            <span class="arch-tag">i18n (pt-BR, en, es)</span>
+          </div>
+        </div>
+
+        <!-- Backend -->
+        <div class="arch-box backend">
+          <h3>⚙️ Backend Core (ConsigPort)</h3>
+          <p>Núcleo transacional com Arquitetura Hexagonal, orquestração assíncrona, idempotência, HMAC e auditoria.</p>
+          <p><strong>Porta:</strong> <code>8080</code> | <strong>Stack:</strong> Java 21, Spring Boot 3.5.x, Flyway</p>
+          <div class="arch-tags">
+            <span class="arch-tag">DDD Puro</span>
+            <span class="arch-tag">ACL (Português &harr; Inglês)</span>
+            <span class="arch-tag">Polling Scheduler</span>
+            <span class="arch-tag">OpenAPI 3.1</span>
+          </div>
+        </div>
+
+        <!-- Mock Central -->
+        <div class="arch-box mock">
+          <h3>🏛️ Central de Convênios (Mock Externo)</h3>
+          <p>Serviço simulador em memória que reproduz o contrato do edital (202 Accepted, 204 com delay e validação HMAC).</p>
+          <p><strong>Porta:</strong> <code>8081</code> | <strong>Stack:</strong> Java 21, Spring MVC (sem DB)</p>
+          <div class="arch-tags">
+            <span class="arch-tag">Contrato em PT</span>
+            <span class="arch-tag">ConcurrentHashMap</span>
+            <span class="arch-tag">Delay Determinístico (2s)</span>
+            <span class="arch-tag">Injeção de Falhas</span>
+          </div>
+        </div>
+
+        <!-- Database -->
+        <div class="arch-box database">
+          <h3>🗄️ PostgreSQL 16</h3>
+          <p>Persistência relacional para operações, autorizações, chaves de idempotência e trilha imutável.</p>
+          <p><strong>Porta:</strong> <code>5432</code> | <strong>Stack:</strong> PostgreSQL 16 Alpine</p>
+          <div class="arch-tags">
+            <span class="arch-tag">Flyway Migrations</span>
+            <span class="arch-tag">Trigger Imutabilidade</span>
+            <span class="arch-tag">Constraint Idempotência</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB 3: CAMADAS HEXAGONAIS E ACL -->
+  <section id="hex" class="tab-pane">
+    <div class="diagram-card">
+      <div class="diagram-title">⬡ Estrutura Hexagonal do Backend Core (Ports & Adapters)</div>
+      <div class="diagram-desc">Isolamento rigoroso onde o modelo de domínio é 100% agnóstico de frameworks, e a Camada Anticorrupção (ACL) traduz o contrato externo da Central.</div>
+
+      <div class="hex-layer-container">
+        <!-- Inbound Adapters -->
+        <div class="hex-layer adapters-in">
+          <div class="hex-layer-header">
+            <span class="hex-layer-title">1. Adaptadores de Entrada (Inbound Adapters — <code>adapters.in.web</code>)</span>
+            <span class="req-tag req-rf">REST / Controllers</span>
+          </div>
+          <p class="hex-layer-detail">Controllers REST Springdoc anotados (<code>/api/v1/authorizations</code>, <code>/api/v1/portability-operations</code>), filtros de Idempotência e validação de tokens/HMAC.</p>
+        </div>
+
+        <!-- Inbound Ports -->
+        <div class="hex-layer app">
+          <div class="hex-layer-header">
+            <span class="hex-layer-title">2. Portas e Casos de Uso (Application Layer — <code>application.usecases</code>)</span>
+            <span class="req-tag req-rf">Application Ports</span>
+          </div>
+          <p class="hex-layer-detail">Orquestradores de casos de uso: <code>RegisterAuthorizationUseCase</code>, <code>RequestPortabilityUseCase</code>, <code>PollPortabilityStatusUseCase</code>. Coordenam transações e disparam eventos.</p>
+        </div>
+
+        <!-- Domain Core -->
+        <div class="hex-layer domain">
+          <div class="hex-layer-header">
+            <span class="hex-layer-title">3. Núcleo de Domínio Puro (Domain Core — <code>domain.model</code>)</span>
+            <span class="req-tag req-rf">DDD Puro (Sem Spring/JPA)</span>
+          </div>
+          <p class="hex-layer-detail">Agregado <code>PortabilityOperation</code>, Entidade <code>Authorization</code>, Value Objects (<code>ReceivingAccount</code>, <code>Installment</code>), Eventos de Domínio imutáveis e Máquina de Estados terminal.</p>
+        </div>
+
+        <!-- Outbound Ports -->
+        <div class="hex-layer app">
+          <div class="hex-layer-header">
+            <span class="hex-layer-title">4. Portas de Saída (Outbound Ports — <code>application.ports.out</code>)</span>
+            <span class="req-tag req-rf">Interfaces de Persistência e Integração</span>
+          </div>
+          <p class="hex-layer-detail">Interfaces: <code>PortabilityRepositoryPort</code>, <code>CentralClientPort</code>, <code>EventLogRepositoryPort</code>. O domínio declara o que precisa sem saber quem implementa.</p>
+        </div>
+
+        <!-- ACL -->
+        <div class="hex-layer acl">
+          <div class="hex-layer-header">
+            <span class="hex-layer-title">5. Camada Anticorrupção (ACL — <code>adapters.out.central.acl</code>)</span>
+            <span class="req-tag req-adr">Tradução Bilíngue</span>
+          </div>
+          <p class="hex-layer-detail">Traduz o contrato externo em português da Central (<code>PENDENTE</code>, <code>beneficiarioId</code>, <code>protocolo</code>) para o vocabulário de domínio em inglês (<code>PENDING</code>, <code>beneficiaryId</code>, <code>protocol</code>).</p>
+        </div>
+
+        <!-- Outbound Adapters -->
+        <div class="hex-layer adapters-out">
+          <div class="hex-layer-header">
+            <span class="hex-layer-title">6. Adaptadores de Saída (Outbound Adapters — <code>adapters.out.*</code>)</span>
+            <span class="req-tag req-rnf">Infraestrutura</span>
+          </div>
+          <p class="hex-layer-detail"><code>CentralRestClientAdapter</code> (RestTemplate/WebClient com HMAC e Resilience4j) e <code>PostgresJpaRepositoryAdapter</code> (Spring Data JPA + mapeadores para entidades).</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB 4: FLUXOS ASSÍNCRONOS E IDEMPOTÊNCIA -->
+  <section id="flows" class="tab-pane">
+    <div class="diagram-card">
+      <div class="diagram-title">🔄 Fluxo de Ponta a Ponta: Solicitação, HMAC, Polling e Auditoria</div>
+      <div class="diagram-desc">Ciclo de vida completo desde a submissão idempotente pelo operador até a confirmação assíncrona na Central e a gravação append-only.</div>
+
+      <div class="flow-steps">
+        <div class="flow-step">
+          <div class="flow-num">1</div>
+          <div class="flow-content">
+            <h4>Operador Solicita Portabilidade (Frontend &rarr; Backend)</h4>
+            <p>O Frontend envia <code>POST /api/v1/portability-operations</code> contendo as parcelas selecionadas, conta de destino e o cabeçalho <code>Idempotency-Key: UUID</code>.</p>
+          </div>
+        </div>
+
+        <div class="flow-step">
+          <div class="flow-num">2</div>
+          <div class="flow-content">
+            <h4>Validação de Idempotência e Criação de Estado</h4>
+            <p>O filtro verifica a chave de idempotência. Se for nova, cria a operação com estado <code>CREATED</code>, grava o snapshot das parcelas e registra o primeiro <code>OperationEvent</code> imutável.</p>
+          </div>
+        </div>
+
+        <div class="flow-step">
+          <div class="flow-num">3</div>
+          <div class="flow-content">
+            <h4>Assinatura HMAC e Envio à Central (Backend &rarr; Mock)</h4>
+            <p>A ACL traduz o payload para o contrato em português. O serviço assina a mensagem com HMAC-SHA256 (<code>X-Signature</code> e <code>X-Timestamp</code>). A Central valida e devolve <code>202 Accepted</code> com <code>protocolo: "PRT-..."</code>.</p>
+          </div>
+        </div>
+
+        <div class="flow-step">
+          <div class="flow-num">4</div>
+          <div class="flow-content">
+            <h4>Transição para PENDING e Registro de Protocolo</h4>
+            <p>O backend recebe o protocolo, armazena na operação, altera o estado para <code>PENDING</code> e emite novo evento de auditoria.</p>
+          </div>
+        </div>
+
+        <div class="flow-step">
+          <div class="flow-num">5</div>
+          <div class="flow-content">
+            <h4>Polling Assíncrono com Respeito a Retry-After</h4>
+            <p>O <code>OperationStatusPoller</code> consulta <code>GET /operacoes-portabilidade/{protocolo}</code>. Enquanto a Central processa, ela responde <code>204 No Content</code> com <code>Retry-After: 2</code>. O poller aguarda antes de nova tentativa.</p>
+          </div>
+        </div>
+
+        <div class="flow-step">
+          <div class="flow-num">6</div>
+          <div class="flow-content">
+            <h4>Confirmação / Rejeição Terminal</h4>
+            <p>Quando a Central responde <code>200 OK</code> com <code>CONFIRMADA</code>, a conta de recebimento é atualizada e a operação transita para <code>COMPLETED</code>. Se for <code>REJEITADA</code>, grava o motivo. Tudo registrado em <code>operation_events</code>.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB 5: GATES E TESTES -->
+  <section id="gates" class="tab-pane">
+    <div class="diagram-card">
+      <div class="diagram-title">🛡️ Portões de Qualidade por Camada de Teste</div>
+      <div class="diagram-desc">Estratégia piramidal de testes garantindo que quebras de contrato, falhas de arquitetura e problemas de desempenho nunca atinjam staging ou produção.</div>
+
+      <div class="table-responsive" style="margin-top: 14px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Nível</th>
+              <th>Ferramenta</th>
+              <th>Alvo / Escopo</th>
+              <th>Regra de Bloqueio (Fail-Fast)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Documentação & Specs</strong></td>
+              <td><code>check-docs.mjs</code> + <code>check-specs.mjs</code></td>
+              <td>Todos os arquivos Markdown e regras do SDD</td>
+              <td>Zero links quebrados; exatamente 1 task <code>[-]</code> no PLAN; arquivos Tier 1/2 presentes.</td>
+            </tr>
+            <tr>
+              <td><strong>Arquitetura & Regras</strong></td>
+              <td><code>ArchUnit</code></td>
+              <td>Backend Java (pacotes e imports)</td>
+              <td>Domínio não conhece Spring/JPA; sem dependências circulares; ACL encapsulada.</td>
+            </tr>
+            <tr>
+              <td><strong>Unidade & Integração</strong></td>
+              <td>JUnit 5 + AssertJ + Testcontainers</td>
+              <td>Domínio, casos de uso e repositórios PostgreSQL 16</td>
+              <td>JaCoCo &ge; 80% cobertura de linhas e branches no domínio e aplicação.</td>
+            </tr>
+            <tr>
+              <td><strong>Contrato de API</strong></td>
+              <td>Spectral + oasdiff + Schemathesis</td>
+              <td>OpenAPI 3.1 (<code>contracts/*.yaml</code>)</td>
+              <td>Linter 100% verde; bloqueio automático de breaking changes em relação à branch main.</td>
+            </tr>
+            <tr>
+              <td><strong>Frontend Unit & Build</strong></td>
+              <td>Vitest + Testing Library + TypeScript</td>
+              <td>Componentes RSC, hooks e design system Matrix</td>
+              <td>TypeScript estrito (zero erros tsc); build estático de produção compilando limpo.</td>
+            </tr>
+            <tr>
+              <td><strong>Ponta a Ponta (E2E)</strong></td>
+              <td>Playwright (Docker Compose)</td>
+              <td>Frontend &harr; Backend &harr; Central Mock &harr; DB</td>
+              <td>Executado <strong>exclusivamente no CI</strong>; valida o fluxo completo de ponta a ponta.</td>
+            </tr>
+            <tr>
+              <td><strong>Performance</strong></td>
+              <td>k6 (Smoke no PR / Load no Nightly)</td>
+              <td>Endpoints de leitura e escrita</td>
+              <td>GET p95 &lt; 200ms; POST p95 &lt; 500ms; taxa de falhas inesperadas &lt; 0.1%.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+    <div>
+      ConsigPort &bull; Spec-Driven Development (SDD) &bull; Branch: <code>docs/001-traceability-architecture-matrix</code>
+    </div>
+    <div>
+      Documentos de Referência: <a href="../../SDD/APP.md" style="color: var(--accent);">APP.md</a> | <a href="../../SDD/ARCHITECTURE.md" style="color: var(--accent);">ARCHITECTURE.md</a> | <a href="../quality/GATES.md" style="color: var(--accent);">GATES.md</a>
+    </div>
+  </footer>
+
+  <script>
+    function openTab(tabId) {
+      document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      
+      const targetPane = document.getElementById(tabId);
+      if (targetPane) targetPane.classList.add('active');
+      
+      const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+      if (activeBtn) activeBtn.classList.add('active');
+    }
+
+    function filterTable() {
+      const searchVal = document.getElementById('search').value.toLowerCase();
+      const typeVal = document.getElementById('typeFilter').value;
+      const rows = document.querySelectorAll('#traceTable tbody tr');
+      let visibleCount = 0;
+
+      rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        const rowType = row.getAttribute('data-type');
+
+        const matchesSearch = text.includes(searchVal);
+        const matchesType = (typeVal === 'ALL' || rowType === typeVal);
+
+        if (matchesSearch && matchesType) {
+          row.style.display = '';
+          visibleCount++;
+        } else {
+          row.style.display = 'none';
+        }
+      });
+
+      document.getElementById('rowCount').innerText = `Exibindo ${visibleCount} de ${rows.length} requisitos rastreados`;
+    }
+  </script>
+</body>
+</html>
