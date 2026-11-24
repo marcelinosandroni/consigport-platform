@@ -48,3 +48,58 @@
 - `scripts/check-specs.mjs`
 - `.github/workflows/ci-docs.yml`
 - `SDD/specs/PLAN.md`
+
+
+---
+
+### Task 0.2 — Gitflow, PR template e CODEOWNERS
+
+- **Data de Conclusão:** 2026-11-24
+- **Branch:** `feat/002-gitflow` (desenvolvido em worktree `consigport-task-0.2`)
+- **Agente / Modelo:** Antigravity — Gemini 3.8 Flash
+- **Objetivo:** Materializar o fluxo de branches, política de revisão obrigatória, template de PR e documentação operacional de Gitflow.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Validação de Links Relativos em Markdown:**
+   ```bash
+   node SDD/SKILLS/check-docs/check-docs.mjs .
+   ```
+   *Saída obtida:*
+   ```text
+   ✓ 60 documents, every relative link resolves.
+   ```
+
+2. **Validação de Invariantes de Especificação (SDD):**
+   ```bash
+   node scripts/check-specs.mjs
+   ```
+   *Saída obtida:*
+   ```text
+   ✓ SDD specifications valid:
+     - Required core documents and ADRs present.
+     - Exactly 1 task in flight in SDD/specs/PLAN.md.
+     - Tasks in PLAN.md are cataloged in BACKLOG.md.
+   ```
+
+3. **Validação de Desenhos e Arquitetura:**
+   ```bash
+   node scripts/check-architecture.mjs
+   ```
+   *Saída obtida:*
+   ```text
+   🎉 Todos os 22 testes de validação dos desenhos e arquitetura passaram com sucesso!
+   ```
+
+4. **Verificação de Ignoração Git:**
+   ```bash
+   git check-ignore .github/PULL_REQUEST_TEMPLATE.md .github/CODEOWNERS docs/process/GITFLOW.md
+   # Exit code 1 (Arquivos não são ignorados pelo .gitignore)
+   ```
+
+#### Arquivos Tocados:
+- `.github/PULL_REQUEST_TEMPLATE.md`
+- `.github/CODEOWNERS`
+- `docs/process/GITFLOW.md`
+- `SDD/specs/PLAN.md`
+- `SDD/docs/EVIDENCE.md`
