@@ -43,3 +43,6 @@ jobs:
 
       - name: Validate SDD specification invariants
         run: node scripts/check-specs.mjs
+
+      - name: Validate architecture diagrams and traceability
+        run: node scripts/check-architecture.mjs

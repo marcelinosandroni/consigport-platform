@@ -3,7 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ConsigPort — Matriz de Rastreabilidade & Arquitetura do Sistema</title>
+  <title>ConsigPort — Matriz de Rastreabilidade & Desenhos de Arquitetura</title>
+  <!-- Mermaid.js para renderização de diagramas em tempo real com fallback SVG nativo -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        darkMode: true,
+        background: '#0d1117',
+        primaryColor: '#161b22',
+        primaryTextColor: '#c9d1d9',
+        primaryBorderColor: '#58a6ff',
+        lineColor: '#58a6ff',
+        secondaryColor: '#1f242c',
+        tertiaryColor: '#161b22'
+      }
+    });
+  </script>
   <style>
     :root {
       --bg: #0d1117;
@@ -240,6 +258,24 @@
       margin-bottom: 16px;
     }
 
+    /* SVG Native Canvas Styling */
+    .svg-canvas-container {
+      width: 100%;
+      background: #0f1319;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 20px;
+      overflow-x: auto;
+      text-align: center;
+    }
+
+    .svg-canvas-container svg {
+      max-width: 100%;
+      height: auto;
+      display: inline-block;
+    }
+
     /* Diagram visual styling */
     .arch-container {
       display: grid;
@@ -296,6 +332,7 @@
       padding: 20px;
       border-radius: 8px;
       border: 1px solid var(--border);
+      margin-top: 16px;
     }
 
     .hex-layer {
@@ -379,24 +416,27 @@
       color: var(--text-muted);
     }
 
-    .legend {
+    .view-toggle {
       display: flex;
-      gap: 16px;
-      margin-top: 14px;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .toggle-btn {
+      background: #21262d;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 4px 10px;
+      border-radius: 4px;
       font-size: 0.8rem;
-      flex-wrap: wrap;
+      cursor: pointer;
     }
 
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .legend-color {
-      width: 12px;
-      height: 12px;
-      border-radius: 3px;
+    .toggle-btn.active {
+      background: var(--accent);
+      color: #0d1117;
+      font-weight: bold;
+      border-color: var(--accent);
     }
   </style>
 </head>
@@ -405,7 +445,7 @@
   <header>
     <h1>
       <span>⚡ ConsigPort</span>
-      <span style="font-weight: 400; font-size: 1.2rem; color: var(--text-muted);">| Matriz de Rastreabilidade & Arquitetura</span>
+      <span style="font-weight: 400; font-size: 1.2rem; color: var(--text-muted);">| Matriz de Rastreabilidade & Desenhos de Arquitetura</span>
     </h1>
     <p class="subtitle">
       Rastreabilidade bidirecional completa: Desafio Técnico &rarr; Requisitos Funcionais &rarr; Requisitos Não-Funcionais &rarr; Regras de Domínio (BR) &rarr; Decisões Arquiteturais (ADRs) &rarr; Módulos &rarr; Testes & Gates.
@@ -470,7 +510,7 @@
             <td><span class="req-tag req-rf">RF</span></td>
             <td>Registrar a autorização (opt-in) de um beneficiário vinculado a identificador único.</td>
             <td><code>BR-01, BR-02</code> (Autorização única por beneficiário + convênio)</td>
-            <td><a href="#adr1" style="color:var(--accent);">ADR-0001</a></td>
+            <td><a href="../adr/0001-hexagonal-ddd-acl-e-mock-isolado.md" style="color:var(--accent);">ADR-0001</a></td>
             <td><code>backend/authorizations</code> + <code>ACL</code> + <code>central-mock</code></td>
             <td><code>POST /api/v1/authorizations</code> &rarr; replica no Mock; teste unitário e de integração.</td>
             <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
@@ -482,7 +522,7 @@
             <td><span class="req-tag req-rf">RF</span></td>
             <td>Consultar agenda de descontos futuros de beneficiário autorizado (valor, data, convênio, status).</td>
             <td><code>BR-01, BR-03</code> (Agenda somente para autorizados; parcelas OPEN)</td>
-            <td><a href="#adr1" style="color:var(--accent);">ADR-0001</a></td>
+            <td><a href="../adr/0001-hexagonal-ddd-acl-e-mock-isolado.md" style="color:var(--accent);">ADR-0001</a></td>
             <td><code>backend/agenda</code> + <code>CentralAgendaAdapter</code></td>
             <td><code>GET /api/v1/beneficiaries/{id}/agenda</code> &rarr; 403 se não autorizado; 200 com lista.</td>
             <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
@@ -494,7 +534,7 @@
             <td><span class="req-tag req-rf">RF</span></td>
             <td>Selecionar uma ou mais parcelas elegíveis e iniciar portabilidade com conta de recebimento.</td>
             <td><code>BR-04, BR-05, BR-06</code> (Ao menos 1 parcela OPEN, snapshot imutável, conta obrigatória)</td>
-            <td><a href="#adr1" style="color:var(--accent);">ADR-0001</a></td>
+            <td><a href="../adr/0001-hexagonal-ddd-acl-e-mock-isolado.md" style="color:var(--accent);">ADR-0001</a></td>
             <td><code>PortabilityOperation</code> (Agregado raiz) + Frontend RSC</td>
             <td>Validação de domínio pura; persistência do snapshot das parcelas; conta de destino válida.</td>
             <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
@@ -506,7 +546,7 @@
             <td><span class="req-tag req-rf">RF</span></td>
             <td>Acompanhar status assíncrono da operação (CREATED &rarr; PENDING &rarr; CONFIRMED/REJECTED &rarr; COMPLETED).</td>
             <td><code>BR-08, BR-09, BR-10</code> (202 Protocolo, polling com backoff, transição terminal)</td>
-            <td><a href="#adr3" style="color:var(--accent);">ADR-0003</a></td>
+            <td><a href="../adr/0003-assincronismo-polling-e-trilha-imutavel.md" style="color:var(--accent);">ADR-0003</a></td>
             <td><code>OperationStatusPoller</code> + <code>Scheduler</code></td>
             <td>Respeito ao <code>Retry-After: 2</code> retornado no 204 da Central; teste com MockMvc.</td>
             <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
@@ -518,7 +558,7 @@
             <td><span class="req-tag req-rf">RF</span></td>
             <td>Exibir trilha de eventos auditável por operação (quando solicitada, mudança de status, retorno).</td>
             <td><code>BR-12, BR-13</code> (Toda transição gera OperationEvent imutável)</td>
-            <td><a href="#adr3" style="color:var(--accent);">ADR-0003</a></td>
+            <td><a href="../adr/0003-assincronismo-polling-e-trilha-imutavel.md" style="color:var(--accent);">ADR-0003</a></td>
             <td><code>AuditTrail</code> + <code>operation_events</code></td>
             <td>Tabela append-only; trigger SQL contra UPDATE/DELETE; linha do tempo visual no Frontend.</td>
             <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
@@ -530,7 +570,7 @@
             <td><span class="req-tag req-rf">RF</span></td>
             <td>Tratar e exibir cenários de rejeição da Central ou falha de integração (indisponibilidade, timeout).</td>
             <td><code>BR-11, BR-14, BR-15</code> (REJECTED terminal com motivo; INTEGRATION_ERROR retomável)</td>
-            <td><a href="#adr3" style="color:var(--accent);">ADR-0003</a></td>
+            <td><a href="../adr/0003-assincronismo-polling-e-trilha-imutavel.md" style="color:var(--accent);">ADR-0003</a></td>
             <td><code>CentralClient</code> + <code>GlobalExceptionHandler</code></td>
             <td>Circuit breaker + retry; cenários <code>-REJ</code> (margem insuficiente) e <code>-TIMEOUT</code> no mock.</td>
             <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
@@ -542,7 +582,7 @@
             <td><span class="req-tag req-rnf">RNF</span></td>
             <td>Assinatura e verificação de integridade das mensagens trocadas com a Central (HMAC-SHA256).</td>
             <td><code>APP-STACK.md §3</code> (X-Signature com method, path, timestamp, body e secret)</td>
-            <td><a href="#adr2" style="color:var(--accent);">ADR-0002</a></td>
+            <td><a href="../adr/0002-integridade-hmac-e-idempotencia.md" style="color:var(--accent);">ADR-0002</a></td>
             <td><code>HmacSignatureService</code> (backend + mock)</td>
             <td>Vetor determinístico <code>contracts/hmac-vector.json</code> validado em CI; rejeita replay &plusmn;300s.</td>
             <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
@@ -554,7 +594,7 @@
             <td><span class="req-tag req-rnf">RNF</span></td>
             <td>Idempotência rigorosa no registro da portabilidade (header <code>Idempotency-Key</code>).</td>
             <td><code>BR-07, BR-15</code> (Mesma chave e payload &rarr; reentrega; payload divergente &rarr; 409)</td>
-            <td><a href="#adr2" style="color:var(--accent);">ADR-0002</a></td>
+            <td><a href="../adr/0002-integridade-hmac-e-idempotencia.md" style="color:var(--accent);">ADR-0002</a></td>
             <td><code>IdempotencyFilter</code> + Tabela <code>idempotency_keys</code></td>
             <td>Constraint única no banco; teste de concorrência com threads simultâneas enviando a mesma chave.</td>
             <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
@@ -566,7 +606,7 @@
             <td><span class="req-tag req-rnf">RNF</span></td>
             <td>Padrão assíncrono com polling, backoff exponencial e circuit breaker para confirmação.</td>
             <td><code>BR-08, BR-09</code> (Central responde 202 com protocolo; 204 indica processamento)</td>
-            <td><a href="#adr3" style="color:var(--accent);">ADR-0003</a></td>
+            <td><a href="../adr/0003-assincronismo-polling-e-trilha-imutavel.md" style="color:var(--accent);">ADR-0003</a></td>
             <td><code>Resilience4j</code> (Retry + CircuitBreaker) + <code>Spring TaskScheduler</code></td>
             <td>Polling honra header <code>Retry-After</code>; não sobrecarrega a Central; para em estado terminal.</td>
             <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
@@ -578,7 +618,7 @@
             <td><span class="req-tag req-rnf">RNF</span></td>
             <td>Tratamento explícito de erros de integração com resiliência sem perda de estado.</td>
             <td><code>BR-15</code> (INTEGRATION_ERROR mantém mesma idempotency-key para reenvio seguro)</td>
-            <td><a href="#adr1" style="color:var(--accent);">ADR-0001</a>, <a href="#adr3" style="color:var(--accent);">0003</a></td>
+            <td><a href="../adr/0001-hexagonal-ddd-acl-e-mock-isolado.md" style="color:var(--accent);">ADR-0001</a>, <a href="../adr/0003-assincronismo-polling-e-trilha-imutavel.md" style="color:var(--accent);">0003</a></td>
             <td><code>CentralClientException</code> + <code>OperationStatus</code></td>
             <td>Falhas de rede não geram nova operação; operação pode ser retomada sem gerar duplicidade.</td>
             <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
@@ -590,7 +630,7 @@
             <td><span class="req-tag req-rnf">RNF</span></td>
             <td>Imutabilidade da trilha de eventos de auditoria (append-only estrito).</td>
             <td><code>BR-12, BR-13</code> (Garantia no domínio, repositório sem update, trigger no PostgreSQL)</td>
-            <td><a href="#adr3" style="color:var(--accent);">ADR-0003</a></td>
+            <td><a href="../adr/0003-assincronismo-polling-e-trilha-imutavel.md" style="color:var(--accent);">ADR-0003</a></td>
             <td><code>@Immutable</code> Hibernate + Trigger PostgreSQL <code>prevent_event_mutation</code></td>
             <td>Testes de banco comprovam que <code>UPDATE</code> ou <code>DELETE</code> em <code>operation_events</code> lançam exceção SQL.</td>
             <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
@@ -602,7 +642,7 @@
             <td><span class="req-tag req-rnf">RNF</span></td>
             <td>Código limpo, arquitetura hexagonal desacoplada e testabilidade.</td>
             <td><code>SDD/stacks/clean-code.md</code>, <code>ARCHITECTURE.md</code></td>
-            <td><a href="#adr1" style="color:var(--accent);">ADR-0001</a></td>
+            <td><a href="../adr/0001-hexagonal-ddd-acl-e-mock-isolado.md" style="color:var(--accent);">ADR-0001</a></td>
             <td>Pacotes <code>domain</code>, <code>application</code>, <code>adapters</code></td>
             <td>Testes ArchUnit garantem: domínio 100% puro (sem Spring/JPA); sem ciclos de pacotes.</td>
             <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
@@ -614,7 +654,7 @@
             <td><span class="req-tag req-rnf">RNF</span></td>
             <td>Testes automatizados cobrindo cenários críticos (idempotência, falha, transição).</td>
             <td><code>docs/quality/GATES.md</code></td>
-            <td><a href="#adr6" style="color:var(--accent);">ADR-0006</a></td>
+            <td><a href="../adr/0006-gitflow-ci-cd-docker-e-performance.md" style="color:var(--accent);">ADR-0006</a></td>
             <td>JUnit 5, Testcontainers, Vitest, Playwright (E2E) e k6 (Performance)</td>
             <td>Cobertura JaCoCo &ge; 80% no domínio; suite E2E e k6 validadas nos workflows de CI.</td>
             <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
@@ -626,7 +666,7 @@
             <td><span class="req-tag req-rnf">RNF</span></td>
             <td>Contrato-first com OpenAPI 3.1, versionamento e suporte a internacionalização (i18n).</td>
             <td><code>BR-16</code> (pt-BR padrão, en e es via Accept-Language; códigos de erro estáveis)</td>
-            <td><a href="#adr4" style="color:var(--accent);">ADR-0004</a></td>
+            <td><a href="../adr/0004-contrato-openapi-versionamento-e-i18n.md" style="color:var(--accent);">ADR-0004</a></td>
             <td><code>contracts/consigport-api.yaml</code> + <code>springdoc-openapi</code></td>
             <td>Linter Spectral sem erros; oasdiff detecta quebras; Schemathesis valida endpoints.</td>
             <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
@@ -638,7 +678,7 @@
             <td><span class="req-tag req-rnf">RNF</span></td>
             <td>Performance mensurável com SLAs claros e limites objetivos de latência.</td>
             <td><code>docs/quality/GATES.md §3.6</code></td>
-            <td><a href="#adr6" style="color:var(--accent);">ADR-0006</a></td>
+            <td><a href="../adr/0006-gitflow-ci-cd-docker-e-performance.md" style="color:var(--accent);">ADR-0006</a></td>
             <td>k6 runner (CI smoke e Nightly load)</td>
             <td>GET p95 &lt; 200ms; POST p95 &lt; 500ms; taxa de falha &lt; 0.1%; relatório HTML anexado.</td>
             <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
@@ -650,7 +690,7 @@
             <td><span class="req-tag req-adr">REST</span></td>
             <td>Simulação isolada da Central de Convênios com contrato externo em português.</td>
             <td><code>central-convenios-mock</code> (Spring MVC simples, em memória, 8081)</td>
-            <td><a href="#adr1" style="color:var(--accent);">ADR-0001</a></td>
+            <td><a href="../adr/0001-hexagonal-ddd-acl-e-mock-isolado.md" style="color:var(--accent);">ADR-0001</a></td>
             <td><code>central-convenios-mock/</code></td>
             <td>Mock independente; sem banco; simula delay de 2s e cenários de margem/timeout determinísticos.</td>
             <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
@@ -662,7 +702,7 @@
             <td><span class="req-tag req-adr">REST</span></td>
             <td>Frontend React 19.2 com Vite RSC oficial, sem Next.js e design responsivo Matrix.</td>
             <td><code>SDD/DESIGN.md</code>, <code>SDD/themes/matrix/</code></td>
-            <td><a href="#adr5" style="color:var(--accent);">ADR-0005</a></td>
+            <td><a href="../adr/0005-frontend-rsc-design-e-renderizacao.md" style="color:var(--accent);">ADR-0005</a></td>
             <td><code>frontend/</code> (Vite RSC + Tailwind 4)</td>
             <td>Shell estático, streaming SSR e hidratação seletiva; tema Matrix; acessibilidade WCAG AA.</td>
             <td><span class="status-pill status-covered">Especificado / Fase 0</span></td>
@@ -674,7 +714,7 @@
             <td><span class="req-tag req-adr">REST</span></td>
             <td>Governança e documentação completa do AI Harness utilizado no desenvolvimento.</td>
             <td><code>AGENTS.md</code>, <code>SDD/AGENTS.md</code>, <code>docs/ai-harness/</code></td>
-            <td><a href="#adr6" style="color:var(--accent);">ADR-0006</a></td>
+            <td><a href="../adr/0006-gitflow-ci-cd-docker-e-performance.md" style="color:var(--accent);">ADR-0006</a></td>
             <td><code>HARNESS_OVERVIEW.md</code> + <code>AI_USAGE_LOG.md</code></td>
             <td>Rastreamento de prompts, contexto em 3 tiers, sessões catalogadas e invariantes validadas por script.</td>
             <td><span class="status-pill status-covered">Concluído / Task 0.1</span></td>
@@ -687,9 +727,106 @@
   <!-- TAB 2: ARQUITETURA DO SISTEMA -->
   <section id="arch" class="tab-pane">
     <div class="diagram-card">
-      <div class="diagram-title">📦 Visão do Monorepo e Topologia de Execução (Docker Compose)</div>
-      <div class="diagram-desc">Três processos desacoplados se comunicando via HTTP/JSON sobre rede bridge interna, isolando responsabilidades de negócio, simulação externa e interface.</div>
-      
+      <div class="diagram-title">🎨 Desenho Visual: Topologia de Execução Docker Compose & Rede Bridge</div>
+      <div class="diagram-desc">Isolamento entre os executáveis locais e a integração assinada com a Central simulada.</div>
+
+      <!-- SVG Native Visual Diagram (Garante visualização mesmo sem internet ou sem rodar JS) -->
+      <div class="svg-canvas-container">
+        <svg viewBox="0 0 900 360" width="100%" height="320" xmlns="http://www.w3.org/2000/svg">
+          <!-- Definitions -->
+          <defs>
+            <linearGradient id="gradClient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#1f2937" />
+              <stop offset="100%" stop-color="#111827" />
+            </linearGradient>
+            <linearGradient id="gradBack" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#1e3a8a" />
+              <stop offset="100%" stop-color="#0f172a" />
+            </linearGradient>
+            <linearGradient id="gradFront" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#134e4a" />
+              <stop offset="100%" stop-color="#0f172a" />
+            </linearGradient>
+            <linearGradient id="gradMock" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#78350f" />
+              <stop offset="100%" stop-color="#1c1917" />
+            </linearGradient>
+            <linearGradient id="gradDb" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#581c87" />
+              <stop offset="100%" stop-color="#0f172a" />
+            </linearGradient>
+            <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#58a6ff" />
+            </marker>
+            <marker id="arrow-gold" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#d29922" />
+            </marker>
+          </defs>
+
+          <!-- Outer boundary: Docker Compose network -->
+          <rect x="230" y="20" width="410" height="310" rx="10" fill="#161b22" stroke="#30363d" stroke-width="2" stroke-dasharray="6,4" />
+          <text x="245" y="45" fill="#8b949e" font-size="12" font-weight="bold">DOCKER NETWORK: consigport-net</text>
+
+          <!-- 1. Client / Browser -->
+          <rect x="20" y="60" width="160" height="100" rx="8" fill="url(#gradClient)" stroke="#58a6ff" stroke-width="2" />
+          <text x="35" y="95" fill="#fff" font-size="14" font-weight="bold">👤 Operador</text>
+          <text x="35" y="115" fill="#c9d1d9" font-size="12">Browser Web</text>
+          <text x="35" y="135" fill="#8b949e" font-size="11">HTTP / SPA Navigation</text>
+
+          <!-- 2. Frontend -->
+          <rect x="250" y="60" width="160" height="110" rx="8" fill="url(#gradFront)" stroke="#39c5cf" stroke-width="2" />
+          <text x="265" y="90" fill="#fff" font-size="14" font-weight="bold">🌐 Frontend</text>
+          <text x="265" y="110" fill="#39c5cf" font-size="12">React 19.2 + Vite RSC</text>
+          <text x="265" y="130" fill="#c9d1d9" font-size="11">Porta: 5173</text>
+          <text x="265" y="150" fill="#8b949e" font-size="10">Design Matrix / Tailwind</text>
+
+          <!-- 3. Backend -->
+          <rect x="460" y="60" width="160" height="110" rx="8" fill="url(#gradBack)" stroke="#58a6ff" stroke-width="2" />
+          <text x="475" y="90" fill="#fff" font-size="14" font-weight="bold">⚙️ Backend Core</text>
+          <text x="475" y="110" fill="#58a6ff" font-size="12">Java 21 + Spring Boot</text>
+          <text x="475" y="130" fill="#c9d1d9" font-size="11">Porta: 8080</text>
+          <text x="475" y="150" fill="#8b949e" font-size="10">Hexagonal + DDD + ACL</text>
+
+          <!-- 4. PostgreSQL -->
+          <rect x="355" y="210" width="160" height="95" rx="8" fill="url(#gradDb)" stroke="#bc8cff" stroke-width="2" />
+          <text x="370" y="240" fill="#fff" font-size="14" font-weight="bold">🗄️ PostgreSQL 16</text>
+          <text x="370" y="260" fill="#bc8cff" font-size="12">Banco Relacional</text>
+          <text x="370" y="280" fill="#c9d1d9" font-size="11">Porta: 5432 (Flyway)</text>
+
+          <!-- 5. Central Mock (External) -->
+          <rect x="680" y="60" width="190" height="110" rx="8" fill="url(#gradMock)" stroke="#d29922" stroke-width="2" />
+          <text x="695" y="90" fill="#fff" font-size="14" font-weight="bold">🏛️ Central de Convênios</text>
+          <text x="695" y="110" fill="#d29922" font-size="12">Mock Simulado (Em memória)</text>
+          <text x="695" y="130" fill="#c9d1d9" font-size="11">Porta: 8081 | Contrato em PT</text>
+          <text x="695" y="150" fill="#8b949e" font-size="10">202 + Delay + HMAC Check</text>
+
+          <!-- Connection Lines and Arrows -->
+          <!-- Operador -> Frontend -->
+          <line x1="180" y1="110" x2="245" y2="110" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrow)" />
+          <!-- Frontend -> Backend -->
+          <line x1="410" y1="110" x2="455" y2="110" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrow)" />
+          <text x="415" y="100" fill="#8b949e" font-size="9">/api/v1</text>
+          <!-- Backend -> PostgreSQL -->
+          <path d="M 500 170 L 500 190 L 450 190 L 450 205" fill="none" stroke="#bc8cff" stroke-width="2" marker-end="url(#arrow)" />
+          <text x="470" y="195" fill="#bc8cff" font-size="9">JDBC</text>
+          <!-- Backend -> Central Mock -->
+          <line x1="620" y1="110" x2="675" y2="110" stroke="#d29922" stroke-width="2" marker-end="url(#arrow-gold)" />
+          <text x="625" y="100" fill="#d29922" font-size="9">HMAC-SHA256</text>
+        </svg>
+      </div>
+
+      <!-- Diagrama Renderizado via Mermaid -->
+      <div class="diagram-title" style="margin-top: 15px;">📊 Renderizador Dinâmico Mermaid</div>
+      <div class="svg-canvas-container">
+        <pre class="mermaid">
+flowchart LR
+    Op["👤 Operador (Navegador)"] -->|HTTP / 5173| Front["🌐 Frontend (React 19.2 + Vite RSC)"]
+    Front -->|REST /api/v1| Back["⚙️ Backend Core (Java 21 / 8080)"]
+    Back -->|JDBC / Flyway| DB[("🗄️ PostgreSQL 16 / 5432")]
+    Back -->|REST + HMAC-SHA256 (Contrato PT)| Mock["🏛️ Central Mock (Java 21 / 8081)"]
+        </pre>
+      </div>
+
       <div class="arch-container">
         <!-- Frontend -->
         <div class="arch-box frontend">
@@ -748,8 +885,98 @@
   <!-- TAB 3: CAMADAS HEXAGONAIS E ACL -->
   <section id="hex" class="tab-pane">
     <div class="diagram-card">
-      <div class="diagram-title">⬡ Estrutura Hexagonal do Backend Core (Ports & Adapters)</div>
+      <div class="diagram-title">🎨 Desenho Visual: Arquitetura Hexagonal & Camada Anticorrupção (ACL)</div>
       <div class="diagram-desc">Isolamento rigoroso onde o modelo de domínio é 100% agnóstico de frameworks, e a Camada Anticorrupção (ACL) traduz o contrato externo da Central.</div>
+
+      <!-- SVG Native Hexagonal Diagram -->
+      <div class="svg-canvas-container">
+        <svg viewBox="0 0 900 320" width="100%" height="280" xmlns="http://www.w3.org/2000/svg">
+          <!-- Inbound Adapters -->
+          <rect x="20" y="40" width="170" height="230" rx="8" fill="#111827" stroke="#39c5cf" stroke-width="2" />
+          <text x="35" y="70" fill="#39c5cf" font-size="13" font-weight="bold">INBOUND ADAPTERS</text>
+          <text x="35" y="100" fill="#fff" font-size="12">Web Controllers</text>
+          <text x="35" y="120" fill="#8b949e" font-size="10">/authorizations</text>
+          <text x="35" y="135" fill="#8b949e" font-size="10">/portability-operations</text>
+          <text x="35" y="170" fill="#fff" font-size="12">IdempotencyFilter</text>
+          <text x="35" y="190" fill="#8b949e" font-size="10">UUID Header Validation</text>
+
+          <!-- Ports & Application -->
+          <rect x="220" y="40" width="190" height="230" rx="8" fill="#0c2d48" stroke="#58a6ff" stroke-width="2" />
+          <text x="235" y="70" fill="#58a6ff" font-size="13" font-weight="bold">APPLICATION LAYER</text>
+          <text x="235" y="100" fill="#fff" font-size="12">Inbound Ports (UseCases):</text>
+          <text x="235" y="120" fill="#c9d1d9" font-size="10">&bull; RegisterAuthUseCase</text>
+          <text x="235" y="135" fill="#c9d1d9" font-size="10">&bull; RequestPortabilityUseCase</text>
+          <text x="235" y="150" fill="#c9d1d9" font-size="10">&bull; PollStatusUseCase</text>
+          <text x="235" y="180" fill="#fff" font-size="12">Outbound Ports (Interfaces):</text>
+          <text x="235" y="200" fill="#c9d1d9" font-size="10">&bull; PortabilityRepositoryPort</text>
+          <text x="235" y="215" fill="#c9d1d9" font-size="10">&bull; CentralClientPort</text>
+
+          <!-- Domain Core (Pure) -->
+          <rect x="440" y="40" width="200" height="230" rx="8" fill="#0d2818" stroke="#3fb950" stroke-width="2" />
+          <text x="455" y="70" fill="#3fb950" font-size="13" font-weight="bold">DOMAIN CORE (PURO)</text>
+          <text x="455" y="100" fill="#fff" font-size="12">Agregados & Entidades:</text>
+          <text x="455" y="120" fill="#c9d1d9" font-size="10">&bull; PortabilityOperation (Root)</text>
+          <text x="455" y="135" fill="#c9d1d9" font-size="10">&bull; Authorization</text>
+          <text x="455" y="165" fill="#fff" font-size="12">Value Objects & Regras:</text>
+          <text x="455" y="185" fill="#c9d1d9" font-size="10">&bull; ReceivingAccount, Installment</text>
+          <text x="455" y="200" fill="#c9d1d9" font-size="10">&bull; StateMachine Terminal</text>
+          <text x="455" y="225" fill="#3fb950" font-size="10" font-weight="bold">&bull; Zero Spring / Zero JPA</text>
+
+          <!-- ACL & Outbound -->
+          <rect x="670" y="40" width="210" height="230" rx="8" fill="#1c1917" stroke="#d29922" stroke-width="2" />
+          <text x="685" y="70" fill="#d29922" font-size="13" font-weight="bold">ACL & OUTBOUND</text>
+          <text x="685" y="100" fill="#d29922" font-size="12" font-weight="bold">Anti-Corruption Layer (ACL):</text>
+          <text x="685" y="120" fill="#c9d1d9" font-size="10">Tradução PT (Central) ⇄ EN</text>
+          <text x="685" y="135" fill="#8b949e" font-size="10">protocolo ⇄ protocol</text>
+          <text x="685" y="150" fill="#8b949e" font-size="10">PENDENTE ⇄ PENDING</text>
+          <text x="685" y="180" fill="#bc8cff" font-size="12" font-weight="bold">Outbound Adapters:</text>
+          <text x="685" y="200" fill="#c9d1d9" font-size="10">&bull; PostgresJpaAdapter (DB)</text>
+          <text x="685" y="215" fill="#c9d1d9" font-size="10">&bull; CentralClientAdapter (HTTP)</text>
+
+          <!-- Arrows connecting layers -->
+          <line x1="190" y1="120" x2="215" y2="120" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrow)" />
+          <line x1="410" y1="120" x2="435" y2="120" stroke="#3fb950" stroke-width="2" marker-end="url(#arrow)" />
+          <line x1="410" y1="200" x2="665" y2="200" stroke="#d29922" stroke-width="2" marker-end="url(#arrow-gold)" />
+        </svg>
+      </div>
+
+      <!-- Mermaid Diagram -->
+      <div class="diagram-title" style="margin-top: 15px;">📊 Renderizador Dinâmico Mermaid — Hexagonal</div>
+      <div class="svg-canvas-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Inbound["Inbound Adapters"]
+        REST["REST Controllers"]
+        Idem["Idempotency Filter"]
+    end
+    subgraph App["Application Layer"]
+        UC["Use Cases / Inbound Ports"]
+        PortsOut["Outbound Interfaces / Ports"]
+    end
+    subgraph Domain["Domain Core (Puro)"]
+        Agg["PortabilityOperation Aggregate"]
+        Auth["Authorization Entity"]
+        VO["Value Objects & State Machine"]
+    end
+    subgraph ACL["Anti-Corruption Layer"]
+        Translator["Central ACL (PT ⇄ EN)"]
+    end
+    subgraph Outbound["Outbound Adapters"]
+        JPA["PostgreSQL JPA Repository"]
+        HTTP["Central HTTP Client (HMAC)"]
+    end
+
+    REST --> UC
+    Idem --> UC
+    UC --> Agg
+    UC --> Auth
+    Agg -.-> VO
+    UC --> PortsOut
+    PortsOut --> JPA
+    PortsOut --> Translator
+    Translator --> HTTP
+        </pre>
+      </div>
 
       <div class="hex-layer-container">
         <!-- Inbound Adapters -->
@@ -812,8 +1039,104 @@
   <!-- TAB 4: FLUXOS ASSÍNCRONOS E IDEMPOTÊNCIA -->
   <section id="flows" class="tab-pane">
     <div class="diagram-card">
-      <div class="diagram-title">🔄 Fluxo de Ponta a Ponta: Solicitação, HMAC, Polling e Auditoria</div>
+      <div class="diagram-title">🎨 Desenho Visual: Sequência do Ciclo Assíncrono com Polling & Trilha Imutável</div>
       <div class="diagram-desc">Ciclo de vida completo desde a submissão idempotente pelo operador até a confirmação assíncrona na Central e a gravação append-only.</div>
+
+      <!-- SVG Native Sequence Diagram -->
+      <div class="svg-canvas-container">
+        <svg viewBox="0 0 900 360" width="100%" height="320" xmlns="http://www.w3.org/2000/svg">
+          <!-- Participants columns -->
+          <!-- Operador -->
+          <line x1="100" y1="40" x2="100" y2="340" stroke="#30363d" stroke-dasharray="4,4" />
+          <rect x="30" y="10" width="140" height="30" rx="5" fill="#1f2937" stroke="#58a6ff" />
+          <text x="100" y="30" fill="#fff" font-size="12" text-anchor="middle" font-weight="bold">Operador (Browser)</text>
+
+          <!-- Backend -->
+          <line x1="330" y1="40" x2="330" y2="340" stroke="#30363d" stroke-dasharray="4,4" />
+          <rect x="250" y="10" width="160" height="30" rx="5" fill="#1e3a8a" stroke="#58a6ff" />
+          <text x="330" y="30" fill="#fff" font-size="12" text-anchor="middle" font-weight="bold">Backend (ConsigPort)</text>
+
+          <!-- PostgreSQL -->
+          <line x1="560" y1="40" x2="560" y2="340" stroke="#30363d" stroke-dasharray="4,4" />
+          <rect x="490" y="10" width="140" height="30" rx="5" fill="#581c87" stroke="#bc8cff" />
+          <text x="560" y="30" fill="#fff" font-size="12" text-anchor="middle" font-weight="bold">PostgreSQL 16</text>
+
+          <!-- Central Mock -->
+          <line x1="780" y1="40" x2="780" y2="340" stroke="#30363d" stroke-dasharray="4,4" />
+          <rect x="700" y="10" width="160" height="30" rx="5" fill="#78350f" stroke="#d29922" />
+          <text x="780" y="30" fill="#fff" font-size="12" text-anchor="middle" font-weight="bold">Central Mock (8081)</text>
+
+          <!-- Step 1: POST Portability -->
+          <line x1="100" y1="70" x2="325" y2="70" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrow)" />
+          <text x="120" y="65" fill="#c9d1d9" font-size="11">1. POST /api/v1/portability-operations [Idempotency-Key]</text>
+
+          <!-- Step 2: Save State CREATED -->
+          <line x1="330" y1="95" x2="555" y2="95" stroke="#bc8cff" stroke-width="2" marker-end="url(#arrow)" />
+          <text x="345" y="90" fill="#bc8cff" font-size="11">2. Salva Op (CREATED) + Evento 1</text>
+
+          <!-- Step 3: Send to Central HMAC -->
+          <line x1="330" y1="125" x2="775" y2="125" stroke="#d29922" stroke-width="2" marker-end="url(#arrow-gold)" />
+          <text x="440" y="120" fill="#d29922" font-size="11">3. POST /operacoes-portabilidade [HMAC-SHA256]</text>
+
+          <!-- Step 4: 202 Accepted + protocolo -->
+          <line x1="780" y1="150" x2="335" y2="150" stroke="#d29922" stroke-width="2" stroke-dasharray="4,2" marker-end="url(#arrow-gold)" />
+          <text x="480" y="145" fill="#d29922" font-size="11">4. 202 Accepted { protocolo: "PRT-01" }</text>
+
+          <!-- Step 5: Save State PENDING -->
+          <line x1="330" y1="175" x2="555" y2="175" stroke="#bc8cff" stroke-width="2" marker-end="url(#arrow)" />
+          <text x="345" y="170" fill="#bc8cff" font-size="11">5. Atualiza Op (PENDING) + Evento 2</text>
+
+          <!-- Step 6: 202 to operator -->
+          <line x1="330" y1="200" x2="105" y2="200" stroke="#58a6ff" stroke-width="2" stroke-dasharray="4,2" marker-end="url(#arrow)" />
+          <text x="130" y="195" fill="#c9d1d9" font-size="11">6. 202 Accepted { id, status: "PENDING", protocol }</text>
+
+          <!-- Polling loop box -->
+          <rect x="220" y="215" width="600" height="65" rx="5" fill="#161b22" stroke="#d29922" stroke-dasharray="3,3" />
+          <text x="230" y="230" fill="#d29922" font-size="10" font-weight="bold">LOOP POLLING COM BACKOFF</text>
+          <line x1="330" y1="245" x2="775" y2="245" stroke="#d29922" stroke-width="1.5" marker-end="url(#arrow-gold)" />
+          <text x="460" y="242" fill="#8b949e" font-size="10">GET /operacoes-portabilidade/PRT-01</text>
+          <line x1="780" y1="265" x2="335" y2="265" stroke="#d29922" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#arrow-gold)" />
+          <text x="440" y="262" fill="#8b949e" font-size="10">204 No Content [Retry-After: 2] ➔ depois 200 OK (CONFIRMADA)</text>
+
+          <!-- Step 7: Completed -->
+          <line x1="330" y1="300" x2="555" y2="300" stroke="#3fb950" stroke-width="2" marker-end="url(#arrow)" />
+          <text x="345" y="295" fill="#3fb950" font-size="11">7. Atualiza Conta & Op (COMPLETED) + Evento Final</text>
+
+          <!-- Step 8: GET Result -->
+          <line x1="100" y1="325" x2="325" y2="325" stroke="#3fb950" stroke-width="2" marker-end="url(#arrow)" />
+          <text x="130" y="320" fill="#3fb950" font-size="11">8. GET /api/v1/portability-operations/{id} ➔ 200 OK (COMPLETED)</text>
+        </svg>
+      </div>
+
+      <!-- Mermaid Sequence Diagram -->
+      <div class="diagram-title" style="margin-top: 15px;">📊 Renderizador Dinâmico Mermaid — Sequência</div>
+      <div class="svg-canvas-container">
+        <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor Operador as 👤 Operador
+    participant Backend as ⚙️ Backend Core
+    participant DB as 🗄️ PostgreSQL 16
+    participant Central as 🏛️ Central Mock
+
+    Operador->>Backend: POST /api/v1/portability-operations [Idempotency-Key]
+    Backend->>DB: Salva operação (CREATED) + Evento 1
+    Backend->>Central: POST /operacoes-portabilidade [Assinado HMAC-SHA256]
+    Central-->>Backend: 202 Accepted { protocolo: "PRT-01" }
+    Backend->>DB: Atualiza (PENDING, protocolo) + Evento 2
+    Backend-->>Operador: 202 Accepted { status: "PENDING" }
+
+    loop Polling com Backoff
+        Backend->>Central: GET /operacoes-portabilidade/PRT-01
+        Central-->>Backend: 204 No Content [Retry-After: 2]
+    end
+
+    Central-->>Backend: 200 OK { status: "CONFIRMADA" }
+    Backend->>DB: Atualiza conta e status (COMPLETED) + Evento Final
+    Operador->>Backend: GET /api/v1/portability-operations/{id}
+    Backend-->>Operador: 200 OK { status: "COMPLETED", auditTrail: [...] }
+        </pre>
+      </div>
 
       <div class="flow-steps">
         <div class="flow-step">
@@ -886,9 +1209,9 @@
           <tbody>
             <tr>
               <td><strong>Documentação & Specs</strong></td>
-              <td><code>check-docs.mjs</code> + <code>check-specs.mjs</code></td>
-              <td>Todos os arquivos Markdown e regras do SDD</td>
-              <td>Zero links quebrados; exatamente 1 task <code>[-]</code> no PLAN; arquivos Tier 1/2 presentes.</td>
+              <td><code>check-docs.mjs</code> + <code>check-specs.mjs</code> + <code>check-architecture.mjs</code></td>
+              <td>Todos os arquivos Markdown, regras SDD e diagramas de arquitetura</td>
+              <td>Zero links quebrados; exatamente 1 task <code>[-]</code> no PLAN; SVGs e diagramas válidos.</td>
             </tr>
             <tr>
               <td><strong>Arquitetura & Regras</strong></td>
