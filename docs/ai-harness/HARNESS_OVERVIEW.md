@@ -68,6 +68,11 @@ flowchart TD
    - **Inglês (`en`):** Código-fonte, nomes de classes/métodos, tabelas de banco, identificadores de evento, termos de domínio e mensagens de commit.
    - **Português (`pt-BR`):** Documentação técnica, especificações SDD, ADRs, descrições do Swagger e mensagens default da API / UI.
 
+6. **Diário de Uso de IA Obrigatório:**
+   - Toda sessão que altere código, specs, contratos, scripts ou CI deve acrescentar uma entrada em [`AI_USAGE_LOG.md`](./AI_USAGE_LOG.md), com numeração contínua, data, agente/modelo, branch, objetivo e atividades realizadas.
+   - O portão `node scripts/check-ai-log.mjs` valida a estrutura e, no PR, exige que o log tenha sido alterado e que ao menos uma sessão nova tenha sido acrescentada.
+   - Localmente, `git config core.hooksPath .githooks` instala o hook que bloqueia o commit de trabalho sem atualização do log.
+
 ---
 
 ## 4. Ferramental e Scripts de Fiscalização
@@ -76,4 +81,6 @@ Os agentes devem executar as ferramentas automatizadas para garantir conformidad
 
 - `node SDD/SKILLS/check-docs/check-docs.mjs .`: Valida se todos os links relativos no Markdown resolvem com sucesso.
 - `node scripts/check-specs.mjs`: Valida se as regras SDD (tarefa única em voo, arquivos obrigatórios, consistência entre PLAN e BACKLOG) estão intactas.
+- `node scripts/check-ai-log.mjs`: Valida numeração, campos obrigatórios e cronologia das sessões; no PR, exige log alterado e sessão nova quando há trabalho.
+- `.githooks/pre-commit`: Bloqueia commit local de trabalho sem atualização do log (ativar com `git config core.hooksPath .githooks`).
 - Workflows do GitHub Actions em `.github/workflows/` aplicam os portões de qualidade no servidor.

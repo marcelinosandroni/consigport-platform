@@ -76,3 +76,100 @@
 4. **Validação:**
    - Execução bem-sucedida de `node SDD/SKILLS/check-docs/check-docs.mjs .` (57 documentos com links resolvidos).
    - Execução bem-sucedida de `node scripts/check-specs.mjs`.
+5. **README Raiz e Rastreabilidade:**
+   - Criação do [`../../README.md`](../../README.md) com visão geral, arquitetura, diagramas e índice das decisões (commit `aa46504`).
+
+---
+
+## Sessão #04 — Task 0.2 (Gitflow, PR Template e CODEOWNERS)
+
+- **Data:** 2026-11-24
+- **Agente / Modelo:** Antigravity — Gemini 3.8 Flash
+- **Branch:** `feat/002-gitflow`
+- **Objetivo:** Materializar o fluxo de branches, a revisão obrigatória e o template de PR exigido pela Task 0.2.
+
+### Atividades Realizadas:
+1. **Template de Pull Request:**
+   - Criação de [`.github/PULL_REQUEST_TEMPLATE.md`](../../.github/PULL_REQUEST_TEMPLATE.md) com contexto da task, arquivos alterados, checklist de qualidade, evidência obrigatória e rastreabilidade de requisitos/ADRs.
+2. **Revisão Obrigatória:**
+   - Criação de [`.github/CODEOWNERS`](../../.github/CODEOWNERS) cobrindo `SDD/`, `contracts/`, `.github/` e os módulos executáveis.
+3. **Processo de Branches:**
+   - Criação de [`../process/GITFLOW.md`](../process/GITFLOW.md) descrevendo `main`, `staging`, `develop`, branches de task, squash merge e proteção via `gh api`.
+   - Ajuste da política: branches por padrão; worktrees apenas para agentes concorrentes (commit `c07dce8`).
+4. **Validação:**
+   - `node SDD/SKILLS/check-docs/check-docs.mjs .` → 60 documentos, todos os links resolvidos.
+   - `node scripts/check-specs.mjs` e `node scripts/check-architecture.mjs` → exit 0.
+5. **Entrega:** PR [#4](https://github.com/marcelinosandroni/consigport-platform/pull/4) mesclado em `develop` (commits `1bd31fa` e `c07dce8`).
+
+---
+
+## Sessão #05 — Task 0.3 (Ambiente Local e PostgreSQL 16)
+
+- **Data:** 2026-11-24
+- **Agente / Modelo:** Antigravity — Gemini 3.8 Flash
+- **Branch:** `feat/003-local-env`
+- **Objetivo:** Estabelecer a infraestrutura local base com `.gitignore`, `.env.example` e `compose.yaml` com PostgreSQL 16.
+
+### Atividades Realizadas:
+1. **Higiene do Repositório:**
+   - Criação de [`.gitignore`](../../.gitignore) cobrindo segredos, artefatos Maven, Node, IDEs, relatórios de teste e volumes locais.
+2. **Configuração de Ambiente:**
+   - Criação de [`.env.example`](../../.env.example) com as variáveis de `POSTGRES_*`, portas, `HMAC_SECRET`, `CENTRAL_BASE_URL` e parâmetros de polling.
+3. **Infraestrutura Docker:**
+   - Criação de [`compose.yaml`](../../compose.yaml) com `postgres:16-alpine`, volume nomeado e healthcheck.
+4. **Validação:**
+   - `docker compose config -q` → exit 0.
+   - `git check-ignore -v .env target/ node_modules/ .idea/` → regras confirmadas; `.env.example` e `compose.yaml` rastreados.
+   - `node SDD/SKILLS/check-docs/check-docs.mjs .`, `node scripts/check-specs.mjs` e `node scripts/check-architecture.mjs` → exit 0.
+5. **Entrega:** PR [#5](https://github.com/marcelinosandroni/consigport-platform/pull/5) mesclado em `develop` (commit `985e87a`).
+
+---
+
+## Sessão #06 — Task 0.4 (Início do Maven Wrapper, sem conclusão)
+
+- **Data:** 2026-11-24
+- **Agente / Modelo:** Antigravity — Gemini 3.8 Flash
+- **Branch:** `feat/004-maven-reactor`
+- **Objetivo:** Iniciar a Task 0.4 com wrapper Maven, reactor raiz e módulos `backend` e `central-convenios-mock`.
+
+### Atividades Realizadas:
+1. **Reactor Raiz:**
+   - Criação de `pom.xml` com Spring Boot 3.5.0, Java 21, BOMs de ArchUnit, springdoc, Testcontainers e Resilience4j.
+2. **Wrapper Manual:**
+   - Criação de `mvnw`, `mvnw.cmd` e `.mvn/wrapper/maven-wrapper.properties` escritos à mão, sem passar pelo `wrapper:wrapper`.
+3. **Planejamento:**
+   - Task 0.4 marcada como `[-]` em [`../../SDD/specs/PLAN.md`](../../SDD/specs/PLAN.md).
+4. **Bloqueio Encontrado:**
+   - O `mvnw.cmd` falhava em `!WRAPPER_JAR_URL!` (delayed expansion ausente), perdia variáveis no `ENDLOCAL` e exigia `JAVA_HOME` mesmo com Java no `PATH`.
+   - O build não foi concluído, nenhuma evidência foi registrada e a sessão terminou sem commit.
+
+---
+
+## Sessão #07 — Task 0.4 (Conclusão), Correção do Log e Portão de Fiscalização
+
+- **Data:** 2026-11-24
+- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Branch:** `feat/004-maven-reactor`
+- **Objetivo:** Retomar a Task 0.4, substituir o wrapper quebrado, fechar o reactor, registrar as evidências, abrir o PR para `develop` e impedir que o AI Usage Log volte a ficar desatualizado.
+
+### Atividades Realizadas:
+1. **Wrapper Oficial e Versões:**
+   - Regeneração com `wrapper:wrapper` 3.3.4 no modo `only-script`, apontando para Maven 3.10.2 e funcionando sem `JAVA_HOME`.
+   - Alinhamento do reactor para Spring Boot 3.5.16 e ArchUnit 1.4.2; propriedade `argLine` vazia para o `@{argLine}` do JaCoCo não quebrar módulos sem agente.
+2. **Módulos e Line Endings:**
+   - POMs mínimos de `backend` e `central-convenios-mock` para o reactor resolver.
+   - Criação de [`.gitattributes`](../../.gitattributes) garantindo LF no `mvnw` e CRLF nos scripts `.cmd`/`.ps1`.
+3. **Evidências e Entrega:**
+   - Atualização de [`../../SDD/docs/EVIDENCE.md`](../../SDD/docs/EVIDENCE.md) e de [`../../SDD/specs/PLAN.md`](../../SDD/specs/PLAN.md) com a Task 0.4 concluída (commit `11e7c2e`).
+   - PR [#6](https://github.com/marcelinosandroni/consigport-platform/pull/6) aberto para `develop` com CI de documentação verde.
+4. **Correção Deste Log:**
+   - Inclusão das sessões #04 a #07, que estavam ausentes desde a sessão #03, e do commit `aa46504` na sessão #03.
+5. **Fiscalização Automática do Log:**
+   - Criação de `scripts/check-ai-log.mjs` para validar a estrutura das sessões e exigir que todo PR que altere código/specs também altere este arquivo e acrescente ao menos uma sessão.
+   - Criação de `.githooks/pre-commit` (instalado via `git config core.hooksPath .githooks`) para bloquear commit local de trabalho sem atualização do log.
+   - Integração do script ao job de documentação em `.github/workflows/ci-docs.yml`.
+6. **Validação:**
+   - `.\mvnw.cmd -v` → Maven 3.10.2 com Java 21.0.12.
+   - `.\mvnw.cmd -N validate` e `.\mvnw.cmd -q -DskipTests package` → exit 0.
+   - `node scripts/check-ai-log.mjs` → log válido, com todas as sessões e campos obrigatórios.
+   - `node scripts/check-specs.mjs`, `node SDD/SKILLS/check-docs/check-docs.mjs .` e `node scripts/check-architecture.mjs` → exit 0.

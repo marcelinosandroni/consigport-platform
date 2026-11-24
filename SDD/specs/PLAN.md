@@ -26,7 +26,10 @@
       Branch `feat/002-gitflow`. Template de PR, CODEOWNERS e docs/process/GITFLOW.md.
 - [x] **0.3 — `.gitignore`, `.env.example` e `compose.yaml` com PostgreSQL 16**
       Branch `feat/003-local-env`. Configuração de ambiente base e banco PostgreSQL 16 com volume e healthcheck.
-- [ ] 0.4 — Maven Wrapper e reactor raiz com `backend` e `central-convenios-mock`
+- [x] **0.4 — Maven Wrapper e reactor raiz com `backend` e `central-convenios-mock`**
+      Branch `feat/004-maven-reactor`. Wrapper 3.3.4 (only-script) apontando para Maven
+      3.10.2, reactor com Java 21 e Spring Boot 3.5.16, módulos mínimos `backend` e
+      `central-convenios-mock`.
 - [ ] 0.5 — Contratos `consigport-api.yaml`, `central-api.yaml` e vetor HMAC
 - [ ] 0.6 — Scaffold do backend (pom, aplicação, `application.yml`)
 - [ ] 0.7 — Scaffold do mock (pom, aplicação, `application.yml`)

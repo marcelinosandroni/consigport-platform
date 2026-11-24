@@ -1,0 +1,4 @@
+#!/bin/sh
+# Blocks a commit that stages project work without updating the AI usage log.
+# Enable once per clone: git config core.hooksPath .githooks
+exec node scripts/check-ai-log.mjs --staged
