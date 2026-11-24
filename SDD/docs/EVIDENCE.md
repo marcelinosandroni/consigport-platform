@@ -103,3 +103,49 @@
 - `docs/process/GITFLOW.md`
 - `SDD/specs/PLAN.md`
 - `SDD/docs/EVIDENCE.md`
+
+
+---
+
+### Task 0.3 — Ambiente local e PostgreSQL
+
+- **Data de Conclusão:** 2026-11-24
+- **Branch:** `feat/003-local-env`
+- **Agente / Modelo:** Antigravity — Gemini 3.8 Flash
+- **Objetivo:** Estabelecer a infraestrutura base local através de `.gitignore`, `.env.example` e `compose.yaml` com o serviço `postgres:16-alpine`, volume e healthcheck.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Validação de Sintaxe e Estrutura do Docker Compose:**
+   ```bash
+   docker compose config -q
+   # Exit code 0 (Sintaxe e variáveis válidas)
+   ```
+
+2. **Verificação das Regras de Ignoração Git (.gitignore):**
+   ```bash
+   git check-ignore -v .env target/ node_modules/ .idea/ .env.example compose.yaml
+   ```
+   *Saída obtida:*
+   ```text
+   .gitignore:8:.env	.env
+   .gitignore:18:target/	target/
+   .gitignore:35:node_modules/	node_modules/
+   .gitignore:52:.idea/	.idea/
+   ```
+   *(.env.example e compose.yaml rastreados; .env e artefatos ignorados).*
+
+3. **Validação de Invariantes e Documentação:**
+   ```bash
+   node SDD/SKILLS/check-docs/check-docs.mjs .
+   node scripts/check-specs.mjs
+   node scripts/check-architecture.mjs
+   # Todos com exit code 0.
+   ```
+
+#### Arquivos Tocados:
+- `.gitignore`
+- `.env.example`
+- `compose.yaml`
+- `SDD/specs/PLAN.md`
+- `SDD/docs/EVIDENCE.md`
