@@ -38,16 +38,18 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
 
 ## 3. Detalhamento de Cada Portão
 
-### 3.1. Portão de Documentação e Especificação (SDD)
+### 3.1. Portão de Documentação, Especificação (SDD) e Arquitetura
 - **Comandos:**
   ```bash
   node SDD/SKILLS/check-docs/check-docs.mjs .
   node scripts/check-specs.mjs
+  node scripts/check-architecture.mjs
   ```
 - **Critérios de Aceite:**
   - Zero links relativos quebrados em toda a árvore Markdown (`check-docs`).
   - Exatamente **uma** tarefa marcada como em andamento `[-]` no [`../../SDD/specs/PLAN.md`](../../SDD/specs/PLAN.md).
   - Presença de todos os documentos obrigatórios do SDD Tier 1 e Tier 2.
+  - Desenhos de arquitetura validados (SVGs nativos, blocos Mermaid suportados, camadas hexagonais e matriz de rastreabilidade).
   - Registro de evidência em [`../../SDD/docs/EVIDENCE.md`](../../SDD/docs/EVIDENCE.md) para tarefas finalizadas.
 
 ---
