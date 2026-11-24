@@ -1,0 +1,977 @@
+openapi: 3.1.0
+info:
+  title: ConsigPort API
+  version: 1.0.0
+  description: |
+    API pública do ConsigPort para portabilidade de convênios de desconto em folha.
+
+    Identificadores, status e códigos de erro são estáveis e em inglês. Mensagens
+    humanas são localizadas por `Accept-Language` (padrão `pt-BR`). A criação de
+    operação exige `Idempotency-Key`; o replay devolve a operação existente com o
+    header `Idempotent-Replay: true`.
+  contact:
+    name: ConsigPort
+    url: https://github.com/marcelinosandroni/consigport-platform
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://localhost:8080
+    description: Desenvolvimento local
+tags:
+  - name: Authorizations
+    description: Opt-in do beneficiário para consulta da agenda.
+  - name: Agenda
+    description: Agenda de descontos futuros de um beneficiário autorizado.
+  - name: Portability Operations
+    description: Criação, consulta e acompanhamento de operações de portabilidade.
+  - name: Audit
+    description: Trilha imutável de eventos de uma operação.
+paths:
+  /api/v1/authorizations:
+    post:
+      tags:
+        - Authorizations
+      operationId: registerAuthorization
+      summary: Registra a autorização (opt-in) do beneficiário
+      description: |
+        Registra o consentimento do beneficiário para um convênio. O par
+        `(beneficiaryId, agreementId)` é único: repetir a chamada devolve `200` com
+        a autorização existente em vez de criar outra.
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorizationRequest'
+            examples:
+              novoOptIn:
+                summary: Opt-in de um beneficiário
+                value:
+                  beneficiaryId: BEN-001
+                  agreementId: AGR-001
+      responses:
+        '201':
+          description: Autorização criada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Authorization'
+              examples:
+                criada:
+                  summary: Autorização recém-criada
+                  value:
+                    authorizationId: 7f0f5d5e-2d6a-4f2e-9f4e-1b2c3d4e5f60
+                    beneficiaryId: BEN-001
+                    agreementId: AGR-001
+                    createdAt: '2026-11-23T12:00:00Z'
+        '200':
+          description: Autorização já existente para o par beneficiário/convênio.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Authorization'
+              examples:
+                existente:
+                  summary: Registro devolvido sem duplicar
+                  value:
+                    authorizationId: 7f0f5d5e-2d6a-4f2e-9f4e-1b2c3d4e5f60
+                    beneficiaryId: BEN-001
+                    agreementId: AGR-001
+                    createdAt: '2026-11-23T12:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/authorizations/{beneficiaryId}:
+    get:
+      tags:
+        - Authorizations
+      operationId: findAuthorization
+      summary: Consulta a autorização de um beneficiário
+      description: Devolve a autorização registrada para o beneficiário.
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - $ref: '#/components/parameters/BeneficiaryIdPath'
+      responses:
+        '200':
+          description: Autorização encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Authorization'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/beneficiaries/{beneficiaryId}/agenda:
+    get:
+      tags:
+        - Agenda
+      operationId: getBeneficiaryAgenda
+      summary: Consulta a agenda de descontos futuros
+      description: |
+        Devolve as parcelas futuras do beneficiário na Central. Exige autorização
+        registrada; apenas parcelas `OPEN` são elegíveis para portabilidade.
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - $ref: '#/components/parameters/BeneficiaryIdPath'
+      responses:
+        '200':
+          description: Agenda do beneficiário.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgendaResponse'
+              examples:
+                agenda:
+                  summary: Duas parcelas abertas
+                  value:
+                    beneficiaryId: BEN-001
+                    installments:
+                      - installmentId: PAR-001
+                        agreementId: AGR-001
+                        amount: 450.00
+                        discountDate: '2026-12-05'
+                        status: OPEN
+                      - installmentId: PAR-002
+                        agreementId: AGR-001
+                        amount: 300.00
+                        discountDate: '2027-01-05'
+                        status: OPEN
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/portability-operations:
+    post:
+      tags:
+        - Portability Operations
+      operationId: startPortabilityOperation
+      summary: Cria uma operação de portabilidade
+      description: |
+        Cria a operação com snapshot das parcelas e envia a solicitação assinada à
+        Central. A resposta é `202` porque a confirmação é assíncrona. A mesma
+        `Idempotency-Key` com o mesmo payload devolve a operação existente e o
+        header `Idempotent-Replay: true`; com payload diferente devolve `409`.
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PortabilityOperationRequest'
+            examples:
+              duasParcelas:
+                summary: Portabilidade de duas parcelas
+                value:
+                  beneficiaryId: BEN-001
+                  agreementId: AGR-001
+                  installmentIds:
+                    - PAR-001
+                    - PAR-002
+                  assigneeCreditor: ConsigPort
+                  receivingAccount:
+                    bank: '001'
+                    branch: '1234'
+                    account: 56789-0
+      responses:
+        '202':
+          description: Operação aceita e enviada à Central.
+          headers:
+            Idempotent-Replay:
+              $ref: '#/components/headers/IdempotentReplay'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationAcceptedResponse'
+              examples:
+                aceita:
+                  summary: Operação pendente de confirmação
+                  value:
+                    operationId: c1a2b3c4-d5e6-4f70-8a91-b2c3d4e5f601
+                    protocol: PRT-20261123-0001
+                    status: PENDING
+                    totalAmount: 750.00
+                    createdAt: '2026-11-23T12:00:05Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    get:
+      tags:
+        - Portability Operations
+      operationId: listPortabilityOperations
+      summary: Lista operações de portabilidade
+      description: Lista paginada, opcionalmente filtrada por status.
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - $ref: '#/components/parameters/StatusFilter'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: Página de operações.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationPage'
+              examples:
+                pagina:
+                  summary: Uma operação pendente
+                  value:
+                    items:
+                      - operationId: c1a2b3c4-d5e6-4f70-8a91-b2c3d4e5f601
+                        protocol: PRT-20261123-0001
+                        beneficiaryId: BEN-001
+                        status: PENDING
+                        totalAmount: 750.00
+                        createdAt: '2026-11-23T12:00:05Z'
+                        updatedAt: '2026-11-23T12:00:05Z'
+                    page: 0
+                    size: 20
+                    totalElements: 1
+                    totalPages: 1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/portability-operations/{operationId}:
+    get:
+      tags:
+        - Portability Operations
+      operationId: findPortabilityOperation
+      summary: Consulta uma operação de portabilidade
+      description: Devolve o detalhe completo, incluindo snapshot, conta e motivo de rejeição.
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - $ref: '#/components/parameters/OperationIdPath'
+      responses:
+        '200':
+          description: Operação encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationDetail'
+              examples:
+                detalhe:
+                  summary: Operação concluída
+                  value:
+                    operationId: c1a2b3c4-d5e6-4f70-8a91-b2c3d4e5f601
+                    protocol: PRT-20261123-0001
+                    beneficiaryId: BEN-001
+                    agreementId: AGR-001
+                    status: COMPLETED
+                    totalAmount: 750.00
+                    installments:
+                      - installmentId: PAR-001
+                        agreementId: AGR-001
+                        amount: 450.00
+                        discountDate: '2026-12-05'
+                      - installmentId: PAR-002
+                        agreementId: AGR-001
+                        amount: 300.00
+                        discountDate: '2027-01-05'
+                    assigneeCreditor: ConsigPort
+                    receivingAccount:
+                      bank: '001'
+                      branch: '1234'
+                      account: 56789-0
+                    rejectionReason: null
+                    retryCount: 0
+                    accountUpdatedAt: '2026-11-23T12:00:09Z'
+                    createdAt: '2026-11-23T12:00:05Z'
+                    updatedAt: '2026-11-23T12:00:09Z'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/portability-operations/{operationId}/events:
+    get:
+      tags:
+        - Audit
+      operationId: listOperationEvents
+      summary: Lista a trilha de eventos da operação
+      description: Devolve os eventos em ordem cronológica. A trilha é append-only.
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - $ref: '#/components/parameters/OperationIdPath'
+      responses:
+        '200':
+          description: Eventos da operação.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationEventsResponse'
+              examples:
+                eventos:
+                  summary: Criação e envio
+                  value:
+                    operationId: c1a2b3c4-d5e6-4f70-8a91-b2c3d4e5f601
+                    events:
+                      - eventId: 1
+                        previousStatus: null
+                        newStatus: CREATED
+                        eventType: OPERATION_CREATED
+                        details: Operação criada com 2 parcelas
+                        rawPayload: null
+                        createdAt: '2026-11-23T12:00:05Z'
+                      - eventId: 2
+                        previousStatus: CREATED
+                        newStatus: PENDING
+                        eventType: OPERATION_SUBMITTED
+                        details: Central aceitou a operação com o protocolo PRT-20261123-0001
+                        rawPayload:
+                          protocolo: PRT-20261123-0001
+                        createdAt: '2026-11-23T12:00:05Z'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  parameters:
+    AcceptLanguage:
+      name: Accept-Language
+      in: header
+      required: false
+      description: Idioma das mensagens humanas. Códigos de erro nunca são traduzidos.
+      schema:
+        type: string
+        enum:
+          - pt-BR
+          - en
+          - es
+        default: pt-BR
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: UUID que identifica a tentativa de criação da operação.
+      schema:
+        type: string
+        format: uuid
+    BeneficiaryIdPath:
+      name: beneficiaryId
+      in: path
+      required: true
+      description: Identificador do beneficiário na Central.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+        example: BEN-001
+    OperationIdPath:
+      name: operationId
+      in: path
+      required: true
+      description: Identificador da operação no ConsigPort.
+      schema:
+        type: string
+        format: uuid
+    StatusFilter:
+      name: status
+      in: query
+      required: false
+      description: Filtra a listagem por status.
+      schema:
+        $ref: '#/components/schemas/OperationStatus'
+    Page:
+      name: page
+      in: query
+      required: false
+      description: Página solicitada, começando em zero.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    Size:
+      name: size
+      in: query
+      required: false
+      description: Itens por página.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  headers:
+    IdempotentReplay:
+      description: '`true` quando a operação devolvida já existia para a chave enviada.'
+      schema:
+        type: boolean
+  responses:
+    BadRequest:
+      description: Requisição inválida.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validacao:
+              summary: Campo obrigatório ausente
+              value:
+                code: VALIDATION_ERROR
+                message: O campo beneficiaryId é obrigatório.
+                locale: pt-BR
+                timestamp: '2026-11-23T12:00:06Z'
+                path: /api/v1/authorizations
+                details:
+                  - field: beneficiaryId
+                    message: não pode ser vazio
+    Forbidden:
+      description: Beneficiário sem autorização registrada.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            semAutorizacao:
+              summary: Opt-in ausente
+              value:
+                code: AUTHORIZATION_REQUIRED
+                message: É necessário registrar a autorização antes de consultar a agenda.
+                locale: pt-BR
+                timestamp: '2026-11-23T12:00:06Z'
+                path: /api/v1/beneficiaries/BEN-001/agenda
+                details: []
+    NotFound:
+      description: Recurso não encontrado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            naoEncontrado:
+              summary: Operação inexistente
+              value:
+                code: OPERATION_NOT_FOUND
+                message: Operação não encontrada.
+                locale: pt-BR
+                timestamp: '2026-11-23T12:00:06Z'
+                path: /api/v1/portability-operations/c1a2b3c4-d5e6-4f70-8a91-b2c3d4e5f601
+                details: []
+    Conflict:
+      description: A chave de idempotência já foi usada com outro conteúdo.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            conflito:
+              summary: Payload divergente para a mesma chave
+              value:
+                code: IDEMPOTENCY_CONFLICT
+                message: A chave de idempotência já foi usada com outro conteúdo.
+                locale: pt-BR
+                timestamp: '2026-11-23T12:00:06Z'
+                path: /api/v1/portability-operations
+                details: []
+    UnprocessableEntity:
+      description: Parcela inelegível para portabilidade.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            parcelaInelegivel:
+              summary: Parcela já encerrada
+              value:
+                code: INSTALLMENT_NOT_ELIGIBLE
+                message: A parcela PAR-003 não está aberta.
+                locale: pt-BR
+                timestamp: '2026-11-23T12:00:06Z'
+                path: /api/v1/portability-operations
+                details:
+                  - field: installmentIds
+                    message: PAR-003 está CLOSED
+    ServiceUnavailable:
+      description: Central de Convênios indisponível.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            indisponivel:
+              summary: Falha de integração
+              value:
+                code: CENTRAL_UNAVAILABLE
+                message: Não foi possível concluir a operação com a Central.
+                locale: pt-BR
+                timestamp: '2026-11-23T12:00:06Z'
+                path: /api/v1/portability-operations
+                details: []
+    InternalError:
+      description: Erro interno inesperado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            interno:
+              summary: Falha não classificada
+              value:
+                code: INTERNAL_ERROR
+                message: Não foi possível processar a requisição.
+                locale: pt-BR
+                timestamp: '2026-11-23T12:00:06Z'
+                path: /api/v1/portability-operations
+                details: []
+  schemas:
+    AuthorizationRequest:
+      type: object
+      required:
+        - beneficiaryId
+        - agreementId
+      properties:
+        beneficiaryId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Identificador do beneficiário.
+          example: BEN-001
+        agreementId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Identificador do convênio de origem.
+          example: AGR-001
+    Authorization:
+      type: object
+      required:
+        - authorizationId
+        - beneficiaryId
+        - agreementId
+        - createdAt
+      properties:
+        authorizationId:
+          type: string
+          format: uuid
+          description: Identificador da autorização.
+        beneficiaryId:
+          type: string
+          description: Identificador do beneficiário.
+        agreementId:
+          type: string
+          description: Identificador do convênio.
+        createdAt:
+          type: string
+          format: date-time
+          description: Instante do opt-in.
+    AgendaResponse:
+      type: object
+      required:
+        - beneficiaryId
+        - installments
+      properties:
+        beneficiaryId:
+          type: string
+          description: Identificador do beneficiário.
+        installments:
+          type: array
+          description: Parcelas futuras do beneficiário.
+          items:
+            $ref: '#/components/schemas/Installment'
+    Installment:
+      type: object
+      required:
+        - installmentId
+        - agreementId
+        - amount
+        - discountDate
+        - status
+      properties:
+        installmentId:
+          type: string
+          description: Identificador da parcela.
+          example: PAR-001
+        agreementId:
+          type: string
+          description: Convênio de origem.
+          example: AGR-001
+        amount:
+          type: number
+          format: double
+          minimum: 0
+          description: Valor da parcela.
+          example: 450.00
+        discountDate:
+          type: string
+          format: date
+          description: Data do desconto futuro.
+          example: '2026-12-05'
+        status:
+          $ref: '#/components/schemas/InstallmentStatus'
+    InstallmentStatus:
+      type: string
+      description: Elegibilidade da parcela.
+      enum:
+        - OPEN
+        - CLOSED
+    ReceivingAccount:
+      type: object
+      required:
+        - bank
+        - branch
+        - account
+      properties:
+        bank:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Banco de destino.
+          example: '001'
+        branch:
+          type: string
+          minLength: 1
+          maxLength: 32
+          description: Agência de destino.
+          example: '1234'
+        account:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Conta de destino.
+          example: 56789-0
+    PortabilityOperationRequest:
+      type: object
+      required:
+        - beneficiaryId
+        - agreementId
+        - installmentIds
+        - assigneeCreditor
+        - receivingAccount
+      properties:
+        beneficiaryId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Beneficiário titular das parcelas.
+          example: BEN-001
+        agreementId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Convênio de origem.
+          example: AGR-001
+        installmentIds:
+          type: array
+          minItems: 1
+          description: Parcelas elegíveis selecionadas.
+          items:
+            type: string
+            minLength: 1
+          example:
+            - PAR-001
+            - PAR-002
+        assigneeCreditor:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Credor cessionário que passa a receber as parcelas.
+          example: ConsigPort
+        receivingAccount:
+          $ref: '#/components/schemas/ReceivingAccount'
+    OperationStatus:
+      type: string
+      description: |
+        Estado da operação. `COMPLETED` e `REJECTED` são terminais;
+        `INTEGRATION_ERROR` é retomável e nunca duplica a submissão.
+      enum:
+        - CREATED
+        - PENDING
+        - CONFIRMED
+        - COMPLETED
+        - REJECTED
+        - INTEGRATION_ERROR
+    OperationAcceptedResponse:
+      type: object
+      required:
+        - operationId
+        - protocol
+        - status
+        - totalAmount
+        - createdAt
+      properties:
+        operationId:
+          type: string
+          format: uuid
+          description: Identificador da operação.
+        protocol:
+          type:
+            - string
+            - 'null'
+          description: Protocolo devolvido pela Central; nulo enquanto não aceita.
+          example: PRT-20261123-0001
+        status:
+          $ref: '#/components/schemas/OperationStatus'
+        totalAmount:
+          type: number
+          format: double
+          minimum: 0
+          description: Soma das parcelas.
+          example: 750.00
+        createdAt:
+          type: string
+          format: date-time
+          description: Instante da criação.
+    OperationSummary:
+      type: object
+      required:
+        - operationId
+        - protocol
+        - beneficiaryId
+        - status
+        - totalAmount
+        - createdAt
+        - updatedAt
+      properties:
+        operationId:
+          type: string
+          format: uuid
+          description: Identificador da operação.
+        protocol:
+          type:
+            - string
+            - 'null'
+          description: Protocolo da Central.
+        beneficiaryId:
+          type: string
+          description: Beneficiário titular.
+        status:
+          $ref: '#/components/schemas/OperationStatus'
+        totalAmount:
+          type: number
+          format: double
+          minimum: 0
+          description: Soma das parcelas.
+        createdAt:
+          type: string
+          format: date-time
+          description: Instante da criação.
+        updatedAt:
+          type: string
+          format: date-time
+          description: Instante da última atualização.
+    OperationDetail:
+      allOf:
+        - $ref: '#/components/schemas/OperationSummary'
+        - type: object
+          required:
+            - agreementId
+            - installments
+            - assigneeCreditor
+            - receivingAccount
+            - rejectionReason
+            - retryCount
+            - accountUpdatedAt
+          properties:
+            agreementId:
+              type: string
+              description: Convênio de origem.
+            installments:
+              type: array
+              minItems: 1
+              description: Snapshot das parcelas no momento da solicitação.
+              items:
+                $ref: '#/components/schemas/InstallmentSnapshot'
+            assigneeCreditor:
+              type: string
+              description: Credor cessionário.
+            receivingAccount:
+              $ref: '#/components/schemas/ReceivingAccount'
+            rejectionReason:
+              type:
+                - string
+                - 'null'
+              description: Motivo devolvido pela Central quando rejeitada.
+              example: MARGIN_INSUFFICIENT
+            retryCount:
+              type: integer
+              minimum: 0
+              description: Tentativas de integração já realizadas.
+            accountUpdatedAt:
+              type:
+                - string
+                - 'null'
+              format: date-time
+              description: Instante da atualização da conta de recebimento.
+    InstallmentSnapshot:
+      type: object
+      required:
+        - installmentId
+        - agreementId
+        - amount
+        - discountDate
+      properties:
+        installmentId:
+          type: string
+          description: Identificador da parcela.
+        agreementId:
+          type: string
+          description: Convênio de origem.
+        amount:
+          type: number
+          format: double
+          minimum: 0
+          description: Valor congelado da parcela.
+        discountDate:
+          type: string
+          format: date
+          description: Data do desconto congelada.
+    OperationPage:
+      type: object
+      required:
+        - items
+        - page
+        - size
+        - totalElements
+        - totalPages
+      properties:
+        items:
+          type: array
+          description: Operações da página.
+          items:
+            $ref: '#/components/schemas/OperationSummary'
+        page:
+          type: integer
+          minimum: 0
+          description: Página atual.
+        size:
+          type: integer
+          minimum: 1
+          description: Itens por página.
+        totalElements:
+          type: integer
+          minimum: 0
+          description: Total de operações.
+        totalPages:
+          type: integer
+          minimum: 0
+          description: Total de páginas.
+    OperationEvent:
+      type: object
+      required:
+        - eventId
+        - previousStatus
+        - newStatus
+        - eventType
+        - details
+        - rawPayload
+        - createdAt
+      properties:
+        eventId:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Identificador sequencial do evento.
+        previousStatus:
+          oneOf:
+            - $ref: '#/components/schemas/OperationStatus'
+            - type: 'null'
+          description: Status anterior; nulo na criação.
+        newStatus:
+          $ref: '#/components/schemas/OperationStatus'
+        eventType:
+          $ref: '#/components/schemas/EventType'
+        details:
+          type: string
+          description: Descrição legível do evento.
+        rawPayload:
+          type:
+            - object
+            - 'null'
+          additionalProperties: true
+          description: Payload externo relevante, quando existir.
+        createdAt:
+          type: string
+          format: date-time
+          description: Instante do evento.
+    EventType:
+      type: string
+      description: Tipo estável do evento.
+      enum:
+        - OPERATION_CREATED
+        - OPERATION_SUBMITTED
+        - POLL_ATTEMPT
+        - OPERATION_CONFIRMED
+        - OPERATION_REJECTED
+        - ACCOUNT_UPDATED
+        - OPERATION_COMPLETED
+        - INTEGRATION_FAILED
+    OperationEventsResponse:
+      type: object
+      required:
+        - operationId
+        - events
+      properties:
+        operationId:
+          type: string
+          format: uuid
+          description: Identificador da operação.
+        events:
+          type: array
+          description: Eventos em ordem cronológica.
+          items:
+            $ref: '#/components/schemas/OperationEvent'
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+        - locale
+        - timestamp
+        - path
+        - details
+      properties:
+        code:
+          type: string
+          description: |
+            Código estável e não traduzido. Valores possíveis: `VALIDATION_ERROR`,
+            `AUTHORIZATION_NOT_FOUND`, `AUTHORIZATION_REQUIRED`,
+            `BENEFICIARY_NOT_FOUND`, `OPERATION_NOT_FOUND`,
+            `IDEMPOTENCY_KEY_REQUIRED`, `IDEMPOTENCY_CONFLICT`,
+            `INSTALLMENT_NOT_ELIGIBLE`, `CENTRAL_UNAVAILABLE`, `INTERNAL_ERROR`.
+          example: IDEMPOTENCY_CONFLICT
+        message:
+          type: string
+          description: Mensagem localizada conforme `Accept-Language`.
+        locale:
+          type: string
+          description: Locale negociado.
+          example: pt-BR
+        timestamp:
+          type: string
+          format: date-time
+          description: Instante do erro.
+        path:
+          type: string
+          description: Caminho da requisição.
+        details:
+          type: array
+          description: Detalhes de validação por campo.
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+    ErrorDetail:
+      type: object
+      required:
+        - field
+        - message
+      properties:
+        field:
+          type: string
+          description: Campo ou caminho relacionado ao erro.
+        message:
+          type: string
+          description: Explicação localizada do problema.

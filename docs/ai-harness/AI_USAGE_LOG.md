@@ -173,3 +173,33 @@
    - `.\mvnw.cmd -N validate` e `.\mvnw.cmd -q -DskipTests package` → exit 0.
    - `node scripts/check-ai-log.mjs` → log válido, com todas as sessões e campos obrigatórios.
    - `node scripts/check-specs.mjs`, `node SDD/SKILLS/check-docs/check-docs.mjs .` e `node scripts/check-architecture.mjs` → exit 0.
+
+---
+
+## Sessão #08 — Task 0.5 (Contratos OpenAPI e Vetor HMAC)
+
+- **Data:** 2026-11-24
+- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Branch:** `feat/005-contracts`
+- **Objetivo:** Implementar o contrato primeiro: superfície pública `/api/v1` em inglês, contrato da Central fiel ao edital em português, vetor HMAC compartilhado e verificação automatizada.
+
+### Atividades Realizadas:
+1. **Contrato Público do ConsigPort:**
+   - Criação de [`../../contracts/consigport-api.yaml`](../../contracts/consigport-api.yaml) com autorizações, agenda, criação/listagem/detalhe de operações e trilha de eventos.
+   - `Idempotency-Key` obrigatório no `POST`, `Idempotent-Replay` na resposta, paginação, `Accept-Language` e códigos de erro estáveis em inglês.
+2. **Contrato da Central:**
+   - Criação de [`../../contracts/central-api.yaml`](../../contracts/central-api.yaml) fiel ao edital: `POST /autorizacoes`, `GET /beneficiarios/{id}/agenda`, `POST /operacoes-portabilidade` (`202` + protocolo) e `GET /operacoes-portabilidade/{protocolo}` (`200` ou `204` + `Retry-After`).
+   - Inclusão dos headers HMAC, da idempotência, dos controles de caos e dos endpoints `/_admin/reset` e `/_admin/state`.
+3. **Vetor HMAC Compartilhado:**
+   - Criação de [`../../contracts/hmac-vector.json`](../../contracts/hmac-vector.json) com três vetores (POST de portabilidade, GET de status e POST de autorização), segredo de teste e assinaturas em hexadecimal.
+   - Criação de `scripts/hmac-vector.mjs` para reproduzir os vetores e de `--write` para regerá-los.
+4. **Validação de Contrato:**
+   - Configuração de `.spectral.yaml` com o ruleset `spectral:oas`.
+   - Spectral sem erros nem avisos nos dois contratos.
+5. **Catálogo de Erros:**
+   - Inclusão de `BENEFICIARY_NOT_FOUND` no core e de `REQUISICAO_INVALIDA`, `SEM_AUTORIZACAO`, `BENEFICIARIO_NAO_ENCONTRADO` e `PARCELA_INVALIDA` na Central, refletidos em [`../../SDD/ARCHITECTURE.md`](../../SDD/ARCHITECTURE.md).
+6. **Validação:**
+   - `node scripts/hmac-vector.mjs` → 3 vetores reproduzidos com HMAC-SHA256.
+   - `npx @stoplight/spectral-cli@6 lint ... --fail-severity=warn` → zero erros e zero avisos.
+   - `node scripts/check-specs.mjs`, `node SDD/SKILLS/check-docs/check-docs.mjs .` e `node scripts/check-architecture.mjs` → exit 0.
+7. **Entrega:** commit e PR para `develop` com a Task 0.5 concluída e evidência em [`../../SDD/docs/EVIDENCE.md`](../../SDD/docs/EVIDENCE.md).

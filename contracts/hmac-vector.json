@@ -1,0 +1,36 @@
+{
+  "algorithm": "HMAC-SHA256",
+  "description": "Vetor compartilhado entre o backend ConsigPort e o mock da Central. O corpo canônico usa JSON com chaves ordenadas, sem espaços e UTF-8; o campo assinatura do POST externo não entra no corpo assinado.",
+  "secret": "consigport-hmac-test-secret-2026",
+  "timeToleranceSeconds": 300,
+  "canonicalTemplate": "METHOD\\nPATH_WITH_QUERY\\nTIMESTAMP\\nSHA256_HEX(body)",
+  "vectors": [
+    {
+      "name": "post-portability",
+      "method": "POST",
+      "path": "/operacoes-portabilidade",
+      "timestamp": 1795435205,
+      "body": "{\"beneficiarioId\":\"BEN-001\",\"contaRecebimento\":{\"agencia\":\"1234\",\"banco\":\"001\",\"conta\":\"56789-0\"},\"credorCessionario\":\"ConsigPort\",\"parcelas\":[\"PAR-001\",\"PAR-002\"]}",
+      "canonical": "POST\n/operacoes-portabilidade\n1795435205\nb63ee3b9e30a4915424bb67a55f0daed5a5451f3f724c7bcbac0e5728af962c9",
+      "signature": "cfd6a19397032e89d21d7a0321725f71ae78985c6cfdfd71eef2d01d5c49510c"
+    },
+    {
+      "name": "get-status",
+      "method": "GET",
+      "path": "/operacoes-portabilidade/PRT-20261123-0001",
+      "timestamp": 1795435205,
+      "body": "",
+      "canonical": "GET\n/operacoes-portabilidade/PRT-20261123-0001\n1795435205\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "signature": "795cbaa776f88831d6f8e614b9a976155b9b04a4cdf3d418d44d7edb09df0ada"
+    },
+    {
+      "name": "post-authorization",
+      "method": "POST",
+      "path": "/autorizacoes",
+      "timestamp": 1795435205,
+      "body": "{\"beneficiarioId\":\"BEN-001\",\"convenioId\":\"AGR-001\"}",
+      "canonical": "POST\n/autorizacoes\n1795435205\n4abc22835a3ee0d2568969b00ba351dfd88a9d6616a5f270b241a71b98e9b3ea",
+      "signature": "f4993d399c7c414db6adaee6b720cf347156a367624d5e83e42eb6809448800c"
+    }
+  ]
+}

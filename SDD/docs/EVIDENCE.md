@@ -236,3 +236,72 @@
 - `docs/quality/GATES.md`
 - `SDD/specs/PLAN.md`
 - `SDD/docs/EVIDENCE.md`
+
+---
+
+### Task 0.5 — Contratos OpenAPI e Vetor HMAC
+
+- **Data de Conclusão:** 2026-11-24
+- **Branch:** `feat/005-contracts`
+- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Objetivo:** Contrato primeiro. Superfície pública `/api/v1` em inglês, contrato da
+  Central fiel ao edital em português, vetor HMAC compartilhado e verificação
+  automatizada de ambos.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Contratos validados pelo Spectral (zero erros e zero avisos):**
+   ```powershell
+   npx @stoplight/spectral-cli@6 lint contracts/consigport-api.yaml contracts/central-api.yaml --fail-severity=warn
+   ```
+   *Saída obtida:*
+   ```text
+   No results with a severity of 'warn' or higher found!
+   exit=0
+   ```
+
+2. **Vetor HMAC reproduzido deterministicamente:**
+   ```powershell
+   node scripts/hmac-vector.mjs
+   ```
+   *Saída obtida:*
+   ```text
+   ✓ HMAC vector: 3 vectors reproduced with HMAC-SHA256.
+   exit=0
+   ```
+
+3. **Invariantes de especificação, links e arquitetura:**
+   ```powershell
+   node scripts/check-specs.mjs
+   node SDD/SKILLS/check-docs/check-docs.mjs .
+   node scripts/check-architecture.mjs
+   ```
+   *Saída obtida:*
+   ```text
+   ✓ SDD specifications valid: ... (exit 0)
+   ✓ 60 documents, every relative link resolves. (exit 0)
+   🎉 Todos os 22 testes de validação dos desenhos e arquitetura passaram com sucesso! (exit 0)
+   ```
+
+#### Conteúdo Entregue:
+- **API pública:** autorizações, agenda, criação/listagem/detalhe de operações e trilha
+  de eventos, com `Idempotency-Key`, `Idempotent-Replay`, paginação e erros localizados.
+- **API da Central:** `POST /autorizacoes`, `GET /beneficiarios/{id}/agenda`,
+  `POST /operacoes-portabilidade`, `GET /operacoes-portabilidade/{protocolo}` com
+  `202`/`204` + `Retry-After`, HMAC, idempotência, caos e administração.
+- **Vetor HMAC:** três requisições canônicas (POST de portabilidade, GET de status e
+  POST de autorização) com segredo de teste e assinatura verificável por script.
+- **Catálogo de erros:** códigos `BENEFICIARY_NOT_FOUND` no core e
+  `REQUISICAO_INVALIDA`, `SEM_AUTORIZACAO`, `BENEFICIARIO_NAO_ENCONTRADO` e
+  `PARCELA_INVALIDA` na Central, refletidos no `ARCHITECTURE.md`.
+
+#### Arquivos Tocados:
+- `contracts/consigport-api.yaml`
+- `contracts/central-api.yaml`
+- `contracts/hmac-vector.json`
+- `scripts/hmac-vector.mjs`
+- `.spectral.yaml`
+- `SDD/ARCHITECTURE.md`
+- `SDD/specs/PLAN.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`
