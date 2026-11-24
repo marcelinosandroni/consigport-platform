@@ -22,6 +22,7 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
 | Portão | Escopo | Execução Local | CI no PR (`develop`/`staging`/`main`) | Push `develop` (CD Staging) | Push `main` (Release) | Nightly (Cron) |
 |---|---|:---:|:---:|:---:|:---:|:---:|
 | **Docs & Links** | Markdown, links relativos, integridade SDD | ✅ | ✅ | — | — | — |
+| **AI Usage Log** | Estrutura das sessões e atualização no PR | ✅ | ✅ | — | — | — |
 | **Backend Lint** | Spotless (formatação Java) | ✅ | ✅ | — | — | — |
 | **Backend Unit & Arch** | JUnit 5 + AssertJ + ArchUnit | ✅ | ✅ | — | — | — |
 | **Backend Integration** | Testcontainers (PostgreSQL 16) + JaCoCo | ✅ | ✅ | — | — | — |
@@ -44,6 +45,7 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
   node SDD/SKILLS/check-docs/check-docs.mjs .
   node scripts/check-specs.mjs
   node scripts/check-architecture.mjs
+  node scripts/check-ai-log.mjs
   ```
 - **Critérios de Aceite:**
   - Zero links relativos quebrados em toda a árvore Markdown (`check-docs`).
@@ -51,6 +53,7 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
   - Presença de todos os documentos obrigatórios do SDD Tier 1 e Tier 2.
   - Desenhos de arquitetura validados (SVGs nativos, blocos Mermaid suportados, camadas hexagonais e matriz de rastreabilidade).
   - Registro de evidência em [`../../SDD/docs/EVIDENCE.md`](../../SDD/docs/EVIDENCE.md) para tarefas finalizadas.
+  - [`../ai-harness/AI_USAGE_LOG.md`](../ai-harness/AI_USAGE_LOG.md) com sessões numeradas, campos obrigatórios e cronologia; no PR, log alterado e ao menos uma sessão nova quando houver mudança de trabalho.
 
 ---
 
