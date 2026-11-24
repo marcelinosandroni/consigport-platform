@@ -207,13 +207,32 @@
    🎉 Todos os 22 testes de validação dos desenhos e arquitetura passaram com sucesso! (exit 0)
    ```
 
+5. **Portão do AI Usage Log (hook e estrutura):**
+   ```powershell
+   node scripts/check-ai-log.mjs
+   node scripts/check-ai-log.mjs --staged   # com trabalho staged e sem o log
+   ```
+   *Saída obtida:*
+   ```text
+   ✓ AI usage log: 7 sessions, structure valid. (exit 0)
+   ✗ AI usage log: staging 1 project file(s) requires staging
+     docs/ai-harness/AI_USAGE_LOG.md with a new session. (exit 1, esperado)
+   ```
+
 #### Arquivos Tocados:
 - `pom.xml`
 - `mvnw`
 - `mvnw.cmd`
 - `.mvn/wrapper/maven-wrapper.properties`
 - `.mvn/jvm.config`
+- `.gitattributes`
 - `backend/pom.xml`
 - `central-convenios-mock/pom.xml`
+- `scripts/check-ai-log.mjs`
+- `.githooks/pre-commit`
+- `.github/workflows/ci-docs.yml`
+- `docs/ai-harness/AI_USAGE_LOG.md`
+- `docs/ai-harness/HARNESS_OVERVIEW.md`
+- `docs/quality/GATES.md`
 - `SDD/specs/PLAN.md`
 - `SDD/docs/EVIDENCE.md`
