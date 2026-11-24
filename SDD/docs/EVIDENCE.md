@@ -149,3 +149,71 @@
 - `compose.yaml`
 - `SDD/specs/PLAN.md`
 - `SDD/docs/EVIDENCE.md`
+
+---
+
+### Task 0.4 — Maven Wrapper e reactor raiz
+
+- **Data de Conclusão:** 2026-11-24
+- **Branch:** `feat/004-maven-reactor`
+- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Objetivo:** Build Java reprodutível sem Maven global. Wrapper oficial 3.3.4
+  (`only-script`) apontando para Maven 3.10.2, reactor raiz em Java 21 + Spring Boot
+  3.5.16 e módulos mínimos `backend` e `central-convenios-mock`.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Wrapper resolve o Maven distribuído e encontra o Java 21:**
+   ```powershell
+   .\mvnw.cmd -v
+   ```
+   *Saída obtida:*
+   ```text
+   Apache Maven 3.10.2 (61b8bc355f4c4325463c22aa9afe4e7811a290f8)
+   Maven home: C:\Users\marcelino\.m2\wrapper\dists\apache-maven-3.10.2\...
+   Java version: 21.0.12, vendor: Oracle Corporation
+   exit=0
+   ```
+
+2. **Reactor válido na raiz (não recursivo):**
+   ```powershell
+   .\mvnw.cmd -N validate
+   ```
+   *Saída obtida:*
+   ```text
+   [INFO] BUILD SUCCESS
+   exit=0
+   ```
+
+3. **Build completo dos dois módulos sem testes:**
+   ```powershell
+   .\mvnw.cmd -q -DskipTests package
+   ```
+   *Saída obtida:*
+   ```text
+   exit=0
+   ```
+
+4. **Invariantes de especificação, links e arquitetura:**
+   ```powershell
+   node scripts/check-specs.mjs
+   node SDD/SKILLS/check-docs/check-docs.mjs .
+   node scripts/check-architecture.mjs
+   ```
+   *Saída obtida:*
+   ```text
+   ✓ SDD specifications valid: ... (exit 0)
+   ✓ 60 documents, every relative link resolves. (exit 0)
+   🎉 Todos os 22 testes de validação dos desenhos e arquitetura passaram com sucesso! (exit 0)
+   ```
+
+#### Arquivos Tocados:
+- `pom.xml`
+- `mvnw`
+- `mvnw.cmd`
+- `.mvn/wrapper/maven-wrapper.properties`
+- `.mvn/jvm.config`
+- `backend/pom.xml`
+- `central-convenios-mock/pom.xml`
+- `SDD/specs/PLAN.md`
+- `SDD/docs/EVIDENCE.md`

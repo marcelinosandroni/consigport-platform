@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       Parent — Spring Boot BOM inherits dependency management
+       ═══════════════════════════════════════════════════════════ -->
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.5.16</version>
+    <relativePath/>
+  </parent>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       Root reactor coordinates
+       ═══════════════════════════════════════════════════════════ -->
+  <groupId>br.com.consigport</groupId>
+  <artifactId>consigport-platform</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>ConsigPort Platform</name>
+  <description>Plataforma de Portabilidade de Convênios de Desconto em Folha</description>
+  <url>https://github.com/marcelinosandroni/consigport-platform</url>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       Modules (order matters for reactor build)
+       ═══════════════════════════════════════════════════════════ -->
+  <modules>
+    <module>backend</module>
+    <module>central-convenios-mock</module>
+  </modules>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       Global properties
+       ═══════════════════════════════════════════════════════════ -->
+  <properties>
+    <!-- Java -->
+    <java.version>21</java.version>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <!-- Dependency versions not in Spring Boot BOM -->
+    <archunit.version>1.4.2</archunit.version>
+    <springdoc.version>2.8.9</springdoc.version>
+    <testcontainers.version>1.21.1</testcontainers.version>
+    <resilience4j.version>2.3.0</resilience4j.version>
+
+    <!-- Plugin versions -->
+    <jacoco.version>0.8.12</jacoco.version>
+    <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
+    <maven-surefire-plugin.version>3.5.3</maven-surefire-plugin.version>
+    <maven-failsafe-plugin.version>3.5.3</maven-failsafe-plugin.version>
+
+    <!-- Coverage threshold (enforced by JaCoCo) -->
+    <jacoco.line.coverage>0.80</jacoco.line.coverage>
+
+    <!-- Late-replaced by JaCoCo's prepare-agent; empty when a module has no agent. -->
+    <argLine></argLine>
+  </properties>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       Dependency management (supplements Spring Boot BOM)
+       ═══════════════════════════════════════════════════════════ -->
+  <dependencyManagement>
+    <dependencies>
+      <!-- ArchUnit for hexagonal boundary enforcement -->
+      <dependency>
+        <groupId>com.tngtech.archunit</groupId>
+        <artifactId>archunit-junit5</artifactId>
+        <version>${archunit.version}</version>
+        <scope>test</scope>
+      </dependency>
+
+      <!-- SpringDoc OpenAPI (Swagger UI) -->
+      <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+        <version>${springdoc.version}</version>
+      </dependency>
+
+      <!-- Testcontainers BOM -->
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers-bom</artifactId>
+        <version>${testcontainers.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!-- Resilience4j BOM -->
+      <dependency>
+        <groupId>io.github.resilience4j</groupId>
+        <artifactId>resilience4j-bom</artifactId>
+        <version>${resilience4j.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       Build — plugin management (child modules inherit)
+       ═══════════════════════════════════════════════════════════ -->
+  <build>
+    <pluginManagement>
+      <plugins>
+
+        <!-- Java 21 compiler (enable-preview ready) -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>${maven-compiler-plugin.version}</version>
+          <configuration>
+            <release>21</release>
+            <parameters>true</parameters>
+            <compilerArgs>
+              <arg>-Xlint:all</arg>
+              <arg>-Xlint:-processing</arg>
+            </compilerArgs>
+          </configuration>
+        </plugin>
+
+        <!-- Surefire — unit tests -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>${maven-surefire-plugin.version}</version>
+          <configuration>
+            <argLine>@{argLine} --add-opens java.base/java.lang=ALL-UNNAMED</argLine>
+          </configuration>
+        </plugin>
+
+        <!-- Failsafe — integration tests (*IT.java) -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-failsafe-plugin</artifactId>
+          <version>${maven-failsafe-plugin.version}</version>
+        </plugin>
+
+        <!-- JaCoCo — coverage instrumentation and threshold check -->
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>${jacoco.version}</version>
+          <executions>
+            <execution>
+              <id>prepare-agent</id>
+              <goals><goal>prepare-agent</goal></goals>
+            </execution>
+            <execution>
+              <id>report</id>
+              <phase>verify</phase>
+              <goals><goal>report</goal></goals>
+            </execution>
+            <execution>
+              <id>check</id>
+              <phase>verify</phase>
+              <goals><goal>check</goal></goals>
+              <configuration>
+                <rules>
+                  <rule>
+                    <element>BUNDLE</element>
+                    <limits>
+                      <limit>
+                        <counter>LINE</counter>
+                        <value>COVEREDRATIO</value>
+                        <minimum>${jacoco.line.coverage}</minimum>
+                      </limit>
+                    </limits>
+                  </rule>
+                </rules>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+
+      </plugins>
+    </pluginManagement>
+  </build>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       Profiles
+       ═══════════════════════════════════════════════════════════ -->
+  <profiles>
+    <!-- CI profile: fail fast on coverage, enable failsafe -->
+    <profile>
+      <id>ci</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-failsafe-plugin</artifactId>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>integration-test</goal>
+                  <goal>verify</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+
+</project>
