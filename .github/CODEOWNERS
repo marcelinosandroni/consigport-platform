@@ -1,0 +1,22 @@
+# CODEOWNERS — ConsigPort Governance
+# Cada alteração em especificações, contratos, governança e pipelines exige revisão.
+
+# Padrão global
+*                   @marcelinosandroni
+
+# Especificações e regras SDD
+/SDD/               @marcelinosandroni
+/AGENTS.md          @marcelinosandroni
+
+# Contratos de API (OpenAPI 3.1)
+/contracts/         @marcelinosandroni
+
+# Pipelines de CI/CD e governança GitHub
+/.github/           @marcelinosandroni
+/scripts/           @marcelinosandroni
+
+# Arquitetura e decisões técnicas
+/docs/adr/          @marcelinosandroni
+/docs/architecture/ @marcelinosandroni
+/docs/quality/      @marcelinosandroni
+/docs/ai-harness/   @marcelinosandroni
