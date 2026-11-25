@@ -79,14 +79,18 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
 ---
 
 ### 3.3. Portão de Contratos de API (OpenAPI 3.1)
+- **Workflow:** [`.github/workflows/ci-contracts.yml`](../../.github/workflows/ci-contracts.yml) (dispara em `contracts/**`, `.spectral.yaml` e `scripts/hmac-vector.mjs`).
 - **Comandos:**
   ```bash
-  npx @stoplight/spectral-cli lint contracts/*.yaml
-  oasdiff changelog contracts/consigport-api.yaml origin/main:contracts/consigport-api.yaml --fail-on ERR
+  npx --yes @stoplight/spectral-cli@6 lint contracts/*.yaml --fail-severity=warn
+  node scripts/hmac-vector.mjs
+  oasdiff breaking <contrato da branch base> contracts/consigport-api.yaml --fail-on ERR
+  oasdiff breaking <contrato da branch base> contracts/central-api.yaml --fail-on ERR
   ```
 - **Critérios de Aceite:**
   - Contratos `contracts/consigport-api.yaml` e `contracts/central-api.yaml` válidos e sem erros no linter Spectral.
-  - Ausência de breaking changes em relação à branch `main` (`oasdiff`).
+  - Ausência de breaking changes em relação ao contrato da branch base; a primeira introdução
+    do contrato é aceita e o diff é pulado com aviso no log do workflow (`oasdiff`).
   - Coerência estrita entre endpoints expostos pelo Springdoc (`/v3/api-docs`) e o contrato versionado.
   - Vetor de assinatura HMAC validado deterministicamente contra `contracts/hmac-vector.json`.
 
