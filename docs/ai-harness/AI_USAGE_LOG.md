@@ -311,3 +311,40 @@
    - `npm run --prefix frontend lint`, `typecheck` e `test:unit` → exit 0 (1 teste).
    - `npm run --prefix frontend dev` → `dev_status=200` com HTML servido em `lang="pt-BR"`.
 7. **Entrega:** branch `feat/008-frontend-base` com commits e PR para `develop`.
+
+---
+
+## Sessão #13 — Task 0.9 (Shell RSC e tema Matrix)
+
+- **Data:** 2026-11-25
+- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Branch:** `feat/009-shell-matrix`
+- **Objetivo:** Casca visual navegável dark-only, conforme o `DESIGN.md`, com tokens verbatim, fontes locais e primitivas reutilizáveis.
+
+### Atividades Realizadas:
+1. **Fontes Locais:**
+   - `@fontsource/manrope`, `@fontsource/jetbrains-mono` e `@fontsource/playfair-display` adicionados ao `frontend/package.json`, com apenas o subset latino.
+   - `src/styles.css` declara `--font-manrope`, `--font-jetbrains-mono` e `--font-playfair`, que o `theme.css` consome; nenhuma requisição externa, nenhum deslocamento de layout.
+2. **Tema e Canvas:**
+   - `src/theme.css` permanece como cópia verbatim de `SDD/themes/matrix/tokens.css`, guardada por `scripts/check-theme-tokens.mjs`.
+   - `src/styles.css` importa Tailwind 4, os tokens e aplica o canvas Tier 0 com a grade de micro-pontos de 1px.
+3. **Primitivas (`src/shared/ui/`):**
+   - `button.tsx` (primary, secondary e ghost, com `buttonClasses` para âncoras), `badge.tsx` (neutral e highlight), `card.tsx` (superfície Tier 1) e `stat-card.tsx` (cabeçalho mono, número, anotação e status).
+   - Nenhum literal hexadecimal em componente: tudo vem dos tokens.
+4. **Shell e Rotas:**
+   - `src/app/shell.tsx` monta a navegação de vidro sobre o canvas, a coluna de conteúdo de 1320px e o rodapé, com alvos de toque de 44px.
+   - `src/app/router.tsx` resolve o caminho para a página e devolve a 404 dentro do mesmo shell; `src/app/pages/` traz a home, a página de seção e a 404.
+   - `src/root.tsx` passa a renderizar o shell e a rota resolvida.
+5. **Testes:**
+   - `src/app/router.test.tsx` cobre home, seção, barra final e 404; `src/shared/ui/stat-card.test.tsx` cobre rótulo, número, anotação e status.
+   - Vitest: 3 arquivos e 7 testes verdes.
+6. **Auditoria Geométrica (`DESIGN.md` §4b):**
+   - Viewports de 390px e 1440px auditadas em navegador real: `scrollWidth` igual a `clientWidth`, nenhum elemento fora da viewport, nenhum alvo de toque abaixo de 44×44px.
+   - O texto de 11px detectado é apenas o chrome `label-mono` (navegação, badge e rótulos de stat card), que o `DESIGN.md` §4b.2.3 permite explicitamente.
+7. **Guard dos Tokens no CI:**
+   - `scripts/check-theme-tokens.mjs` passa a normalizar quebras de linha antes de comparar, porque o `.gitattributes` garante LF no repositório enquanto a árvore de trabalho do Windows pode guardar CRLF.
+   - O workflow de documentação executa o guard e dispara quando `frontend/src/theme.css` ou `SDD/themes/**` mudam.
+8. **Validação:**
+   - `npm run --prefix frontend build` → exit 0 nos três ambientes; CSS do cliente em 20,23 kB (4,50 kB gzip) depois de restringir os subsets das fontes.
+   - `npm run --prefix frontend lint`, `typecheck` e `test:unit` → exit 0.
+9. **Entrega:** branch `feat/009-shell-matrix` com commits e PR para `develop`.

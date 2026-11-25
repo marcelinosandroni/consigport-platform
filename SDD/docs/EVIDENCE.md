@@ -556,3 +556,100 @@
 - `frontend/src/test/setup.ts`, `frontend/src/test/client-counter.test.tsx`
 - `scripts/check-theme-tokens.mjs`
 - `SDD/specs/PLAN.md`, `SDD/docs/EVIDENCE.md`, `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 0.9 — Shell RSC e Design Matrix
+
+- **Data de Conclusão:** 2026-11-25
+- **Branch:** `feat/009-shell-matrix`
+- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Objetivo:** Casca visual navegável dark-only, conforme o `DESIGN.md`, com tokens
+  verbatim, fontes locais, primitivas reutilizáveis e as três viewports do §4b provadas.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Build dos três ambientes RSC:**
+   ```powershell
+   npm run --prefix frontend build
+   ```
+   *Saída obtida:*
+   ```text
+   dist/rsc/assets/index-CQ-rpez6.css              20.23 kB
+   dist/client/assets/index-CQ-rpez6.css           20.23 kB │ gzip: 4.50 kB
+   dist/client/assets/index-D2VVaZFS.js           221.90 kB │ gzip: 69.82 kB
+   dist/ssr/index.js                            1,581.90 kB
+   build_exit=0
+   ```
+
+2. **Qualidade do frontend:**
+   ```powershell
+   npm run --prefix frontend lint
+   npm run --prefix frontend typecheck
+   npm run --prefix frontend test:unit
+   ```
+   *Saída obtida:*
+   ```text
+   lint_exit=0
+   typecheck_exit=0
+    Test Files  3 passed (3)
+         Tests  7 passed (7)
+   test_exit=0
+   ```
+
+3. **Auditoria geométrica do `DESIGN.md` §4b em navegador real (Chrome headless, CDP):**
+   ```text
+   mobile 390x844:
+     scrollWidth=390  clientWidth=390  offenders=[]  small=[]
+   desktop 1440x1000:
+     scrollWidth=1440 clientWidth=1440 offenders=[]  small=[]
+   404 em 390x844:
+     scrollWidth=390  clientWidth=390  offenders=[]  small=[]
+   ```
+   Nenhum elemento fora da viewport, nenhum alvo de toque abaixo de 44×44px. O único
+   texto abaixo de 13px é o chrome `label-mono` (navegação, badge e rótulos de stat
+   card), explicitamente permitido pelo §4b.2.3.
+
+4. **Tokens sem deriva:**
+   ```powershell
+   node scripts/check-theme-tokens.mjs
+   ```
+   *Saída obtida:*
+   ```text
+   ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css (line endings normalized).
+   tokens_exit=0
+   ```
+   O guard também roda no workflow de documentação e dispara quando
+   `frontend/src/theme.css` ou `SDD/themes/**` mudam.
+
+5. **Invariantes de especificação, links e arquitetura:**
+   ```powershell
+   node scripts/check-specs.mjs
+   node SDD/SKILLS/check-docs/check-docs.mjs .
+   node scripts/check-architecture.mjs
+   ```
+   *Saída obtida:* exit 0 nos três.
+
+#### Conteúdo Entregue:
+- **Shell (`src/app/shell.tsx`):** navegação de vidro (`backdrop-blur`, 82% de opacidade)
+  sobre o canvas Tier 0 com grade de micro-pontos, coluna de conteúdo de 1320px e
+  rodapé; alvos de toque de 44px e navegação que quebra em vez de estourar a largura.
+- **Rotas (`src/app/router.tsx`):** `/`, `/portabilidade`, `/agenda` e `/auditoria`, com
+  barra final normalizada e 404 renderizada dentro do mesmo shell.
+- **Primitivas (`src/shared/ui/`):** `Button` (primary, secondary, ghost), `Badge`
+  (neutral, highlight), `Card` e `StatCard` — sem literal hexadecimal, só tokens.
+- **Fontes:** `@fontsource` de Manrope, JetBrains Mono e Playfair Display, apenas subset
+  latino, servidas localmente.
+- **Testes:** quatro casos de rota (home, seção, barra final, 404) e dois casos de
+  stat card (conteúdo e status).
+
+#### Arquivos Tocados:
+- `frontend/package.json`, `frontend/package-lock.json`
+- `frontend/src/styles.css`, `frontend/src/root.tsx`
+- `frontend/src/app/shell.tsx`, `frontend/src/app/router.tsx`, `frontend/src/app/router.test.tsx`
+- `frontend/src/app/pages/home.tsx`, `frontend/src/app/pages/section.tsx`, `frontend/src/app/pages/not-found.tsx`
+- `frontend/src/shared/ui/button.tsx`, `badge.tsx`, `card.tsx`, `stat-card.tsx`, `stat-card.test.tsx`
+- `.gitignore`
+- `.github/workflows/ci-docs.yml`
+- `scripts/check-theme-tokens.mjs`
+- `SDD/specs/PLAN.md`, `SDD/docs/EVIDENCE.md`, `docs/ai-harness/AI_USAGE_LOG.md`

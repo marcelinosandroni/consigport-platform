@@ -37,6 +37,7 @@ dist/
 dist-ssr/
 build/
 .next/
+.vite/
 *.tsbuildinfo
 .npm
 .yarn/

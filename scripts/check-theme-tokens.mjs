@@ -23,7 +23,11 @@ if (!fs.existsSync(COPY)) fail(`${COPY} not found.`);
 const source = fs.readFileSync(SOURCE, "utf8");
 const copy = fs.readFileSync(COPY, "utf8");
 
-if (source !== copy) {
+// The repository stores both files with LF (see .gitattributes), but a Windows
+// working tree may still hold CRLF. Line endings are not design drift.
+const normalize = (text) => text.replace(/\r\n/g, "\n");
+
+if (normalize(source) !== normalize(copy)) {
   fail(`${COPY} diverged from ${SOURCE}; copy the source again.`);
 }
 
@@ -31,4 +35,4 @@ if (!source.includes("@theme")) {
   fail(`${SOURCE} does not declare a Tailwind @theme block.`);
 }
 
-console.log(`✓ Theme tokens: ${COPY} matches ${SOURCE} byte for byte.`);
+console.log(`✓ Theme tokens: ${COPY} matches ${SOURCE} (line endings normalized).`);

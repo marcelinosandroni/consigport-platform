@@ -44,7 +44,10 @@
       Branch `feat/008-frontend-base`. Template oficial `rsc` do Vite com React 19.2,
       Tailwind 4 consumindo os tokens do `DESIGN.md` e scripts `dev`, `build`, `lint`,
       `typecheck` e `test:unit`.
-- [ ] 0.9 — Shell RSC, tema Matrix e fontes locais
+- [x] **0.9 — Shell RSC, tema Matrix e fontes locais**
+      Branch `feat/009-shell-matrix`. Casca visual dark-only, responsiva nas três
+      viewports do `DESIGN.md` §4b, com `theme.css` verbatim, fontes `@fontsource`
+      e primitivas em `src/shared/ui/`.
 - [ ] 0.10 — `ci.yml` completo e `nightly.yml`
 - [ ] 0.11 — `release-please`, `release.yml`, `cd-staging.yml` e imagens GHCR
 
