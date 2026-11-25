@@ -56,9 +56,10 @@ flowchart LR
    atualiza) o PR `chore(main): release vX.Y.Z` com o CHANGELOG.
 3. **Tag.** O merge desse PR cria a tag `vX.Y.Z` e a release no GitHub. Ninguém
    escreve a tag à mão: ela vem dos commits.
-4. **Imagens.** No mesmo run, o job `publish-images` constrói e publica as três imagens
-   no GHCR com as tags `vX.Y.Z`, `X.Y.Z` e `latest`. Uma pré-release (`v1.0.0-rc.1`)
-   não move a `latest`.
+4. **Imagens.** O push da tag dispara o job `publish-images`, que constrói e publica as
+   três imagens no GHCR com as tags `vX.Y.Z`, `X.Y.Z` e `latest`. Uma pré-release
+   (`v1.0.0-rc.1`) não move a `latest`. As imagens saem sempre do commit etiquetado,
+   nunca da branch que disparou o workflow.
 5. **Staging.** O push da tag dispara o job `deploy-staging`, que sobe
    `compose.staging.yaml` com as imagens publicadas e exige healthcheck verde nos três
    serviços.
@@ -119,7 +120,7 @@ curl -fsS -o /dev/null http://localhost:5173/
 
 | Situação | Ação |
 |---|---|
-| Imagem com defeito | Republicar a tag anterior: `workflow_dispatch` em `release.yml` com a tag `vX.Y.Z` antiga, ou reconstruir a tag boa e republicar. |
+| Imagem com defeito | Republicar a tag anterior: `workflow_dispatch` em `release.yml` com a tag `vX.Y.Z` antiga. O job reconstrói as três imagens a partir do commit etiquetado e republica as mesmas tags no GHCR. |
 | Staging quebrado | `workflow_dispatch` em `cd-staging.yml` com a tag anterior; o ambiente volta ao stack anterior. |
 | Release errada no GitHub | Editar a release e mover a tag (`git tag -f vX.Y.Z <commit> && git push --force origin vX.Y.Z`) só com o repositório em modo admin. |
 

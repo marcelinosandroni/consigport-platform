@@ -2,10 +2,10 @@ name: Release
 
 # release-please turns the Conventional Commits merged into main into a
 # release PR; merging that PR creates the SemVer tag and the GitHub release.
-# The same run publishes the three images to GHCR under that tag.
+# The tag push is what publishes the three images to GHCR under that tag.
 #
-# A tag pushed by hand (or by another tool) also publishes the images: the
-# tag is the contract between the release and the environment.
+# The tag is the contract between the release and the environment: a tag
+# pushed by hand (or by another tool) publishes the images too.
 on:
   push:
     branches:
@@ -13,6 +13,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag whose images must be published again'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -43,10 +48,14 @@ jobs:
 
   publish-images:
     name: Publish ${{ matrix.image }} to GHCR
-    needs: release-please
-    # Either release-please just created the tag, or the workflow was triggered
-    # by a tag push.
-    if: ${{ needs.release-please.outputs.tag != '' || github.ref_type == 'tag' }}
+    # The tag is the contract: the images are published for the tagged commit
+    # and for nothing else. This job deliberately does NOT depend on
+    # release-please: that job is skipped on a tag push, and a skipped need
+    # takes the dependent job down with it, which would kill the publish.
+    #
+    # workflow_dispatch republishes an existing tag, which is the rollback
+    # path documented in docs/process/RELEASE.md.
+    if: github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -62,10 +71,14 @@ jobs:
           - image: frontend
             dockerfile: frontend/Dockerfile
     env:
-      IMAGE_TAG: ${{ needs.release-please.outputs.tag || github.ref_name }}
+      IMAGE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          # The images always come from the tagged commit, never from the
+          # branch that happens to be running the workflow.
+          ref: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v4.4.1
