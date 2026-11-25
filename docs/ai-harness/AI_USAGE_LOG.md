@@ -475,3 +475,24 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
 6. **Validação:**
    - `node scripts/check-ai-log.mjs` → log válido.
    - `node scripts/check-specs.mjs`, `node SDD/SKILLS/check-docs/check-docs.mjs .` e `node scripts/check-architecture.mjs` → exit 0.
+
+---
+
+## Sessão #17 — Fechamento da Task 0.11: Evidência e Gatilho de Publicação
+
+- **Data:** 2026-11-25
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
+- **Branch:** `fix/011-release-closure`
+- **Objetivo:** Fechar a task 0.11 com a evidência colada e corrigir o gatilho que publica as imagens no GHCR.
+
+### Atividades Realizadas:
+1. **Evidência da Task 0.11:**
+   - Dry-run do release-please propondo `v0.1.0`, build das três imagens, `actionlint`, `compose config -q` e stack de staging com os quatro serviços `healthy`.
+   - Task 0.11 marcada `[x]` e task 0.12 (promoção da `v0.1.0` e arquivamento da fase) aberta no `PLAN.md`.
+2. **Correção do Gatilho de Publicação:**
+   - O job `publish-images` declarava `needs: release-please`. No push da tag, o job `release-please` é pulado (`if: github.ref_type == 'branch'`) e um `needs` pulado leva o dependente junto: o caminho de publicação documentado nunca executava.
+   - O job passou a ser independente, disparado apenas pelo push da tag, com `IMAGE_TAG` vindo de `github.ref_name` e o checkout fixado no commit etiquetado — as imagens nunca saem da branch que disparou o workflow.
+3. **Rollback Real:**
+   - O `workflow_dispatch` de `release.yml` passou a aceitar a tag a republicar, reconstruindo as três imagens a partir do commit etiquetado.
+   - `docs/process/RELEASE.md` ajustado ao comportamento real do workflow.
+4. **Entrega:** branch `fix/011-release-closure` com commits e PR para `develop`.
