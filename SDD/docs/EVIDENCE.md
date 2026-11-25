@@ -774,7 +774,7 @@
 
 - **Data de Conclusão:** 2026-11-25
 - **Branch:** `feat/011-release-cd`
-- **PR:** [#15](https://github.com/marcelinosandroni/consigport-platform/pull/15)
+- **PR:** [#15](https://github.com/marcelinosandroni/consigport-platform/pull/15) (implementação) e [#16](https://github.com/marcelinosandroni/consigport-platform/pull/16) (evidência e correção do gatilho de publicação)
 - **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
 - **Objetivo:** Uma versão para a plataforma inteira (release-please), as três imagens
   publicadas no GHCR por tag SemVer e o deploy de staging disparado pela tag.
@@ -939,6 +939,12 @@
 - **Publicação:** `.github/workflows/release.yml` roda o release-please no push em
   `main` e publica as três imagens no GHCR com as tags `vX.Y.Z`, `X.Y.Z` e `latest`
   (a `latest` nunca é movida por uma pré-release).
+  A publicação é disparada **pelo push da tag**, não pelo push em `main`: o job
+  `publish-images` declarava `needs: release-please`, e no push da tag o job
+  `release-please` é pulado (`if: github.ref_type == 'branch'`) — um `needs` pulado
+  leva o dependente junto, então o caminho de publicação documentado nunca executava.
+  O job passou a ser independente, com `IMAGE_TAG` vindo de `github.ref_name` e o
+  checkout fixado no commit etiquetado.
 - **Deploy:** `.github/workflows/cd-staging.yml` dispara na tag, sobe
   `compose.staging.yaml` com as imagens publicadas, exige os healthchecks dos três
   serviços e imprime os digests.
