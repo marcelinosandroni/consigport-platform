@@ -319,3 +319,80 @@
 - `SDD/specs/PLAN.md`
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 0.6 — Scaffold do Backend
+
+- **Data de Conclusão:** 2026-11-25
+- **Branch:** `feat/006-backend-scaffold`
+- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Objetivo:** Aplicação Spring Boot vazia, compilando, com health respondendo `UP` e
+  configuração única (`application.yml`) dirigida por `DATABASE_URL`.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Build do módulo no reactor (compilação + testes):**
+   ```powershell
+   .\mvnw.cmd -q -pl backend -am verify
+   ```
+   *Saída obtida:*
+   ```text
+   Tomcat started on port 54011 (http) with context path '/'
+   Init duration for springdoc-openapi is: 180 ms
+   Tests run: 2, Failures: 0, Errors: 0, Skipped: 0 -- in br.com.consigport.ConsigPortApplicationTests
+   verify_exit=0
+   ```
+
+2. **Health e contrato expostos por HTTP (dentro do teste, servidor real):**
+   ```text
+   GET /actuator/health → 200 {"status":"UP"}
+   GET /v3/api-docs     → 200 {"openapi":"3.1.0",...}
+   ```
+
+3. **Reactor válido (critério de saída da fase):**
+   ```powershell
+   .\mvnw.cmd -N validate
+   ```
+   *Saída obtida:*
+   ```text
+   [INFO] BUILD SUCCESS
+   reactor_validate_exit=0
+   ```
+
+4. **Invariantes de documentação e especificação:**
+   ```powershell
+   node scripts/check-specs.mjs
+   node SDD/SKILLS/check-docs/check-docs.mjs .
+   node scripts/check-architecture.mjs
+   ```
+   *Saída obtida:* exit 0 nos três.
+
+#### Conteúdo Entregue:
+- **Dependências:** `web`, `validation`, `data-jpa`, `actuator`, `flyway-core`,
+  `flyway-database-postgresql`, driver PostgreSQL (runtime), springdoc e
+  `spring-boot-starter-test`; H2 apenas em escopo de teste.
+- **Configuração:** porta `8080` (`SERVER_PORT`), `DATABASE_URL`/`POSTGRES_*` vindos do
+  `.env`, Hibernate em `ddl-auto: validate` (o schema é do Flyway), `open-in-view: false`,
+  timezone UTC, `shutdown: graceful`, actuator expondo `health`/`info` com probes e
+  Swagger em `/swagger-ui.html`.
+- **Contrato alinhado:** springdoc configurado com `openapi_3_1`, então `/v3/api-docs`
+  publica OpenAPI `3.1.0`, a mesma versão dos contratos versionados.
+- **Perfil `local`:** mesmo bloco YAML apontando para o PostgreSQL do `compose.yaml` em
+  `localhost:5432`, com log `DEBUG` do pacote `br.com.consigport`.
+- **Teste de fumaça:** sobe o contexto completo em porta aleatória e prova
+  `GET /actuator/health` → `UP` e `GET /v3/api-docs` → 200.
+
+#### Débito Registrado:
+- O teste do scaffold usa H2 em memória para não depender de Docker; a task de
+  persistência troca por Testcontainers PostgreSQL 16 e reativa o Flyway, cobrindo as
+  migrações de verdade.
+
+#### Arquivos Tocados:
+- `backend/pom.xml`
+- `backend/src/main/java/br/com/consigport/ConsigPortApplication.java`
+- `backend/src/main/resources/application.yml`
+- `backend/src/test/java/br/com/consigport/ConsigPortApplicationTests.java`
+- `SDD/specs/PLAN.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`
