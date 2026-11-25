@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: central-convenios-mock
+
+server:
+  port: ${SERVER_PORT:8081}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    # The mock mirrors contracts/central-api.yaml, which is OpenAPI 3.1.
+    version: openapi_3_1
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
+info:
+  app:
+    name: Central de Convênios Mock
+    version: 0.1.0
+
+---
+# Local profile: mock on the compose.yaml network, verbose project logs.
+spring:
+  config:
+    activate:
+      on-profile: local
+
+logging:
+  level:
+    br.com.consigport.central: DEBUG
