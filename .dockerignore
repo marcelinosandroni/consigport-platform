@@ -1,0 +1,30 @@
+# Build context exclusions for the three images (backend, central mock and
+# frontend). The context is the repository root because the Maven reactor needs
+# the parent pom.xml to resolve the modules.
+
+# VCS and CI
+.git
+.gitignore
+.github
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Build artifacts (never inside an image)
+**/node_modules
+**/dist
+**/target
+**/.vite
+
+# Documentation and specifications
+docs
+SDD
+contracts
+tests
+
+# Editor and OS noise
+.idea
+.vscode
+*.md
