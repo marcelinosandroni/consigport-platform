@@ -1,0 +1,19 @@
+/* ═══════════════════════════════════════════════════════════════
+   ConsigPort — global styles
+   Tailwind CSS 4 reads the design tokens from src/theme.css, which is
+   a verbatim copy of SDD/themes/matrix/tokens.css.
+   ═══════════════════════════════════════════════════════════════ */
+@import "tailwindcss";
+@import "./theme.css";
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-surface-base);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+  }
+}
