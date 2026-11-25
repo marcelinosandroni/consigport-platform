@@ -203,3 +203,25 @@
    - `npx @stoplight/spectral-cli@6 lint ... --fail-severity=warn` → zero erros e zero avisos.
    - `node scripts/check-specs.mjs`, `node SDD/SKILLS/check-docs/check-docs.mjs .` e `node scripts/check-architecture.mjs` → exit 0.
 7. **Entrega:** commit e PR para `develop` com a Task 0.5 concluída e evidência em [`../../SDD/docs/EVIDENCE.md`](../../SDD/docs/EVIDENCE.md).
+
+---
+
+## Sessão #09 — Portão de Contratos no CI (fechamento da Task 0.5)
+
+- **Data:** 2026-11-25
+- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Branch:** `feat/005-contracts`
+- **Objetivo:** Fechar a Task 0.5 transformando a verificação de contrato em portão automático no GitHub Actions, conforme o Gate 3.3 de [`../../docs/quality/GATES.md`](../../docs/quality/GATES.md).
+
+### Atividades Realizadas:
+1. **Workflow Dedicado de Contratos:**
+   - Criação de [`.github/workflows/ci-contracts.yml`](../../.github/workflows/ci-contracts.yml), disparado por mudanças em `contracts/**`, `.spectral.yaml` e `scripts/hmac-vector.mjs`.
+   - Etapas: Spectral com `--fail-severity=warn`, reprodução do vetor HMAC e validação do log de IA com `AI_LOG_BASE_SHA`.
+2. **Bloqueio de Breaking Changes:**
+   - Instalação do `oasdiff` em versão fixa e comparação `oasdiff breaking` contra o contrato da branch base para os dois contratos.
+   - Primeira introdução do contrato é aceita com aviso no log, sem quebrar o pipeline.
+3. **Documentação do Portão:**
+   - Atualização do Gate 3.3 em [`../../docs/quality/GATES.md`](../../docs/quality/GATES.md) com o workflow, os comandos reais e a baseline do `oasdiff`.
+4. **Entrega:**
+   - PR #7 para `develop` reunindo os contratos, o vetor HMAC e o portão de CI.
+   - Validação local: `node scripts/hmac-vector.mjs` (3 vetores), Spectral sem erros nem avisos, `check-specs`, `check-docs`, `check-architecture` e `check-ai-log` com exit 0.

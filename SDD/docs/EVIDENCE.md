@@ -283,6 +283,16 @@
    🎉 Todos os 22 testes de validação dos desenhos e arquitetura passaram com sucesso! (exit 0)
    ```
 
+4. **Portão de contratos no CI (Spectral, HMAC e oasdiff):**
+   ```text
+   Workflow: CI Contracts (.github/workflows/ci-contracts.yml)
+   - npx --yes @stoplight/spectral-cli@6 lint contracts/*.yaml --fail-severity=warn
+   - node scripts/hmac-vector.mjs
+   - node scripts/check-ai-log.mjs          (AI_LOG_BASE_SHA no pull request)
+   - oasdiff breaking <contrato da base> <contrato atual> --fail-on ERR
+   Baseline ausente na branch base → diff pulado com aviso, sem quebrar o pipeline.
+   ```
+
 #### Conteúdo Entregue:
 - **API pública:** autorizações, agenda, criação/listagem/detalhe de operações e trilha
   de eventos, com `Idempotency-Key`, `Idempotent-Replay`, paginação e erros localizados.
@@ -291,6 +301,8 @@
   `202`/`204` + `Retry-After`, HMAC, idempotência, caos e administração.
 - **Vetor HMAC:** três requisições canônicas (POST de portabilidade, GET de status e
   POST de autorização) com segredo de teste e assinatura verificável por script.
+- **Portão de CI:** workflow dedicado que reprova contrato inválido, vetor HMAC divergente
+  e breaking change contra a branch base.
 - **Catálogo de erros:** códigos `BENEFICIARY_NOT_FOUND` no core e
   `REQUISICAO_INVALIDA`, `SEM_AUTORIZACAO`, `BENEFICIARIO_NAO_ENCONTRADO` e
   `PARCELA_INVALIDA` na Central, refletidos no `ARCHITECTURE.md`.
@@ -301,6 +313,8 @@
 - `contracts/hmac-vector.json`
 - `scripts/hmac-vector.mjs`
 - `.spectral.yaml`
+- `.github/workflows/ci-contracts.yml`
+- `docs/quality/GATES.md`
 - `SDD/ARCHITECTURE.md`
 - `SDD/specs/PLAN.md`
 - `SDD/docs/EVIDENCE.md`

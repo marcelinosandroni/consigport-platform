@@ -1,0 +1,92 @@
+name: CI Contracts
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+      - develop
+    paths:
+      - 'contracts/**'
+      - '.spectral.yaml'
+      - 'scripts/hmac-vector.mjs'
+      - '.github/workflows/ci-contracts.yml'
+  pull_request:
+    branches:
+      - main
+      - staging
+      - develop
+    paths:
+      - 'contracts/**'
+      - '.spectral.yaml'
+      - 'scripts/hmac-vector.mjs'
+      - '.github/workflows/ci-contracts.yml'
+
+# Both contracts are linted, the shared HMAC vector is reproduced and, when the
+# base branch already ships the contract, breaking changes fail the job.
+jobs:
+  validate-contracts:
+    name: Lint OpenAPI, Prove HMAC and Block Breaking Changes
+    runs-on: ubuntu-latest
+
+    env:
+      OASDIFF_VERSION: v1.39.0
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Lint contracts with Spectral
+        run: >
+          npx --yes @stoplight/spectral-cli@6 lint
+          contracts/consigport-api.yaml contracts/central-api.yaml
+          --fail-severity=warn
+
+      - name: Reproduce the shared HMAC vector
+        run: node scripts/hmac-vector.mjs
+
+      - name: Validate the AI usage log
+        run: node scripts/check-ai-log.mjs
+        env:
+          AI_LOG_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+
+      - name: Install oasdiff
+        run: |
+          curl -sSfL \
+            "https://github.com/oasdiff/oasdiff/releases/download/${OASDIFF_VERSION}/oasdiff_${OASDIFF_VERSION#v}_linux_amd64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin oasdiff
+          oasdiff --version
+
+      - name: Prepare the contract baseline
+        id: baseline
+        run: |
+          base_ref="${{ github.base_ref }}"
+          if [ -z "$base_ref" ]; then
+            base_ref="develop"
+          fi
+          if git cat-file -e "origin/${base_ref}:contracts/consigport-api.yaml" 2>/dev/null; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            mkdir -p "$RUNNER_TEMP/baseline"
+            git show "origin/${base_ref}:contracts/consigport-api.yaml" \
+              > "$RUNNER_TEMP/baseline/consigport-api.yaml"
+            git show "origin/${base_ref}:contracts/central-api.yaml" \
+              > "$RUNNER_TEMP/baseline/central-api.yaml"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::origin/${base_ref} has no contract yet; skipping the breaking-change diff."
+          fi
+
+      - name: Block breaking changes with oasdiff
+        if: steps.baseline.outputs.available == 'true'
+        run: |
+          oasdiff breaking "$RUNNER_TEMP/baseline/consigport-api.yaml" \
+            contracts/consigport-api.yaml --fail-on ERR
+          oasdiff breaking "$RUNNER_TEMP/baseline/central-api.yaml" \
+            contracts/central-api.yaml --fail-on ERR
