@@ -52,7 +52,10 @@
       Branch `feat/010-ci-pipeline`. Jobs paralelos `docs`, `backend`, `mock`,
       `frontend`, `contracts`, `compose`, `smoke`, `e2e`, `k6-smoke` e `security`,
       com cache de Maven e npm e artefatos de relatório. Run verde `45622026445`.
-- [ ] 0.11 — `release-please`, `release.yml`, `cd-staging.yml` e imagens GHCR
+- [-] **0.11 — `release-please`, `release.yml`, `cd-staging.yml` e imagens GHCR**
+      Branch `feat/011-release-cd`. Conventional Commits viram changelog e tag
+      SemVer; as três imagens (backend, mock, frontend) são publicadas no GHCR
+      com tag SemVer e `latest`; a tag dispara o deploy de staging.
 
 ### Critérios de saída da fase
 
