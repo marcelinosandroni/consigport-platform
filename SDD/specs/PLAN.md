@@ -33,7 +33,10 @@
 - [x] **0.5 — Contratos `consigport-api.yaml`, `central-api.yaml` e vetor HMAC**
       Branch `feat/005-contracts`. Contrato primeiro: superfície pública em EN,
       contrato da Central fiel ao edital em PT e vetor compartilhado de assinatura.
-- [ ] 0.6 — Scaffold do backend (pom, aplicação, `application.yml`)
+- [x] **0.6 — Scaffold do backend (pom, aplicação, `application.yml`)**
+      Branch `feat/006-backend-scaffold`. Aplicação Spring Boot com web, validation,
+      JPA, Flyway, actuator e springdoc; porta 8080, perfil `local` via `DATABASE_URL`
+      e health respondendo `UP`.
 - [ ] 0.7 — Scaffold do mock (pom, aplicação, `application.yml`)
 - [ ] 0.8 — Base do frontend RSC (package, Vite, TypeScript, Tailwind)
 - [ ] 0.9 — Shell RSC, tema Matrix e fontes locais

@@ -225,3 +225,32 @@
 4. **Entrega:**
    - PR #7 para `develop` reunindo os contratos, o vetor HMAC e o portão de CI.
    - Validação local: `node scripts/hmac-vector.mjs` (3 vetores), Spectral sem erros nem avisos, `check-specs`, `check-docs`, `check-architecture` e `check-ai-log` com exit 0.
+
+---
+
+## Sessão #10 — Task 0.6 (Scaffold do Backend)
+
+- **Data:** 2026-11-25
+- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Branch:** `feat/006-backend-scaffold`
+- **Objetivo:** Aplicação Spring Boot vazia, compilando e com health `UP`, base para as fatias de domínio seguintes.
+
+### Atividades Realizadas:
+1. **Dependências do Backend:**
+   - [`../../backend/pom.xml`](../../backend/pom.xml) com `web`, `validation`, `data-jpa`, `actuator`, `flyway-core`, `flyway-database-postgresql`, driver PostgreSQL em runtime, springdoc e `spring-boot-starter-test`; H2 apenas em escopo de teste.
+   - `spring-boot-maven-plugin` para gerar o jar executável.
+2. **Composition Root:**
+   - Criação de `backend/src/main/java/br/com/consigport/ConsigPortApplication.java` sem qualquer dependência de domínio, mantendo o pacote `domain` livre de Spring nas próximas tasks.
+3. **Configuração Única:**
+   - [`../../backend/src/main/resources/application.yml`](../../backend/src/main/resources/application.yml) com porta `8080` (`SERVER_PORT`), `DATABASE_URL` e `POSTGRES_*` vindos do `.env`, `ddl-auto: validate`, `open-in-view: false`, timezone UTC, `shutdown: graceful` e actuator com probes.
+   - Perfil `local` no mesmo arquivo apontando para o PostgreSQL do `compose.yaml` em `localhost:5432`.
+   - springdoc em `openapi_3_1`, alinhando `/v3/api-docs` ao contrato `3.1.0` de `contracts/`.
+4. **Teste de Fumaça:**
+   - `ConsigPortApplicationTests` sobe o contexto completo em porta aleatória e prova `GET /actuator/health` → `UP` e `GET /v3/api-docs` → `200` com `"openapi":"3.1.0"`.
+5. **Validação:**
+   - `.\mvnw.cmd -q -pl backend -am verify` → `Tests run: 2, Failures: 0, Errors: 0`, exit 0.
+   - `.\mvnw.cmd -N validate` → `BUILD SUCCESS`, exit 0.
+   - `check-specs`, `check-docs` e `check-architecture` → exit 0.
+6. **Débito Registrado:**
+   - H2 substitui o PostgreSQL no teste do scaffold; a task de persistência troca por Testcontainers PostgreSQL 16 e reativa o Flyway.
+7. **Entrega:** branch `feat/006-backend-scaffold` com commit e PR para `develop`.
