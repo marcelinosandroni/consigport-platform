@@ -616,9 +616,11 @@
    ```
    *Saída obtida:*
    ```text
-   ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css byte for byte.
+   ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css (line endings normalized).
    tokens_exit=0
    ```
+   O guard também roda no workflow de documentação e dispara quando
+   `frontend/src/theme.css` ou `SDD/themes/**` mudam.
 
 5. **Invariantes de especificação, links e arquitetura:**
    ```powershell
@@ -648,4 +650,6 @@
 - `frontend/src/app/pages/home.tsx`, `frontend/src/app/pages/section.tsx`, `frontend/src/app/pages/not-found.tsx`
 - `frontend/src/shared/ui/button.tsx`, `badge.tsx`, `card.tsx`, `stat-card.tsx`, `stat-card.test.tsx`
 - `.gitignore`
+- `.github/workflows/ci-docs.yml`
+- `scripts/check-theme-tokens.mjs`
 - `SDD/specs/PLAN.md`, `SDD/docs/EVIDENCE.md`, `docs/ai-harness/AI_USAGE_LOG.md`

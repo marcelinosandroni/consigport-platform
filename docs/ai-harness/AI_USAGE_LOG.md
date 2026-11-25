@@ -341,7 +341,10 @@
 6. **Auditoria Geométrica (`DESIGN.md` §4b):**
    - Viewports de 390px e 1440px auditadas em navegador real: `scrollWidth` igual a `clientWidth`, nenhum elemento fora da viewport, nenhum alvo de toque abaixo de 44×44px.
    - O texto de 11px detectado é apenas o chrome `label-mono` (navegação, badge e rótulos de stat card), que o `DESIGN.md` §4b.2.3 permite explicitamente.
-7. **Validação:**
+7. **Guard dos Tokens no CI:**
+   - `scripts/check-theme-tokens.mjs` passa a normalizar quebras de linha antes de comparar, porque o `.gitattributes` garante LF no repositório enquanto a árvore de trabalho do Windows pode guardar CRLF.
+   - O workflow de documentação executa o guard e dispara quando `frontend/src/theme.css` ou `SDD/themes/**` mudam.
+8. **Validação:**
    - `npm run --prefix frontend build` → exit 0 nos três ambientes; CSS do cliente em 20,23 kB (4,50 kB gzip) depois de restringir os subsets das fontes.
    - `npm run --prefix frontend lint`, `typecheck` e `test:unit` → exit 0.
-8. **Entrega:** branch `feat/009-shell-matrix` com commits e PR para `develop`.
+9. **Entrega:** branch `feat/009-shell-matrix` com commits e PR para `develop`.
