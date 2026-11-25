@@ -240,6 +240,9 @@ jobs:
       - name: Validate the compose file
         run: docker compose config -q
 
+      - name: Validate the staging compose file
+        run: docker compose -f compose.staging.yaml config -q
+
   smoke:
     name: Stack Smoke — backend and mock against PostgreSQL 16
     runs-on: ubuntu-latest
