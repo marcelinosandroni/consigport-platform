@@ -5,7 +5,7 @@
 > voo, em [`PLAN.md`](./PLAN.md). **Nada entra no PLAN sem existir aqui.**
 >
 > Regras: uma task por vez, branch própria, PR para `develop`, commit
-> `type(scope): descrição. (Agent: OpenCode - DeepSeek V4.1 Flash)`.
+> `type(scope): descrição. (Agent: OpenCode - MiniMax-M3.1-Flash)`.
 > E2E e performance rodam somente no CI/CD — nunca na máquina local.
 
 ---
