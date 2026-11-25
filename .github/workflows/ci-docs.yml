@@ -11,6 +11,7 @@ on:
       - 'SDD/**'
       - 'docs/**'
       - 'scripts/**'
+      - 'frontend/src/theme.css'
       - '.github/workflows/ci-docs.yml'
   pull_request:
     branches:
@@ -22,6 +23,7 @@ on:
       - 'SDD/**'
       - 'docs/**'
       - 'scripts/**'
+      - 'frontend/src/theme.css'
       - '.github/workflows/ci-docs.yml'
 
 jobs:
@@ -48,6 +50,9 @@ jobs:
 
       - name: Validate architecture diagrams and traceability
         run: node scripts/check-architecture.mjs
+
+      - name: Validate the design tokens
+        run: node scripts/check-theme-tokens.mjs
 
       - name: Validate the AI usage log
         run: node scripts/check-ai-log.mjs

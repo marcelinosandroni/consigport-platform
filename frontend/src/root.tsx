@@ -1,6 +1,6 @@
 import './styles.css'
-import { getServerCounter, updateServerCounter } from './action.tsx'
-import { ClientCounter } from './client.tsx'
+import { resolveRoute } from './app/router.tsx'
+import { Shell } from './app/shell.tsx'
 
 export function Root(props: { url: URL }) {
   return (
@@ -11,24 +11,8 @@ export function Root(props: { url: URL }) {
         <title>ConsigPort</title>
       </head>
       <body>
-        <App {...props} />
+        <Shell pathname={props.url.pathname}>{resolveRoute(props.url.pathname)}</Shell>
       </body>
     </html>
-  )
-}
-
-function App(props: { url: URL }) {
-  return (
-    <main className="p-8">
-      <h1 className="text-headline-lg">ConsigPort</h1>
-      <p className="text-body-md text-text-secondary">
-        Base RSC pronta para o shell Matrix da Task 0.9.
-      </p>
-      <ClientCounter />
-      <form action={updateServerCounter.bind(null, 1)}>
-        <button>Server Counter: {getServerCounter()}</button>
-      </form>
-      <p className="text-label-mono">Request URL: {props.url?.href}</p>
-    </main>
   )
 }

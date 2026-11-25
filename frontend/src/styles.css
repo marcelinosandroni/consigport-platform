@@ -6,6 +6,25 @@
 @import "tailwindcss";
 @import "./theme.css";
 
+/* Local fonts: no external request, no layout shift. The token file points
+   the three families at these variables. Only the latin subset ships. */
+@import "@fontsource/manrope/latin-400.css";
+@import "@fontsource/manrope/latin-500.css";
+@import "@fontsource/manrope/latin-600.css";
+@import "@fontsource/manrope/latin-700.css";
+@import "@fontsource/manrope/latin-800.css";
+@import "@fontsource/jetbrains-mono/latin-400.css";
+@import "@fontsource/jetbrains-mono/latin-500.css";
+@import "@fontsource/jetbrains-mono/latin-600.css";
+@import "@fontsource/playfair-display/latin-500.css";
+@import "@fontsource/playfair-display/latin-500-italic.css";
+
+:root {
+  --font-manrope: 'Manrope';
+  --font-jetbrains-mono: 'JetBrains Mono';
+  --font-playfair: 'Playfair Display';
+}
+
 @layer base {
   html {
     color-scheme: dark;
@@ -15,5 +34,17 @@
     background-color: var(--color-surface-base);
     color: var(--color-text-primary);
     font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Tier 0 canvas: the 1px micro-dot grid of the Matrix theme. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 24px 24px;
   }
 }
