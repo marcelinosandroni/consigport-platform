@@ -280,3 +280,34 @@
    - `.\mvnw.cmd -q -pl central-convenios-mock -am verify` → `Tests run: 2, Failures: 0`, exit 0.
    - `check-specs`, `check-docs` e `check-architecture` → exit 0.
 6. **Entrega:** branch `feat/007-mock-scaffold` com commit e PR para `develop`.
+
+---
+
+## Sessão #12 — Task 0.8 (Base do Frontend RSC)
+
+- **Data:** 2026-11-25
+- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Branch:** `feat/008-frontend-base`
+- **Objetivo:** Projeto React 19.2 com Vite RSC, TypeScript e Tailwind 4, sem Next.js, consumindo os tokens do `DESIGN.md`.
+
+### Atividades Realizadas:
+1. **Template Oficial RSC:**
+   - Geração do starter oficial com `npm create vite@latest frontend -- --template rsc` (entradas `rsc`, `ssr` e `client` do `@vitejs/plugin-rsc`).
+   - Remoção da demo visual do template (logos Vite/React) e da pasta de assets não usada.
+2. **Dependências conforme o `APP-STACK`:**
+   - [`../../frontend/package.json`](../../frontend/package.json) com React 19.2.9, Vite 7.3.8, `@vitejs/plugin-rsc`, Tailwind CSS 4.3.5, TypeScript 5.9, ESLint 9, Vitest 4.1 e Testing Library 16.
+   - Scripts `dev`, `build`, `preview`, `lint`, `typecheck` e `test:unit`; `allowScripts` libera o postinstall do `esbuild`, exigido pelo Vite.
+3. **Configuração:**
+   - [`../../frontend/vite.config.ts`](../../frontend/vite.config.ts) mantém os três ambientes do template e acrescenta o plugin do Tailwind 4.
+   - [`../../frontend/tsconfig.json`](../../frontend/tsconfig.json) em modo estrito (`strict`, `noUncheckedIndexedAccess`, `noImplicitOverride`) com alias `@/*`.
+   - `frontend/eslint.config.js` (flat config) e `frontend/vitest.config.ts` com ambiente `jsdom`.
+4. **Tema:**
+   - [`../../frontend/src/theme.css`](../../frontend/src/theme.css) como cópia verbatim de `SDD/themes/matrix/tokens.css`, consumida por `frontend/src/styles.css` via `@import "tailwindcss"`.
+   - [`../../scripts/check-theme-tokens.mjs`](../../scripts/check-theme-tokens.mjs) impede a deriva entre a fonte e a cópia.
+5. **Correções no Template:**
+   - `override` em `state` e `render` do `error-boundary`, `action(...args)` no lugar de `apply`, `catch` sem binding e `const link` no `entry.browser`.
+6. **Validação:**
+   - `npm ci --prefix frontend` → exit 0; `npm run --prefix frontend build` → exit 0 nos três ambientes.
+   - `npm run --prefix frontend lint`, `typecheck` e `test:unit` → exit 0 (1 teste).
+   - `npm run --prefix frontend dev` → `dev_status=200` com HTML servido em `lang="pt-BR"`.
+7. **Entrega:** branch `feat/008-frontend-base` com commits e PR para `develop`.
