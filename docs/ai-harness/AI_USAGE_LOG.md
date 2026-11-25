@@ -215,7 +215,7 @@
 
 ### Atividades Realizadas:
 1. **Workflow Dedicado de Contratos:**
-   - Criação de [`.github/workflows/ci-contracts.yml`](../../.github/workflows/ci-contracts.yml), disparado por mudanças em `contracts/**`, `.spectral.yaml` e `scripts/hmac-vector.mjs`.
+   - Criação de `.github/workflows/ci-contracts.yml`, disparado por mudanças em `contracts/**`, `.spectral.yaml` e `scripts/hmac-vector.mjs` (consolidado no job `contracts` do `ci.yml` na Task 0.10).
    - Etapas: Spectral com `--fail-severity=warn`, reprodução do vetor HMAC e validação do log de IA com `AI_LOG_BASE_SHA`.
 2. **Bloqueio de Breaking Changes:**
    - Instalação do `oasdiff` em versão fixa e comparação `oasdiff breaking` contra o contrato da branch base para os dois contratos.
@@ -348,3 +348,32 @@
    - `npm run --prefix frontend build` → exit 0 nos três ambientes; CSS do cliente em 20,23 kB (4,50 kB gzip) depois de restringir os subsets das fontes.
    - `npm run --prefix frontend lint`, `typecheck` e `test:unit` → exit 0.
 9. **Entrega:** branch `feat/009-shell-matrix` com commits e PR para `develop`.
+
+---
+
+## Sessão #14 — Task 0.10 (Pipeline de Integração Contínua)
+
+- **Data:** 2026-11-25
+- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Branch:** `feat/010-ci-pipeline`
+- **Objetivo:** Um pipeline único com jobs paralelos que provam cada PR, mais o nightly com os portões pesados.
+
+### Atividades Realizadas:
+1. **Pipeline Principal (`ci.yml`):**
+   - Jobs `docs`, `backend`, `mock`, `frontend`, `contracts`, `compose`, `smoke`, `e2e`, `k6-smoke` e `security`, todos em paralelo, com `concurrency` cancelando execuções antigas do mesmo PR.
+   - `permissions: contents: read` no topo e Node 24, npm 12.0.2 e Temurin 21 fixados por variável de ambiente.
+   - Cache de Maven via `actions/setup-java` e de npm via `actions/setup-node` com `cache-dependency-path: frontend/package-lock.json`.
+2. **Smoke Real da Stack:**
+   - O job `smoke` sobe o PostgreSQL 16 do `compose.yaml`, empacota os jars, inicia mock e backend e exige `200` em `/actuator/health` dos dois, anexando os payloads de health como artefato.
+3. **Portões Condicionais Honestos:**
+   - Um job `detect` procura as suítes no commit (`frontend/e2e`, `tests/k6`, `tests/schemathesis`, `Dockerfile`) e publica os resultados; `e2e`, `k6-smoke` e `security-images` só rodam quando a suíte existe, em vez de fingir verde.
+4. **Nightly (`nightly.yml`):**
+   - Cron diário às 03:00 UTC com `contract-drift` (oasdiff contra `main`), `e2e-full`, `k6-load`, `schemathesis` e `security-images`.
+5. **Consolidação:**
+   - Os workflows `ci-docs.yml` e `ci-contracts.yml` foram removidos: as mesmas verificações agora vivem nos jobs `docs` e `contracts`, sem duplicar runner.
+6. **Documentação:**
+   - [`../../docs/quality/GATES.md`](../../docs/quality/GATES.md) agora mapeia cada portão ao seu job, com a nota de que E2E, k6, Schemathesis e scan de imagens acendem quando a suíte chega.
+7. **Validação:**
+   - `actionlint` (v1.7.12) sem erros em `ci.yml` e `nightly.yml`.
+   - `npm audit --prefix frontend --omit=dev --audit-level=high` → `found 0 vulnerabilities`.
+8. **Entrega:** branch `feat/010-ci-pipeline` com commit e PR para `develop`; a task fecha com os jobs verdes deste PR.

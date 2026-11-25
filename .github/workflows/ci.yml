@@ -1,0 +1,423 @@
+name: CI
+
+# Every pull request is proven by parallel jobs. The pipeline is the gate:
+# a red job blocks the merge, locally or not.
+on:
+  pull_request:
+    branches:
+      - develop
+      - staging
+      - main
+  push:
+    branches:
+      - develop
+      - staging
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '24'
+  NPM_VERSION: '12.0.2'
+  JAVA_VERSION: '21'
+  OASDIFF_VERSION: 'v1.39.0'
+
+jobs:
+  detect:
+    name: Detect the suites available in this commit
+    runs-on: ubuntu-latest
+    outputs:
+      e2e: ${{ steps.suites.outputs.e2e }}
+      k6: ${{ steps.suites.outputs.k6 }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Look for the suites
+        id: suites
+        run: |
+          if [ -n "$(find frontend/e2e -name '*.spec.ts' -print -quit 2>/dev/null)" ]; then
+            echo "e2e=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "e2e=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -n "$(find tests/k6 -name '*.js' -print -quit 2>/dev/null)" ]; then
+            echo "k6=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "k6=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  docs:
+    name: Docs, Specs, Architecture and AI Log
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Check relative Markdown links
+        run: node SDD/SKILLS/check-docs/check-docs.mjs .
+
+      - name: Validate SDD specification invariants
+        run: node scripts/check-specs.mjs
+
+      - name: Validate architecture diagrams and traceability
+        run: node scripts/check-architecture.mjs
+
+      - name: Validate the design tokens
+        run: node scripts/check-theme-tokens.mjs
+
+      - name: Validate the AI usage log
+        run: node scripts/check-ai-log.mjs
+        env:
+          AI_LOG_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+
+  backend:
+    name: Backend — build, unit tests and coverage report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Verify the backend module
+        run: ./mvnw -B -pl backend -am verify
+
+      - name: Upload the test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-reports
+          path: backend/target/surefire-reports
+          if-no-files-found: ignore
+
+  mock:
+    name: Central Mock — build and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Verify the mock module
+        run: ./mvnw -B -pl central-convenios-mock -am verify
+
+      - name: Upload the test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mock-reports
+          path: central-convenios-mock/target/surefire-reports
+          if-no-files-found: ignore
+
+  frontend:
+    name: Frontend — lint, typecheck, unit tests and build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Pin the package manager
+        run: npm install --global npm@${{ env.NPM_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci --prefix frontend
+
+      - name: Lint
+        run: npm run --prefix frontend lint
+
+      - name: Typecheck
+        run: npm run --prefix frontend typecheck
+
+      - name: Unit tests
+        run: npm run --prefix frontend test:unit
+
+      - name: Build
+        run: npm run --prefix frontend build
+
+      - name: Upload the build output
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          if-no-files-found: ignore
+
+  contracts:
+    name: Contracts — Spectral, HMAC vector and breaking changes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Lint the contracts with Spectral
+        run: >
+          npx --yes @stoplight/spectral-cli@6 lint
+          contracts/consigport-api.yaml contracts/central-api.yaml
+          --fail-severity=warn
+
+      - name: Reproduce the shared HMAC vector
+        run: node scripts/hmac-vector.mjs
+
+      - name: Install oasdiff
+        run: |
+          curl -sSfL \
+            "https://github.com/oasdiff/oasdiff/releases/download/${OASDIFF_VERSION}/oasdiff_${OASDIFF_VERSION#v}_linux_amd64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin oasdiff
+          oasdiff --version
+
+      - name: Prepare the contract baseline
+        id: baseline
+        run: |
+          base_ref="${{ github.base_ref }}"
+          if [ -z "$base_ref" ]; then
+            base_ref="develop"
+          fi
+          if git cat-file -e "origin/${base_ref}:contracts/consigport-api.yaml" 2>/dev/null; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            mkdir -p "$RUNNER_TEMP/baseline"
+            git show "origin/${base_ref}:contracts/consigport-api.yaml" \
+              > "$RUNNER_TEMP/baseline/consigport-api.yaml"
+            git show "origin/${base_ref}:contracts/central-api.yaml" \
+              > "$RUNNER_TEMP/baseline/central-api.yaml"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::origin/${base_ref} has no contract yet; skipping the breaking-change diff."
+          fi
+
+      - name: Block breaking changes with oasdiff
+        if: steps.baseline.outputs.available == 'true'
+        run: |
+          oasdiff breaking "$RUNNER_TEMP/baseline/consigport-api.yaml" \
+            contracts/consigport-api.yaml --fail-on ERR
+          oasdiff breaking "$RUNNER_TEMP/baseline/central-api.yaml" \
+            contracts/central-api.yaml --fail-on ERR
+
+  compose:
+    name: Docker Compose — configuration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Validate the compose file
+        run: docker compose config -q
+
+  smoke:
+    name: Stack Smoke — backend and mock against PostgreSQL 16
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Start PostgreSQL 16
+        run: docker compose up -d --wait postgres
+
+      - name: Build the jars
+        run: ./mvnw -B -DskipTests package
+
+      - name: Boot the mock and the backend
+        run: |
+          nohup java -jar central-convenios-mock/target/central-convenios-mock-0.1.0-SNAPSHOT.jar \
+            --server.port=8081 > mock.log 2>&1 &
+          mock_pid=$!
+          nohup java -jar backend/target/consigport-backend-0.1.0-SNAPSHOT.jar \
+            --server.port=8080 > backend.log 2>&1 &
+          backend_pid=$!
+          echo "mock_pid=${mock_pid}" >> "$GITHUB_ENV"
+          echo "backend_pid=${backend_pid}" >> "$GITHUB_ENV"
+
+      - name: Wait for the health probes
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://localhost:8081/actuator/health > mock-health.json \
+              && curl -fsS http://localhost:8080/actuator/health > backend-health.json; then
+              cat mock-health.json backend-health.json
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "the stack did not become healthy" >&2
+          tail -n 100 mock.log backend.log >&2 || true
+          exit 1
+
+      - name: Upload the health payloads
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: stack-health
+          path: '*-health.json'
+          if-no-files-found: ignore
+
+      - name: Stop the services
+        if: always()
+        run: kill "${{ env.mock_pid }}" "${{ env.backend_pid }}" || true
+
+      - name: Stop PostgreSQL 16
+        if: always()
+        run: docker compose down -v
+
+  e2e:
+    name: E2E — Playwright
+    # The suite arrives with the feature phases; the job turns on by itself the
+    # moment the specs exist, instead of pretending to be green.
+    needs: detect
+    if: needs.detect.outputs.e2e == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Pin the package manager
+        run: npm install --global npm@${{ env.NPM_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci --prefix frontend
+
+      - name: Install the browsers
+        run: npm exec --prefix frontend -- playwright install --with-deps chromium
+
+      - name: Run the end-to-end suite
+        run: npm run --prefix frontend test:e2e
+
+      - name: Upload the Playwright report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: frontend/playwright-report
+          if-no-files-found: ignore
+
+  k6-smoke:
+    name: Performance Smoke — k6
+    # The k6 scripts arrive with the performance phase; same rule as the E2E job.
+    needs: detect
+    if: needs.detect.outputs.k6 == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Start PostgreSQL 16
+        run: docker compose up -d --wait postgres
+
+      - name: Set up k6
+        uses: grafana/setup-k6-action@v1.3.0
+
+      - name: Build the jars
+        run: ./mvnw -B -DskipTests package
+
+      - name: Boot the stack
+        run: |
+          nohup java -jar central-convenios-mock/target/central-convenios-mock-0.1.0-SNAPSHOT.jar \
+            --server.port=8081 > mock.log 2>&1 &
+          nohup java -jar backend/target/consigport-backend-0.1.0-SNAPSHOT.jar \
+            --server.port=8080 > backend.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/actuator/health > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+
+      - name: Run the k6 smoke test
+        run: k6 run tests/k6/smoke.js
+
+      - name: Upload the k6 report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: k6-smoke-report
+          path: k6-report.html
+          if-no-files-found: ignore
+
+      - name: Stop the stack
+        if: always()
+        run: docker compose down -v
+
+  security:
+    name: Security — dependency audit and vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Pin the package manager
+        run: npm install --global npm@${{ env.NPM_VERSION }}
+
+      - name: Audit the frontend dependencies
+        run: npm audit --prefix frontend --omit=dev --audit-level=high
+
+      - name: Scan the repository with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Review the dependency changes
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high

@@ -19,32 +19,41 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
 
 ## 2. Matriz de Execução dos Gates
 
-| Portão | Escopo | Execução Local | CI no PR (`develop`/`staging`/`main`) | Push `develop` (CD Staging) | Push `main` (Release) | Nightly (Cron) |
-|---|---|:---:|:---:|:---:|:---:|:---:|
-| **Docs & Links** | Markdown, links relativos, integridade SDD | ✅ | ✅ | — | — | — |
-| **AI Usage Log** | Estrutura das sessões e atualização no PR | ✅ | ✅ | — | — | — |
-| **Backend Lint** | Spotless (formatação Java) | ✅ | ✅ | — | — | — |
-| **Backend Unit & Arch** | JUnit 5 + AssertJ + ArchUnit | ✅ | ✅ | — | — | — |
-| **Backend Integration** | Testcontainers (PostgreSQL 16) + JaCoCo | ✅ | ✅ | — | — | — |
-| **Contratos OpenAPI** | Spectral + oasdiff (breaking change) | ✅ | ✅ | — | — | — |
-| **Frontend Checks** | ESLint + TypeScript (`tsc`) + Vitest + Build | ✅ | ✅ | — | — | — |
-| **Docker Compose** | Validação sintática e compose config | ✅ | ✅ | ✅ | ✅ | — |
-| **E2E Smoke** | Playwright (fluxo completo em Docker) | ❌ | ✅ | ✅ | ✅ | ✅ |
-| **Performance Smoke** | k6 smoke test (thresholds estritos) | ❌ | ✅ | ✅ | — | — |
-| **Performance Load** | k6 load test sustentado + relatório HTML | ❌ | ❌ | — | — | ✅ |
-| **Contrato Dinâmico** | Schemathesis (property-based) | ❌ | ✅ (smoke) | — | — | ✅ (full) |
-| **Segurança** | Trivy container vulnerability scan | ❌ | ✅ | ✅ | ✅ | ✅ |
+| Portão | Escopo | Job no CI | Execução Local | CI no PR (`develop`/`staging`/`main`) | Nightly (Cron) |
+|---|---|---|:---:|:---:|:---:|
+| **Docs & Links** | Markdown, links relativos, integridade SDD | `docs` | ✅ | ✅ | — |
+| **AI Usage Log** | Estrutura das sessões e atualização no PR | `docs` | ✅ | ✅ | — |
+| **Design Tokens** | Cópia verbatim de `themes/matrix/tokens.css` | `docs` | ✅ | ✅ | — |
+| **Backend Lint** | Spotless (formatação Java) | `backend` | ✅ | ✅ | — |
+| **Backend Unit & Arch** | JUnit 5 + AssertJ + ArchUnit | `backend` | ✅ | ✅ | — |
+| **Backend Integration** | Testcontainers (PostgreSQL 16) + JaCoCo | `backend` | ✅ | ✅ | — |
+| **Mock Unit** | JUnit 5 da Central simulada | `mock` | ✅ | ✅ | — |
+| **Contratos OpenAPI** | Spectral + HMAC + oasdiff (breaking change) | `contracts` | ✅ | ✅ | ✅ (contra `main`) |
+| **Frontend Checks** | ESLint + TypeScript (`tsc`) + Vitest + Build | `frontend` | ✅ | ✅ | — |
+| **Docker Compose** | Validação sintática e compose config | `compose` | ✅ | ✅ | — |
+| **Stack Smoke** | Backend e mock contra PostgreSQL 16 | `smoke` | ❌ | ✅ | — |
+| **E2E Smoke** | Playwright (fluxo completo em Docker) | `e2e` | ❌ | ✅ (quando a suíte existe) | ✅ |
+| **Performance Smoke** | k6 smoke test (thresholds estritos) | `k6-smoke` | ❌ | ✅ (quando o script existe) | — |
+| **Performance Load** | k6 load test sustentado + relatório HTML | `k6-load` | ❌ | ❌ | ✅ |
+| **Contrato Dinâmico** | Schemathesis (property-based) | `schemathesis` | ❌ | ✅ (smoke) | ✅ (full) |
+| **Segurança** | `npm audit` + Trivy (fs e imagens) | `security` | ❌ | ✅ | ✅ |
+
+> Os jobs `e2e`, `k6-smoke`, `k6-load`, `schemathesis` e `security-images` ficam
+> condicionados à existência da suíte no commit: eles acendem sozinhos quando o
+> artefato chega, em vez de fingir um verde que não existe.
 
 ---
 
 ## 3. Detalhamento de Cada Portão
 
 ### 3.1. Portão de Documentação, Especificação (SDD) e Arquitetura
+- **Workflow:** [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml), job `docs`.
 - **Comandos:**
   ```bash
   node SDD/SKILLS/check-docs/check-docs.mjs .
   node scripts/check-specs.mjs
   node scripts/check-architecture.mjs
+  node scripts/check-theme-tokens.mjs
   node scripts/check-ai-log.mjs
   ```
 - **Critérios de Aceite:**
@@ -52,6 +61,7 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
   - Exatamente **uma** tarefa marcada como em andamento `[-]` no [`../../SDD/specs/PLAN.md`](../../SDD/specs/PLAN.md).
   - Presença de todos os documentos obrigatórios do SDD Tier 1 e Tier 2.
   - Desenhos de arquitetura validados (SVGs nativos, blocos Mermaid suportados, camadas hexagonais e matriz de rastreabilidade).
+  - `frontend/src/theme.css` idêntico a `SDD/themes/matrix/tokens.css` (`check-theme-tokens`).
   - Registro de evidência em [`../../SDD/docs/EVIDENCE.md`](../../SDD/docs/EVIDENCE.md) para tarefas finalizadas.
   - [`../ai-harness/AI_USAGE_LOG.md`](../ai-harness/AI_USAGE_LOG.md) com sessões numeradas, campos obrigatórios e cronologia; no PR, log alterado e ao menos uma sessão nova quando houver mudança de trabalho.
 
@@ -79,7 +89,7 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
 ---
 
 ### 3.3. Portão de Contratos de API (OpenAPI 3.1)
-- **Workflow:** [`.github/workflows/ci-contracts.yml`](../../.github/workflows/ci-contracts.yml) (dispara em `contracts/**`, `.spectral.yaml` e `scripts/hmac-vector.mjs`).
+- **Workflow:** [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml), job `contracts` (e `contract-drift` no nightly, comparando com `main`).
 - **Comandos:**
   ```bash
   npx --yes @stoplight/spectral-cli@6 lint contracts/*.yaml --fail-severity=warn
@@ -141,9 +151,11 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
 
 ### 3.7. Portão de Segurança e Imagens
 - **Execução:**
-  - Trivy escaneia as imagens OCI construídas (`backend`, `central-convenios-mock`, `frontend`).
+  - No PR, o job `security` roda `npm audit --omit=dev --audit-level=high`, a varredura de filesystem com Trivy e o `dependency-review` do GitHub.
+  - No nightly, o job `security-images` escaneia as imagens OCI construídas (`backend`, `central-convenios-mock`, `frontend`).
 - **Critérios de Aceite:**
   - Nenhuma vulnerabilidade `CRITICAL` ou `HIGH` sem mitigação conhecida nos pacotes base das imagens.
+  - Nenhuma dependência de produção com vulnerabilidade `high` ou `critical`.
 
 ---
 

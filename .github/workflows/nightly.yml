@@ -1,0 +1,232 @@
+name: Nightly
+
+# The heavy gates: contract drift against main, the full end-to-end suite, the
+# sustained load test, the dynamic contract test and the image scan.
+#
+# E2E, k6 and Schemathesis never run locally: they belong to the CI, and the
+# nightly is where they run at full depth.
+on:
+  schedule:
+    # 03:00 UTC, every day.
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '24'
+  NPM_VERSION: '12.0.2'
+  JAVA_VERSION: '21'
+  OASDIFF_VERSION: 'v1.39.0'
+
+jobs:
+  detect:
+    name: Detect the suites available in this commit
+    runs-on: ubuntu-latest
+    outputs:
+      e2e: ${{ steps.suites.outputs.e2e }}
+      k6: ${{ steps.suites.outputs.k6 }}
+      schemathesis: ${{ steps.suites.outputs.schemathesis }}
+      images: ${{ steps.suites.outputs.images }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Look for the suites
+        id: suites
+        run: |
+          if [ -n "$(find frontend/e2e -name '*.spec.ts' -print -quit 2>/dev/null)" ]; then
+            echo "e2e=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "e2e=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -n "$(find tests/k6 -name '*.js' -print -quit 2>/dev/null)" ]; then
+            echo "k6=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "k6=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -n "$(find tests/schemathesis -type f -print -quit 2>/dev/null)" ]; then
+            echo "schemathesis=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "schemathesis=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -n "$(find . -name 'Dockerfile' -not -path './.git/*' -print -quit 2>/dev/null)" ]; then
+            echo "images=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "images=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  contract-drift:
+    name: Contracts — breaking changes against main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install oasdiff
+        run: |
+          curl -sSfL \
+            "https://github.com/oasdiff/oasdiff/releases/download/${OASDIFF_VERSION}/oasdiff_${OASDIFF_VERSION#v}_linux_amd64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin oasdiff
+          oasdiff --version
+
+      - name: Compare the contracts with main
+        run: |
+          if git cat-file -e origin/main:contracts/consigport-api.yaml 2>/dev/null; then
+            git show origin/main:contracts/consigport-api.yaml > "$RUNNER_TEMP/main-consigport-api.yaml"
+            git show origin/main:contracts/central-api.yaml > "$RUNNER_TEMP/main-central-api.yaml"
+            oasdiff breaking "$RUNNER_TEMP/main-consigport-api.yaml" \
+              contracts/consigport-api.yaml --fail-on ERR
+            oasdiff breaking "$RUNNER_TEMP/main-central-api.yaml" \
+              contracts/central-api.yaml --fail-on ERR
+          else
+            echo "::notice::main has no contract yet; nothing to compare."
+          fi
+
+  e2e-full:
+    name: E2E — full suite
+    needs: detect
+    if: needs.detect.outputs.e2e == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Pin the package manager
+        run: npm install --global npm@${{ env.NPM_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci --prefix frontend
+
+      - name: Install the browsers
+        run: npm exec --prefix frontend -- playwright install --with-deps chromium
+
+      - name: Run the end-to-end suite
+        run: npm run --prefix frontend test:e2e
+
+      - name: Upload the Playwright report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-playwright-report
+          path: frontend/playwright-report
+          if-no-files-found: ignore
+
+  k6-load:
+    name: Performance — sustained load
+    needs: detect
+    if: needs.detect.outputs.k6 == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Set up k6
+        uses: grafana/setup-k6-action@v1.3.0
+
+      - name: Start PostgreSQL 16
+        run: docker compose up -d --wait postgres
+
+      - name: Build the jars
+        run: ./mvnw -B -DskipTests package
+
+      - name: Boot the stack
+        run: |
+          nohup java -jar central-convenios-mock/target/central-convenios-mock-0.1.0-SNAPSHOT.jar \
+            --server.port=8081 > mock.log 2>&1 &
+          nohup java -jar backend/target/consigport-backend-0.1.0-SNAPSHOT.jar \
+            --server.port=8080 > backend.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/actuator/health > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+
+      - name: Run the sustained load test
+        run: k6 run tests/k6/load.js
+
+      - name: Upload the k6 report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-k6-report
+          path: k6-report.html
+          if-no-files-found: ignore
+
+      - name: Stop the stack
+        if: always()
+        run: docker compose down -v
+
+  schemathesis:
+    name: Contract — dynamic test
+    needs: detect
+    if: needs.detect.outputs.schemathesis == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install Schemathesis
+        run: pip install schemathesis
+
+      - name: Run the dynamic contract test
+        run: schemathesis run tests/schemathesis/consigport.yaml
+
+  security-images:
+    name: Security — container images
+    needs: detect
+    if: needs.detect.outputs.images == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Build the images
+        run: |
+          docker build -t consigport-backend:nightly backend
+          docker build -t consigport-central-mock:nightly central-convenios-mock
+
+      - name: Scan the images with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: consigport-backend:nightly
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Scan the mock image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: consigport-central-mock:nightly
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true
