@@ -86,7 +86,7 @@
 - (comando da task) → exit 0
 
 **Arquivos tocados:** (lista, no máximo 5)
-**Commit:** `type(scope): descrição. (Agent: OpenCode - DeepSeek V4.1 Flash)`
+**Commit:** `type(scope): descrição. (Agent: OpenCode - MiniMax-M3.1-Flash)`
 ```
 
 Gate completo e o que cada comando prova: [`../../docs/quality/GATES.md`](../../docs/quality/GATES.md).
