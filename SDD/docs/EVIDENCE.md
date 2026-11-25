@@ -326,7 +326,7 @@
 
 - **Data de Conclusão:** 2026-11-25
 - **Branch:** `feat/006-backend-scaffold`
-- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
 - **Objetivo:** Aplicação Spring Boot vazia, compilando, com health respondendo `UP` e
   configuração única (`application.yml`) dirigida por `DATABASE_URL`.
 
@@ -403,7 +403,7 @@
 
 - **Data de Conclusão:** 2026-11-25
 - **Branch:** `feat/007-mock-scaffold`
-- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
 - **Objetivo:** Central simulada vazia, sem banco e sem Flyway, compilando e respondendo
   `UP` na porta 8081, pronta para receber o contrato em português.
 
@@ -464,7 +464,7 @@
 
 - **Data de Conclusão:** 2026-11-25
 - **Branch:** `feat/008-frontend-base`
-- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
 - **Objetivo:** Projeto React 19.2 com Vite RSC, TypeScript e Tailwind 4, sem Next.js,
   consumindo os tokens do `DESIGN.md` e com os scripts de qualidade exigidos pelos gates.
 
@@ -563,7 +563,7 @@
 
 - **Data de Conclusão:** 2026-11-25
 - **Branch:** `feat/009-shell-matrix`
-- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
 - **Objetivo:** Casca visual navegável dark-only, conforme o `DESIGN.md`, com tokens
   verbatim, fontes locais, primitivas reutilizáveis e as três viewports do §4b provadas.
 
@@ -661,7 +661,7 @@
 - **Data de Conclusão:** 2026-11-25
 - **Branch:** `feat/010-ci-pipeline`
 - **PR:** [#12](https://github.com/marcelinosandroni/consigport-platform/pull/12)
-- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
 - **Objetivo:** Um pipeline único com jobs paralelos que provam cada PR, mais o nightly
   com os portões pesados (drift de contrato, E2E completo, carga, Schemathesis e
   scan das imagens).

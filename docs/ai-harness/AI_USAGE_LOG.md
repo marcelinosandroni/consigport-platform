@@ -5,6 +5,39 @@
 
 ---
 
+## Estratégia de Modelos: 100% Free
+
+O ConsigPort é desenvolvido **sem nenhum custo de API**. A escolha do modelo é uma
+decisão de projeto, não um detalhe da ferramenta: toda a Fase 0 roda em modelos
+gratuitos e leves, para que qualquer pessoa possa reproduzir a entrega.
+
+| Sessões | Tarefas | Harness | Provider | Modelo |
+|---|---|---|---|---|
+| #01, #07–#09 | 0.1, 0.4, 0.5 | OpenCode | — | DeepSeek V4.1 Flash |
+| #02–#06 | 0.1 a 0.4 | Antigravity | Google | Gemini 3.8 Flash |
+| #10 em diante | 0.6 em diante | OpenCode | NVIDIA | MiniMax-M3.1-Flash (`nvidia/minimaxai/minimax-m3.1-flash`) |
+
+- **Harness estável:** `OpenCode` cobre a fase inteira; o que muda entre as tasks é o
+  provider e o modelo atendidos por ele.
+- **Modelo leve:** `MiniMax-M3.1-Flash` pertence à família Flash — resposta rápida e
+  consumo de contexto baixo, as duas características que mantêm viável o ciclo SDD
+  (task de até uma hora, evidência colada, commit pequeno) sem pagar por token.
+- **Custo zero:** nenhum modelo pago entra no desenvolvimento. Adotar um exige
+  decisão explícita do desenvolvedor e registro nesta política.
+- **Atribuição real:** o par agente/modelo registrado aqui e o trailer
+  `(Agent: ...)` do commit descrevem a sessão em que o trabalho foi feito, nunca o
+  de uma sessão anterior.
+
+> **Fonte de verdade.** Este diário é o registro autoritativo de atribuição. O
+> trailer `(Agent: ...)` já gravado em commits antigos pode ter ficado desatualizado
+> quando o modelo mudou no meio da fase; quando divergirem, este diário prevalece.
+> O histórico de commits não é reescrito: ele é registro imutável, como a trilha de
+> auditoria do domínio.
+
+Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
+
+---
+
 ## Sessão #01 — Refinamento Inicial e Fundação SDD
 
 - **Data:** 2026-11-23
@@ -231,7 +264,7 @@
 ## Sessão #10 — Task 0.6 (Scaffold do Backend)
 
 - **Data:** 2026-11-25
-- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
 - **Branch:** `feat/006-backend-scaffold`
 - **Objetivo:** Aplicação Spring Boot vazia, compilando e com health `UP`, base para as fatias de domínio seguintes.
 
@@ -260,7 +293,7 @@
 ## Sessão #11 — Task 0.7 (Scaffold do Mock da Central)
 
 - **Data:** 2026-11-25
-- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
 - **Branch:** `feat/007-mock-scaffold`
 - **Objetivo:** Central simulada vazia, sem banco e sem Flyway, compilando e com health `UP` na porta 8081.
 
@@ -286,7 +319,7 @@
 ## Sessão #12 — Task 0.8 (Base do Frontend RSC)
 
 - **Data:** 2026-11-25
-- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
 - **Branch:** `feat/008-frontend-base`
 - **Objetivo:** Projeto React 19.2 com Vite RSC, TypeScript e Tailwind 4, sem Next.js, consumindo os tokens do `DESIGN.md`.
 
@@ -317,7 +350,7 @@
 ## Sessão #13 — Task 0.9 (Shell RSC e tema Matrix)
 
 - **Data:** 2026-11-25
-- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
 - **Branch:** `feat/009-shell-matrix`
 - **Objetivo:** Casca visual navegável dark-only, conforme o `DESIGN.md`, com tokens verbatim, fontes locais e primitivas reutilizáveis.
 
@@ -354,7 +387,7 @@
 ## Sessão #14 — Task 0.10 (Pipeline de Integração Contínua)
 
 - **Data:** 2026-11-25
-- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
 - **Branch:** `feat/010-ci-pipeline`
 - **Objetivo:** Um pipeline único com jobs paralelos que provam cada PR, mais o nightly com os portões pesados.
 
@@ -391,7 +424,7 @@
 ## Sessão #15 — Task 0.11 (Release e Entrega Contínua)
 
 - **Data:** 2026-11-25
-- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
 - **Branch:** `feat/011-release-cd`
 - **Objetivo:** Conventional Commits viram changelog e tag SemVer, as três imagens são publicadas no GHCR e a tag dispara o deploy de staging.
 
@@ -408,3 +441,29 @@
 5. **Validação:**
    - `release-please` em modo dry-run, `docker build` das três imagens e `docker compose config -q` dos dois arquivos de compose.
 6. **Entrega:** branch `feat/011-release-cd` com commits e PR para `develop`.
+
+---
+
+## Sessão #16 — Correção da Atribuição de Modelo e Política 100% Free
+
+- **Data:** 2026-11-25
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
+- **Branch:** `feat/011-release-cd`
+- **Objetivo:** Corrigir a atribuição de harness, provider e modelo das sessões da Fase 0 e registrar a política de modelos gratuitos do projeto.
+
+### Atividades Realizadas:
+1. **Correção das Sessões #10 a #15:**
+   - As tasks 0.6 a 0.11 foram executadas no harness OpenCode com o provider NVIDIA e o modelo `nvidia/minimaxai/minimax-m3.1-flash` (MiniMax-M3.1-Flash); o diário as registrava como DeepSeek V4.1 Flash.
+   - As sessões #01 a #09 permanecem como DeepSeek V4.1 Flash e Gemini 3.8 Flash, conforme executado.
+2. **Correção das Evidências:**
+   - [`../../SDD/docs/EVIDENCE.md`](../../SDD/docs/EVIDENCE.md) atualizado nas tasks 0.6 a 0.10 com o mesmo par provider/modelo.
+3. **Política de Modelos Gratuitos:**
+   - Nova seção 4 em [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) que fixa a estratégia 100% free: harness OpenCode, provider NVIDIA, modelo leve MiniMax-M3.1-Flash e custo zero de API.
+   - O trailer `(Agent: ...)` passa a exigir o par real (harness e modelo) da sessão, nunca o de uma sessão anterior.
+4. **Exemplos de Formato Corrigidos:**
+   - [`../adr/0006-gitflow-ci-cd-docker-e-performance.md`](../adr/0006-gitflow-ci-cd-docker-e-performance.md), [`../../SDD/specs/BACKLOG.md`](../../SDD/specs/BACKLOG.md) e [`../../SDD/specs/PLAN.md`](../../SDD/specs/PLAN.md) deixam de fixar um modelo antigo.
+5. **Histórico Preservado:**
+   - Os títulos de commit já escritos mantêm a anotação original: o histórico é append-only e não é reescrito. O diário é a fonte de verdade da atribuição.
+6. **Validação:**
+   - `node scripts/check-ai-log.mjs` → log válido.
+   - `node scripts/check-specs.mjs`, `node SDD/SKILLS/check-docs/check-docs.mjs .` e `node scripts/check-architecture.mjs` → exit 0.
