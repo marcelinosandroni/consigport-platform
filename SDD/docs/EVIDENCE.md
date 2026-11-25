@@ -396,3 +396,64 @@
 - `SDD/specs/PLAN.md`
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 0.7 — Scaffold do Mock da Central
+
+- **Data de Conclusão:** 2026-11-25
+- **Branch:** `feat/007-mock-scaffold`
+- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Objetivo:** Central simulada vazia, sem banco e sem Flyway, compilando e respondendo
+  `UP` na porta 8081, pronta para receber o contrato em português.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Build do módulo no reactor:**
+   ```powershell
+   .\mvnw.cmd -q -pl central-convenios-mock -am verify
+   ```
+   *Saída obtida:*
+   ```text
+   Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 10.68 s
+     -- in br.com.consigport.central.CentralConveniosMockApplicationTests
+   verify_exit=0
+   ```
+
+2. **Processo real (jar empacotado) respondendo por HTTP:**
+   ```powershell
+   java -jar central-convenios-mock/target/central-convenios-mock-0.1.0-SNAPSHOT.jar --server.port=18081
+   ```
+   *Saída obtida:*
+   ```text
+   GET /actuator/health → 200 {"status":"UP","groups":["liveness","readiness"]}
+   GET /v3/api-docs     → 200 {"openapi":"3.1.0","info":{"title":"Open...
+   stopped_pid=27772
+   ```
+
+3. **Invariantes de documentação e especificação:**
+   ```powershell
+   node scripts/check-specs.mjs
+   node SDD/SKILLS/check-docs/check-docs.mjs .
+   node scripts/check-architecture.mjs
+   ```
+   *Saída obtida:* exit 0 nos três.
+
+#### Conteúdo Entregue:
+- **Dependências:** `web`, `validation`, `actuator`, springdoc e `spring-boot-starter-test`;
+  nenhum JPA, nenhum Flyway, nenhum driver de banco.
+- **Configuração:** porta `8081` (`SERVER_PORT:8081`), `shutdown: graceful`, actuator
+  expondo `health`/`info` com probes, Swagger em `/swagger-ui.html` e springdoc em
+  `openapi_3_1` para espelhar `contracts/central-api.yaml`.
+- **Perfil `local`:** log `DEBUG` de `br.com.consigport.central`, sem datasource.
+- **Testes:** health `UP` e `/v3/api-docs` publicando `3.1.0`, além da prova em processo
+  real com o jar empacotado.
+
+#### Arquivos Tocados:
+- `central-convenios-mock/pom.xml`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/CentralConveniosMockApplication.java`
+- `central-convenios-mock/src/main/resources/application.yml`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/CentralConveniosMockApplicationTests.java`
+- `SDD/specs/PLAN.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`

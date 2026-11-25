@@ -254,3 +254,29 @@
 6. **Débito Registrado:**
    - H2 substitui o PostgreSQL no teste do scaffold; a task de persistência troca por Testcontainers PostgreSQL 16 e reativa o Flyway.
 7. **Entrega:** branch `feat/006-backend-scaffold` com commit e PR para `develop`.
+
+---
+
+## Sessão #11 — Task 0.7 (Scaffold do Mock da Central)
+
+- **Data:** 2026-11-25
+- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Branch:** `feat/007-mock-scaffold`
+- **Objetivo:** Central simulada vazia, sem banco e sem Flyway, compilando e com health `UP` na porta 8081.
+
+### Atividades Realizadas:
+1. **Dependências do Mock:**
+   - [`../../central-convenios-mock/pom.xml`](../../central-convenios-mock/pom.xml) com `web`, `validation`, `actuator`, springdoc e `spring-boot-starter-test`.
+   - Nenhum JPA, Flyway ou driver de banco: o estado é em memória e resetável, o que preserva o determinismo dos testes.
+2. **Aplicação:**
+   - Criação de `central-convenios-mock/src/main/java/br/com/consigport/central/CentralConveniosMockApplication.java`.
+3. **Configuração:**
+   - [`../../central-convenios-mock/src/main/resources/application.yml`](../../central-convenios-mock/src/main/resources/application.yml) com porta `8081`, `shutdown: graceful`, actuator com probes, Swagger em `/swagger-ui.html` e springdoc em `openapi_3_1`.
+   - Perfil `local` com log `DEBUG` de `br.com.consigport.central`.
+4. **Testes e Prova em Processo Real:**
+   - `CentralConveniosMockApplicationTests` prova `GET /actuator/health` → `UP` e `GET /v3/api-docs` → `3.1.0`.
+   - Execução do jar empacotado em `--server.port=18081` com `GET /actuator/health` → `200 {"status":"UP","groups":["liveness","readiness"]}`.
+5. **Validação:**
+   - `.\mvnw.cmd -q -pl central-convenios-mock -am verify` → `Tests run: 2, Failures: 0`, exit 0.
+   - `check-specs`, `check-docs` e `check-architecture` → exit 0.
+6. **Entrega:** branch `feat/007-mock-scaffold` com commit e PR para `develop`.

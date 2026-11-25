@@ -37,7 +37,9 @@
       Branch `feat/006-backend-scaffold`. Aplicação Spring Boot com web, validation,
       JPA, Flyway, actuator e springdoc; porta 8080, perfil `local` via `DATABASE_URL`
       e health respondendo `UP`.
-- [ ] 0.7 — Scaffold do mock (pom, aplicação, `application.yml`)
+- [x] **0.7 — Scaffold do mock (pom, aplicação, `application.yml`)**
+      Branch `feat/007-mock-scaffold`. Central simulada sem banco e sem Flyway, porta
+      8081, actuator e springdoc habilitados, com health `UP` provado no processo real.
 - [ ] 0.8 — Base do frontend RSC (package, Vite, TypeScript, Tailwind)
 - [ ] 0.9 — Shell RSC, tema Matrix e fontes locais
 - [ ] 0.10 — `ci.yml` completo e `nightly.yml`
