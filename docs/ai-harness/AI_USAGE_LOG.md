@@ -379,4 +379,5 @@
 8. **O Portão Encontrou uma Vulnerabilidade Real:**
    - O job `security` reprovou o primeiro PR: `org.postgresql:postgresql` 42.7.11 com `CVE-2026-54291` (downgrade de SCRAM-SHA-256-PLUS), corrigida em 42.7.12.
    - O driver foi sobrescrito no `pom.xml` para 42.7.15, acima da versão corrigida.
+   - O `dependency-review` do GitHub foi removido do job: a API de Dependency Graph está desabilitada neste repositório, e a varredura de filesystem do Trivy já lê `pom.xml` e `package-lock.json`.
 9. **Entrega:** branch `feat/010-ci-pipeline` com commit e PR para `develop`; a task fecha com os jobs verdes deste PR.

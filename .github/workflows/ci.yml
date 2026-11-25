@@ -415,9 +415,5 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: '1'
           ignore-unfixed: true
-
-      - name: Review the dependency changes
-        if: github.event_name == 'pull_request'
-        uses: actions/dependency-review-action@v5
-        with:
-          fail-on-severity: high
+          # Trivy reads the Maven and npm manifests, so the dependency surface
+          # of the repository is covered by this single scan.

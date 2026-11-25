@@ -151,7 +151,7 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
 
 ### 3.7. Portão de Segurança e Imagens
 - **Execução:**
-  - No PR, o job `security` roda `npm audit --omit=dev --audit-level=high`, a varredura de filesystem com Trivy e o `dependency-review` do GitHub.
+  - No PR, o job `security` roda `npm audit --omit=dev --audit-level=high` e a varredura de filesystem com Trivy, que lê `pom.xml` e `package-lock.json` e cobre a superfície de dependências do repositório.
   - No nightly, o job `security-images` escaneia as imagens OCI construídas (`backend`, `central-convenios-mock`, `frontend`).
 - **Critérios de Aceite:**
   - Nenhuma vulnerabilidade `CRITICAL` ou `HIGH` sem mitigação conhecida nos pacotes base das imagens.
