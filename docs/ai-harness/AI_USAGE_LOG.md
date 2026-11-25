@@ -439,8 +439,16 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
 4. **Deploy de staging:**
    - `.github/workflows/cd-staging.yml` dispara na tag, sobe `compose.staging.yaml` com as imagens publicadas, espera os healthchecks e valida backend, mock e frontend.
 5. **Validação:**
-   - `release-please` em modo dry-run, `docker build` das três imagens e `docker compose config -q` dos dois arquivos de compose.
-6. **Entrega:** branch `feat/011-release-cd` com commits e PR para `develop`.
+   - `docker build` das três imagens → exit 0; `actionlint` (v1.7.12) sem erros nos quatro workflows; `docker compose config -q` dos dois compose → exit 0.
+   - Stack de staging real com os quatro serviços `healthy`: backend e mock em `UP`, frontend em HTTP 200.
+   - `release-please` em dry-run → `v0.1.0`.
+6. **Defeito Encontrado pelo Dry-Run:**
+   - A primeira execução propôs `1.0.0` em vez de `0.1.0`: sem release anterior, o release-please não usa a versão do manifesto, e sim `initialReleaseVersion()`, cujo padrão é `1.0.0`.
+   - Correção: `initial-version: "0.1.0"` no `release-please-config.json` (commit `de2d260`).
+   - O token nunca entra no argv: o dry-run roda pela API programática (`release-please/build/src/index.js`) com o token vindo de uma variável de ambiente.
+7. **Defeitos Encontrados pelo Deploy de Staging:**
+   - O reactor Maven exigia o `pom.xml` dos dois módulos; a imagem do frontend exigia o `vite.config.ts` e a propriedade de `node_modules`; o healthcheck do frontend precisou de `127.0.0.1` em vez de `localhost` (o busybox resolve `::1` primeiro).
+8. **Entrega:** branch `feat/011-release-cd` com commits e PR [#15](https://github.com/marcelinosandroni/consigport-platform/pull/15) para `develop`; task 0.11 fechada e task 0.12 (promoção da `v0.1.0`) aberta.
 
 ---
 

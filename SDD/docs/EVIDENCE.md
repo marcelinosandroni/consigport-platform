@@ -767,3 +767,196 @@
 - `pom.xml`
 - `docs/quality/GATES.md`
 - `SDD/specs/PLAN.md`, `SDD/docs/EVIDENCE.md`, `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 0.11 — Release e Entrega Contínua
+
+- **Data de Conclusão:** 2026-11-25
+- **Branch:** `feat/011-release-cd`
+- **PR:** [#15](https://github.com/marcelinosandroni/consigport-platform/pull/15)
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
+- **Objetivo:** Uma versão para a plataforma inteira (release-please), as três imagens
+  publicadas no GHCR por tag SemVer e o deploy de staging disparado pela tag.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Build das três imagens (contexto na raiz do repositório):**
+   ```powershell
+   docker build -f backend/Dockerfile -t consigport-backend:local .
+   docker build -f central-convenios-mock/Dockerfile -t consigport-central-mock:local .
+   docker build -f frontend/Dockerfile -t consigport-frontend:local .
+   ```
+   *Saída obtida:*
+   ```text
+   #20 naming to docker.io/library/consigport-backend:local done
+   #20 DONE 0.1s
+   backend_build_exit=0
+   #20 naming to docker.io/library/consigport-central-mock:local done
+   #20 DONE 0.1s
+   mock_build_exit=0
+   #19 naming to docker.io/library/consigport-frontend:local done
+   #19 DONE 0.1s
+   frontend_build_exit=0
+   ```
+   O contexto é a **raiz** porque o reactor Maven precisa do `pom.xml` pai. Os três
+   estágios de runtime rodam sem privilégio (`consigport` nos jars, `node` no frontend)
+   e trazem `HEALTHCHECK` próprio.
+
+2. **Lint dos workflows (actionlint v1.7.12):**
+   ```powershell
+   actionlint .github/workflows/ci.yml .github/workflows/nightly.yml `
+             .github/workflows/release.yml .github/workflows/cd-staging.yml
+   ```
+   *Saída obtida:* nenhum diagnóstico; `actionlint_exit=0`.
+
+3. **Validação dos dois arquivos de compose:**
+   ```powershell
+   docker compose config -q
+   docker compose -f compose.staging.yaml config -q
+   ```
+   *Saída obtida:* `compose_exit=0` e `staging_compose_exit=0`.
+
+4. **Stack de staging real (imagens construídas localmente, tags GHCR emuladas):**
+   ```powershell
+   docker tag consigport-backend:local ghcr.io/marcelinosandroni/consigport-platform/backend:latest
+   docker tag consigport-central-mock:local ghcr.io/marcelinosandroni/consigport-platform/central-convenios-mock:latest
+   docker tag consigport-frontend:local ghcr.io/marcelinosandroni/consigport-platform/frontend:latest
+   docker compose -f compose.staging.yaml up -d --wait --wait-timeout 180
+   ```
+   *Saída obtida:*
+   ```text
+   up_exit=0
+   backend: Up 8 minutes (healthy)
+   central-convenios-mock: Up 8 minutes (healthy)
+   frontend: Up About a minute (healthy)
+   postgres: Up 8 minutes (healthy)
+   backend_health={"status":"UP","groups":["liveness","readiness"]}
+   mock_health={"status":"UP","groups":["liveness","readiness"]}
+   frontend_status=200
+   ```
+   A primeira tentativa reprovou e revelou quatro defeitos reais, corrigidos antes do
+   fechamento:
+   - O reactor Maven exigia o `pom.xml` dos **dois** módulos: `backend` e
+     `central-convenios-mock` precisam existir no contexto do build.
+   - A imagem do frontend precisa do `vite.config.ts`: sem ele o `vite preview` sobe
+     sem o plugin RSC e responde `404` em todas as rotas.
+   - O `vite preview` escreve em `node_modules/.vite-temp`, então a árvore precisa
+     pertencer ao usuário `node` (`chown -R node:node`).
+   - O healthcheck do frontend usa `127.0.0.1`: o servidor escuta só IPv4 e o busybox
+     resolve `localhost` para `::1` primeiro, o que produz `Connection refused`.
+
+5. **Dry-run do release-please (API programática, token fora do argv):**
+   O CLI só aceita `--token` por argv e o `npm notice run` ecoa a linha de comando
+   inteira — foi assim que um token vazou nesta fase. O dry-run roda pela API
+   programática (`release-please/build/src/index.js`), com o token lido de um arquivo
+   temporário privado e passado por variável de ambiente:
+   ```powershell
+   $env:RELEASE_PLEASE_TOKEN = (Get-Content -Raw <arquivo privado>).Trim()
+   node release-dry-run.mjs
+   ```
+   *Saída obtida:*
+   ```text
+   > Fetching release-please-config.json from branch feat/011-release-cd
+   > Fetching .release-please-manifest.json from branch feat/011-release-cd
+   √ Building strategies by path
+   > .: simple
+   √ Splitting 36 commits by path
+   √ Building candidate release pull request for path: .
+   > type: simple
+   > targetBranch: feat/011-release-cd
+   > commits: 36
+   Would open 1 pull requests
+   title: chore(feat/011-release-cd): release 0.1.0
+   branch: release-please--branches--feat/011-release-cd--components--consigport-platform
+   draft: false
+   body: :robot: I have created a release *beep* *boop*
+   ---
+
+   ## 0.1.0 (2026-11-25)
+
+   ### Features
+
+   * **backend:** scaffold the spring boot application with health and openapi. (Agent: OpenCode - DeepSeek V4.1 Flash) ([#8](https://github.com/marcelinosandroni/consigport-platform/issues/8)) ([ce7226f](https://github.com/marcelinosandroni/consigport-platform/commit/ce7226faf8762c8ca27fa3af73864a3da5828761))
+   * **contracts:** define public api, central mock and hmac vector ([#7](https://github.com/marcelinosandroni/consigport-platform/issues/7)) ([69a8310](https://github.com/marcelinosandroni/consigport-platform/commit/69a83101ce5a0debf0e92cb116a203a431dab56a))
+   * **frontend:** add the rsc shell with the matrix design system ([#11](https://github.com/marcelinosandroni/consigport-platform/issues/11)) ([06c9195](https://github.com/marcelinosandroni/consigport-platform/commit/06c9195c246de49ac7831a2c424c893e535b126b))
+   * **gitflow:** add pull request template, CODEOWNERS and gitflow process documentation. (Agent: Antigravity - Gemini 3.8 Flash) ([1bd31fa](https://github.com/marcelinosandroni/consigport-platform/commit/1bd31fa58ae7a2c4d05f879feb00c546b7033df8))
+   * **gitflow:** governança de branches, template de PR e CODEOWNERS ([d623c50](https://github.com/marcelinosandroni/consigport-platform/commit/d623c50a1272b29c6f9762fda101e9d69d2bd769))
+   * **infra:** add monorepo gitignore, env template and compose with postgres 16. (Agent: Antigravity - Gemini 3.8 Flash) ([985e87a](https://github.com/marcelinosandroni/consigport-platform/commit/985e87af95231460056ebfc8faf9af22ff261e03))
+   * **infra:** ambiente local, .env.example e compose com postgresql 16 ([322fac0](https://github.com/marcelinosandroni/consigport-platform/commit/322fac0e39d033f8f4e6221c9621241749f7307e))
+   * **mock:** scaffold the central mock with health and openapi. (Agent: OpenCode - DeepSeek V4.1 Flash) ([#9](https://github.com/marcelinosandroni/consigport-platform/issues/9)) ([d584249](https://github.com/marcelinosandroni/consigport-platform/commit/d584249d878d08b4468be5d7a38cbe5f207fa6f4))
+
+   ### Bug Fixes
+
+   * **release:** set the initial version so the first release is v0.1.0. (Agent: OpenCode - MiniMax-M3.1-Flash) ([de2d260](https://github.com/marcelinosandroni/consigport-platform/commit/de2d260573c1c9ca2a17780c50c1f4254082074c))
+
+   updates: 3
+     CHANGELOG.md: Changelog
+     .release-please-manifest.json: ReleasePleaseManifest
+   Index: .release-please-manifest.json
+   @@ -1,3 +1,3 @@
+    {
+   -  ".": "0.0.0"
+   +  ".": "0.1.0"
+    }
+
+   dry_run_exit=0
+   ```
+   **O dry-run encontrou um defeito real.** A primeira execução propôs `1.0.0`, e não
+   `0.1.0`. A causa está em `BaseStrategy.buildNewVersion()`: sem release anterior, o
+   release-please não usa a versão do manifesto, e sim `initialReleaseVersion()`, cujo
+   padrão é `1.0.0`. A correção foi a chave `initial-version: "0.1.0"` no
+   `release-please-config.json` (commit `de2d260`). A tag gerada é `v0.1.0`, que é a
+   saída da Fase 0.
+
+6. **Invariantes de especificação, links, arquitetura e diário de IA:**
+   ```powershell
+   node scripts/check-specs.mjs
+   node SDD/SKILLS/check-docs/check-docs.mjs .
+   node scripts/check-architecture.mjs
+   node scripts/check-ai-log.mjs
+   ```
+   *Saída obtida:*
+   ```text
+   ✓ SDD specifications valid:
+     - Required core documents and ADRs present.
+     - Exactly 1 task in flight in SDD/specs/PLAN.md.
+     - Tasks in PLAN.md are cataloged in BACKLOG.md.
+
+   ✓ 62 documents, every relative link resolves.
+
+   🎉 Todos os 22 testes de validação dos desenhos e arquitetura passaram com sucesso!
+
+   ✓ AI usage log: 16 sessions, structure valid.
+   ```
+
+#### Conteúdo Entregue:
+- **Imagens:** `backend/Dockerfile`, `central-convenios-mock/Dockerfile` e
+  `frontend/Dockerfile` em build de múltiplos estágios, a partir do contexto da raiz,
+  com runtime sem privilégio e `HEALTHCHECK`; `.dockerignore` na raiz.
+- **Versionamento:** `release-please-config.json` com o tipo `simple` (uma versão para
+  a plataforma inteira), `initial-version: 0.1.0` e manifesto começando em `0.0.0`.
+- **Publicação:** `.github/workflows/release.yml` roda o release-please no push em
+  `main` e publica as três imagens no GHCR com as tags `vX.Y.Z`, `X.Y.Z` e `latest`
+  (a `latest` nunca é movida por uma pré-release).
+- **Deploy:** `.github/workflows/cd-staging.yml` dispara na tag, sobe
+  `compose.staging.yaml` com as imagens publicadas, exige os healthchecks dos três
+  serviços e imprime os digests.
+- **Nightly:** `.github/workflows/nightly.yml` passa a construir e escanear as três
+  imagens com Trivy; `.github/workflows/ci.yml` valida o compose de staging.
+- **Documentação:** `docs/process/RELEASE.md` (fluxo, imagens, rollback e segredos),
+  portão 3.8 e matriz em `docs/quality/GATES.md`.
+- **Governança de IA:** atribuição de agente/modelo corrigida nas tasks 0.6 a 0.11 e
+  política de modelos gratuitos registrada em `docs/ai-harness/HARNESS_OVERVIEW.md` §4.
+
+#### Arquivos Tocados:
+- `.dockerignore`
+- `backend/Dockerfile`, `central-convenios-mock/Dockerfile`, `frontend/Dockerfile`
+- `release-please-config.json`, `.release-please-manifest.json`
+- `.github/workflows/release.yml`, `.github/workflows/cd-staging.yml`
+- `.github/workflows/ci.yml`, `.github/workflows/nightly.yml`
+- `compose.staging.yaml`
+- `docs/process/RELEASE.md`, `docs/quality/GATES.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`, `docs/ai-harness/HARNESS_OVERVIEW.md`
+- `docs/adr/0006-gitflow-ci-cd-docker-e-performance.md`
+- `SDD/specs/PLAN.md`, `SDD/specs/BACKLOG.md`, `SDD/docs/EVIDENCE.md`

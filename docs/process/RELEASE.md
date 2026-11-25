@@ -39,6 +39,13 @@ flowchart LR
 | [`../../compose.staging.yaml`](../../compose.staging.yaml) | Stack de staging com as imagens publicadas. |
 | `backend/Dockerfile`, `central-convenios-mock/Dockerfile`, `frontend/Dockerfile` | As três imagens, em build de múltiplos estágios. |
 
+> **Sobre o `version.txt`:** a strategy `simple` do release-please atualiza um
+> arquivo `version.txt` na raiz **quando ele existe**. O ConsigPort não usa esse
+> arquivo — a versão da plataforma vive no
+> [`.release-please-manifest.json`](../../.release-please-manifest.json) e nas
+> coordenadas do `pom.xml`. O updater roda com `createIfMissing: false`, então o PR
+> de release não cria o arquivo.
+
 ---
 
 ## 3. Fluxo de Release
