@@ -40,7 +40,7 @@
 - [x] **0.7 — Scaffold do mock (pom, aplicação, `application.yml`)**
       Branch `feat/007-mock-scaffold`. Central simulada sem banco e sem Flyway, porta
       8081, actuator e springdoc habilitados, com health `UP` provado no processo real.
-- [-] **0.8 — Base do frontend RSC (package, Vite, TypeScript, Tailwind)**
+- [x] **0.8 — Base do frontend RSC (package, Vite, TypeScript, Tailwind)**
       Branch `feat/008-frontend-base`. Template oficial `rsc` do Vite com React 19.2,
       Tailwind 4 consumindo os tokens do `DESIGN.md` e scripts `dev`, `build`, `lint`,
       `typecheck` e `test:unit`.

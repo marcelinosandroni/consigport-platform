@@ -457,3 +457,102 @@
 - `SDD/specs/PLAN.md`
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 0.8 — Base do Frontend RSC
+
+- **Data de Conclusão:** 2026-11-25
+- **Branch:** `feat/008-frontend-base`
+- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Objetivo:** Projeto React 19.2 com Vite RSC, TypeScript e Tailwind 4, sem Next.js,
+  consumindo os tokens do `DESIGN.md` e com os scripts de qualidade exigidos pelos gates.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Instalação reprodutível e build dos três ambientes RSC:**
+   ```powershell
+   npm ci --prefix frontend
+   npm run --prefix frontend build
+   ```
+   *Saída obtida:*
+   ```text
+   added 277 packages, and audited 284 packages in 5s
+   ci_exit=0
+
+   [3/5] build rsc environment...  ✓ 57 modules transformed.
+   dist/rsc/index.js                                   424.60 kB
+   [4/5] build client environment... ✓ 42 modules transformed.
+   dist/client/assets/index-C6Rif_XN.js                223.16 kB │ gzip: 70.40 kB
+   [5/5] build ssr environment...   ✓ 52 modules transformed.
+   dist/ssr/index.js                                1,582.08 kB
+   build_exit=0
+   ```
+
+2. **Qualidade do frontend:**
+   ```powershell
+   npm run --prefix frontend lint
+   npm run --prefix frontend typecheck
+   npm run --prefix frontend test:unit
+   ```
+   *Saída obtida:*
+   ```text
+   lint_exit=0
+   typecheck_exit=0
+   Test Files  1 passed (1)
+        Tests  1 passed (1)
+   test_exit=0
+   ```
+
+3. **Prova de vida com o servidor de desenvolvimento:**
+   ```powershell
+   npm run --prefix frontend dev -- --port 15173 --strictPort
+   ```
+   *Saída obtida:*
+   ```text
+   VITE v7.3.8 ready in 476 ms
+   dev_status=200
+   <!DOCTYPE html><html lang="pt-BR"><head>...<title>ConsigPort</title></head>
+   <body><main class="p-8"><h1 class="text-headline-lg">ConsigPort</h1>...
+   ```
+
+4. **Tokens sem deriva:**
+   ```powershell
+   node scripts/check-theme-tokens.mjs
+   ```
+   *Saída obtida:*
+   ```text
+   ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css byte for byte.
+   tokens_exit=0
+   ```
+
+5. **Invariantes de especificação, links e arquitetura:**
+   ```powershell
+   node scripts/check-specs.mjs
+   node SDD/SKILLS/check-docs/check-docs.mjs .
+   node scripts/check-architecture.mjs
+   ```
+   *Saída obtida:* exit 0 nos três.
+
+#### Conteúdo Entregue:
+- **Template oficial:** `npm create vite@latest frontend -- --template rsc`, com os ambientes
+  `rsc`, `ssr` e `client` do `@vitejs/plugin-rsc` e as entradas em `src/framework/`.
+- **Versões:** React 19.2.9, React DOM 19.2.9, Vite 7.3.8, Tailwind CSS 4.3.5,
+  TypeScript 5.9, ESLint 9.39, Vitest 4.1.12 e Testing Library 16, conforme `APP-STACK`.
+- **Scripts:** `dev`, `build`, `preview`, `lint`, `typecheck` e `test:unit`.
+- **Tema:** `src/theme.css` como cópia verbatim de `SDD/themes/matrix/tokens.css`, consumida
+  por `src/styles.css` com `@import "tailwindcss"`; `scripts/check-theme-tokens.mjs`
+  bloqueia a deriva entre a fonte e a cópia.
+- **Tipagem estrita:** `strict`, `noUncheckedIndexedAccess` e `noImplicitOverride`, com
+  alias `@/*` para `src/*`.
+- **Correções no template:** `override` em `state`/`render` do `error-boundary`,
+  `action(...args)`, `catch` sem binding e `const link` no `entry.browser`.
+
+#### Arquivos Tocados:
+- `frontend/package.json`, `frontend/package-lock.json`
+- `frontend/vite.config.ts`, `frontend/vitest.config.ts`, `frontend/tsconfig.json`, `frontend/eslint.config.js`
+- `frontend/src/framework/*`, `frontend/src/root.tsx`, `frontend/src/client.tsx`, `frontend/src/action.tsx`
+- `frontend/src/styles.css`, `frontend/src/theme.css`
+- `frontend/src/test/setup.ts`, `frontend/src/test/client-counter.test.tsx`
+- `scripts/check-theme-tokens.mjs`
+- `SDD/specs/PLAN.md`, `SDD/docs/EVIDENCE.md`, `docs/ai-harness/AI_USAGE_LOG.md`
