@@ -1,0 +1,122 @@
+name: Release
+
+# release-please turns the Conventional Commits merged into main into a
+# release PR; merging that PR creates the SemVer tag and the GitHub release.
+# The tag push is what publishes the three images to GHCR under that tag.
+#
+# The tag is the contract between the release and the environment: a tag
+# pushed by hand (or by another tool) publishes the images too.
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag whose images must be published again'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    name: Release PR, changelog and SemVer tag
+    # The tag push path publishes images only; release-please owns the branch.
+    if: github.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Create or update the release PR
+        id: release
+        uses: googleapis/release-please-action@v5.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  publish-images:
+    name: Publish ${{ matrix.image }} to GHCR
+    # The tag is the contract: the images are published for the tagged commit
+    # and for nothing else. This job deliberately does NOT depend on
+    # release-please: that job is skipped on a tag push, and a skipped need
+    # takes the dependent job down with it, which would kill the publish.
+    #
+    # workflow_dispatch republishes an existing tag, which is the rollback
+    # path documented in docs/process/RELEASE.md.
+    if: github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: backend
+            dockerfile: backend/Dockerfile
+          - image: central-convenios-mock
+            dockerfile: central-convenios-mock/Dockerfile
+          - image: frontend
+            dockerfile: frontend/Dockerfile
+    env:
+      IMAGE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          # The images always come from the tagged commit, never from the
+          # branch that happens to be running the workflow.
+          ref: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4.4.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute the image tags
+        id: tags
+        env:
+          IMAGE_NAME: ${{ matrix.image }}
+        run: |
+          version="${IMAGE_TAG#v}"
+          image="ghcr.io/${GITHUB_REPOSITORY}/${IMAGE_NAME}"
+          {
+            echo "tags<<EOF"
+            echo "${image}:${IMAGE_TAG}"
+            if [ "${version}" != "${IMAGE_TAG}" ]; then
+              echo "${image}:${version}"
+            fi
+            # A pre-release never moves the latest tag.
+            case "${version}" in
+              *-*) ;;
+              *) echo "${image}:latest" ;;
+            esac
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push the image
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

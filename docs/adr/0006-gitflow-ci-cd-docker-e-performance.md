@@ -32,7 +32,10 @@ de olhar a aplicação. Portanto o processo também é entregável.
 ### Commits e versão
 
 - Conventional Commits em inglês:
-  `type(scope): descrição. (Agent: OpenCode - DeepSeek V4.1 Flash)`.
+  `type(scope): descrição. (Agent: OpenCode - MiniMax-M3.1-Flash)`.
+- O par agente/modelo é o da sessão real, nunca o de uma sessão anterior; a política de
+  modelos gratuitos está em
+  [`../ai-harness/HARNESS_OVERVIEW.md`](../ai-harness/HARNESS_OVERVIEW.md) §4.
 - SemVer com tag por fase: `v0.1.0` … `v1.0.0`.
 - `release-please` gera changelog e tag a partir dos commits.
 

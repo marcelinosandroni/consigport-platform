@@ -5,12 +5,12 @@
 > voo, em [`PLAN.md`](./PLAN.md). **Nada entra no PLAN sem existir aqui.**
 >
 > Regras: uma task por vez, branch própria, PR para `develop`, commit
-> `type(scope): descrição. (Agent: OpenCode - DeepSeek V4.1 Flash)`.
+> `type(scope): descrição. (Agent: OpenCode - MiniMax-M3.1-Flash)`.
 > E2E e performance rodam somente no CI/CD — nunca na máquina local.
 
 ---
 
-## Fase 0 — Fundação (11 tasks)
+## Fase 0 — Fundação (12 tasks)
 
 ### 0.1 — Refinamento SDD completo
 - **Objetivo:** specs, ADRs, harness, gates, CI de documentação e correção dos links do `AGENTS.md`.
@@ -77,6 +77,12 @@
 - **Arquivos:** `release-please-config.json`, `.release-please-manifest.json`, `.github/workflows/release.yml`, `.github/workflows/cd-staging.yml`.
 - **Aceite:** Conventional Commits geram changelog e tag; imagens publicadas em GHCR com tag SemVer e `latest`; deploy de staging por tag.
 - **Verificação:** `release-please` em modo dry-run e `docker build` das três imagens com exit 0.
+
+### 0.12 — Promoção da release `v0.1.0` e arquivamento da Fase 0
+- **Objetivo:** fechar a Fase 0 com a tag `v0.1.0` e as três imagens no GHCR.
+- **Arquivos:** `SDD/specs/history/phases/phase-0-finished.md`, `SDD/specs/PLAN.md`, `SDD/docs/EVIDENCE.md`, `docs/ai-harness/AI_USAGE_LOG.md`.
+- **Aceite:** `develop` promovido para `staging` e `main` por PR; tag `v0.1.0` criada pelo release-please; release no GitHub com o CHANGELOG; três imagens no GHCR com `v0.1.0`, `0.1.0` e `latest`; run de staging verde; fase arquivada.
+- **Verificação:** `git tag --list "v*"` mostra `v0.1.0`; `gh release view v0.1.0`; run do `cd-staging` verde; `node scripts/check-specs.mjs` com exit 0.
 
 ---
 

@@ -1,0 +1,74 @@
+name: CD Staging
+
+# The tag is the contract: staging runs exactly the images that were published
+# under it. The deployment is verified by the health probes of the three
+# services, so a broken image never reaches staging unnoticed.
+#
+# Phase 0 runs the staging stack on the GitHub runner. The persistent staging
+# host, the manual approval gate and the digest pinning arrive with task 4.6.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to deploy to staging'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  IMAGE_TAG: ${{ inputs.tag || github.ref_name }}
+  IMAGE_REPOSITORY: ghcr.io/${{ github.repository }}
+
+jobs:
+  deploy-staging:
+    name: Deploy the tagged images to staging
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull the published images
+        run: |
+          for image in backend central-convenios-mock frontend; do
+            docker pull "${IMAGE_REPOSITORY}/${image}:${IMAGE_TAG}"
+          done
+
+      - name: Start the staging stack
+        run: docker compose -f compose.staging.yaml up -d --wait --wait-timeout 180
+
+      - name: Check the deployed services
+        run: |
+          curl -fsS http://localhost:8080/actuator/health
+          curl -fsS http://localhost:8081/actuator/health
+          curl -fsS -o /dev/null http://localhost:5173/
+
+      - name: Print the deployed digests
+        run: |
+          for image in backend central-convenios-mock frontend; do
+            digest="$(docker image inspect "${IMAGE_REPOSITORY}/${image}:${IMAGE_TAG}" \
+              --format '{{index .RepoDigests 0}}')"
+            echo "${image} ${digest}"
+          done
+
+      - name: Show the logs when a service fails
+        if: failure()
+        run: docker compose -f compose.staging.yaml logs
+
+      - name: Tear down the staging stack
+        if: always()
+        run: docker compose -f compose.staging.yaml down -v
