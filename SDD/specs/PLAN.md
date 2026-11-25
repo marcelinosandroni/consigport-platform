@@ -48,7 +48,10 @@
       Branch `feat/009-shell-matrix`. Casca visual dark-only, responsiva nas três
       viewports do `DESIGN.md` §4b, com `theme.css` verbatim, fontes `@fontsource`
       e primitivas em `src/shared/ui/`.
-- [ ] 0.10 — `ci.yml` completo e `nightly.yml`
+- [x] **0.10 — `ci.yml` completo e `nightly.yml`**
+      Branch `feat/010-ci-pipeline`. Jobs paralelos `docs`, `backend`, `mock`,
+      `frontend`, `contracts`, `compose`, `smoke`, `e2e`, `k6-smoke` e `security`,
+      com cache de Maven e npm e artefatos de relatório. Run verde `45622026445`.
 - [ ] 0.11 — `release-please`, `release.yml`, `cd-staging.yml` e imagens GHCR
 
 ### Critérios de saída da fase

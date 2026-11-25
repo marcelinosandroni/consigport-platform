@@ -51,6 +51,10 @@
     <testcontainers.version>1.21.1</testcontainers.version>
     <resilience4j.version>2.3.0</resilience4j.version>
 
+    <!-- Overrides the driver version of the Spring Boot BOM: CVE-2026-54291
+         (SCRAM-SHA-256-PLUS downgrade) is fixed in 42.7.12. -->
+    <postgresql.version>42.7.15</postgresql.version>
+
     <!-- Plugin versions -->
     <jacoco.version>0.8.12</jacoco.version>
     <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
