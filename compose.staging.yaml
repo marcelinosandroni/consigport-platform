@@ -1,0 +1,94 @@
+# Staging stack: the images published to GHCR by release.yml, pinned by tag.
+#
+# The tag is the only contract between a release and this environment: what was
+# published under vX.Y.Z is what staging runs. The local compose.yaml keeps the
+# development flow untouched (PostgreSQL only, images built from source).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-consigport}
+      POSTGRES_USER: ${POSTGRES_USER:-consigport}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-consigport}
+    volumes:
+      - staging-postgres-data:/var/lib/postgresql/data
+    networks:
+      - staging-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-consigport} -d ${POSTGRES_DB:-consigport}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  backend:
+    image: ${IMAGE_REPOSITORY:-ghcr.io/marcelinosandroni/consigport-platform}/backend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8080
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-consigport}
+      POSTGRES_USER: ${POSTGRES_USER:-consigport}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-consigport}
+      HMAC_SECRET: ${HMAC_SECRET:-consigport-secret-key-change-me-in-production}
+      CENTRAL_BASE_URL: http://central-convenios-mock:8081
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    networks:
+      - staging-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  central-convenios-mock:
+    image: ${IMAGE_REPOSITORY:-ghcr.io/marcelinosandroni/consigport-platform}/central-convenios-mock:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8081
+      MOCK_CONFIRMATION_DELAY_MS: ${MOCK_CONFIRMATION_DELAY_MS:-4000}
+      MOCK_TIMEOUT_DELAY_MS: ${MOCK_TIMEOUT_DELAY_MS:-6000}
+    ports:
+      - "${MOCK_PORT:-8081}:8081"
+    networks:
+      - staging-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  frontend:
+    image: ${IMAGE_REPOSITORY:-ghcr.io/marcelinosandroni/consigport-platform}/frontend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    # The API base URL is baked into the bundle at build time (Vite), so it is
+    # not an environment variable of the container yet; the typed OpenAPI
+    # client arrives with task 3.1.
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    networks:
+      - staging-net
+    healthcheck:
+      # 127.0.0.1, not localhost: the server binds IPv4 only and busybox
+      # resolves localhost to ::1 first.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5173/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  staging-postgres-data:
+    name: consigport-staging-postgres-data
+
+networks:
+  staging-net:
+    name: consigport-staging-net
+    driver: bridge

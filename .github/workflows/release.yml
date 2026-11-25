@@ -1,0 +1,109 @@
+name: Release
+
+# release-please turns the Conventional Commits merged into main into a
+# release PR; merging that PR creates the SemVer tag and the GitHub release.
+# The same run publishes the three images to GHCR under that tag.
+#
+# A tag pushed by hand (or by another tool) also publishes the images: the
+# tag is the contract between the release and the environment.
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    name: Release PR, changelog and SemVer tag
+    # The tag push path publishes images only; release-please owns the branch.
+    if: github.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Create or update the release PR
+        id: release
+        uses: googleapis/release-please-action@v5.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  publish-images:
+    name: Publish ${{ matrix.image }} to GHCR
+    needs: release-please
+    # Either release-please just created the tag, or the workflow was triggered
+    # by a tag push.
+    if: ${{ needs.release-please.outputs.tag != '' || github.ref_type == 'tag' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: backend
+            dockerfile: backend/Dockerfile
+          - image: central-convenios-mock
+            dockerfile: central-convenios-mock/Dockerfile
+          - image: frontend
+            dockerfile: frontend/Dockerfile
+    env:
+      IMAGE_TAG: ${{ needs.release-please.outputs.tag || github.ref_name }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4.4.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute the image tags
+        id: tags
+        env:
+          IMAGE_NAME: ${{ matrix.image }}
+        run: |
+          version="${IMAGE_TAG#v}"
+          image="ghcr.io/${GITHUB_REPOSITORY}/${IMAGE_NAME}"
+          {
+            echo "tags<<EOF"
+            echo "${image}:${IMAGE_TAG}"
+            if [ "${version}" != "${IMAGE_TAG}" ]; then
+              echo "${image}:${version}"
+            fi
+            # A pre-release never moves the latest tag.
+            case "${version}" in
+              *-*) ;;
+              *) echo "${image}:latest" ;;
+            esac
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push the image
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
