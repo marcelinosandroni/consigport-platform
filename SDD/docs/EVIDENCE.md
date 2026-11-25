@@ -653,3 +653,117 @@
 - `.github/workflows/ci-docs.yml`
 - `scripts/check-theme-tokens.mjs`
 - `SDD/specs/PLAN.md`, `SDD/docs/EVIDENCE.md`, `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 0.10 — Pipeline de Integração Contínua
+
+- **Data de Conclusão:** 2026-11-25
+- **Branch:** `feat/010-ci-pipeline`
+- **PR:** [#12](https://github.com/marcelinosandroni/consigport-platform/pull/12)
+- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Objetivo:** Um pipeline único com jobs paralelos que provam cada PR, mais o nightly
+  com os portões pesados (drift de contrato, E2E completo, carga, Schemathesis e
+  scan das imagens).
+
+#### Comandos de Verificação e Saídas:
+
+1. **Lint dos workflows (actionlint v1.7.12):**
+   ```powershell
+   actionlint .github/workflows/ci.yml .github/workflows/nightly.yml
+   ```
+   *Saída obtida:* nenhuma diagnóstico; `actionlint_exit=0`.
+
+2. **Auditoria de dependências de produção do frontend:**
+   ```powershell
+   npm audit --prefix frontend --omit=dev --audit-level=high
+   ```
+   *Saída obtida:*
+   ```text
+   found 0 vulnerabilities
+   audit_exit=0
+   ```
+
+3. **Portão de segurança no CI (run `45622026445`, job `Security`):**
+   ```text
+   ✓ Audit the frontend dependencies
+   ✓ Scan the repository with Trivy
+   Total: 0 (HIGH: 0, CRITICAL: 0)
+   ```
+   O primeiro run (`45620040274`) reprovou com `org.postgresql:postgresql` 42.7.11 e
+   `CVE-2026-54291` (HIGH, corrigida em 42.7.12); o driver foi sobrescrito para
+   42.7.15 no `pom.xml`. O run `45621324609` provou que o `dependency-review` falha
+   neste repositório (Dependency Graph API desabilitada) e o passo foi removido: o
+   Trivy já lê `pom.xml` e `package-lock.json`.
+
+4. **Invariantes de especificação, links e arquitetura:**
+   ```powershell
+   node scripts/check-specs.mjs
+   node SDD/SKILLS/check-docs/check-docs.mjs .
+   node scripts/check-architecture.mjs
+   node scripts/check-ai-log.mjs
+   ```
+   *Saída obtida:*
+   ```text
+   ✓ SDD specifications valid:
+     - Required core documents and ADRs present.
+     - Exactly 1 task in flight in SDD/specs/PLAN.md.
+     - Tasks in PLAN.md are cataloged in BACKLOG.md.
+
+   ✓ 61 documents, every relative link resolves.
+
+   🎉 Todos os 22 testes de validação dos desenhos e arquitetura passaram com sucesso!
+
+   ✓ AI usage log: 14 sessions, structure valid.
+   ```
+
+5. **Pipeline completo do PR — run verde `45622026445`:**
+   ```text
+   ✓ feat/010-ci-pipeline CI marcelinosandroni/consigport-platform#12 · 45622026445
+   Triggered via pull_request
+
+   JOBS
+   ✓ Backend — build, unit tests and coverage report in 25s
+   ✓ Detect the suites available in this commit in 5s
+   ✓ Docs, Specs, Architecture and AI Log in 7s
+   ✓ Stack Smoke — backend and mock against PostgreSQL 16 in 37s
+   ✓ Docker Compose — configuration in 6s
+   ✓ Frontend — lint, typecheck, unit tests and build in 27s
+   ✓ Contracts — Spectral, HMAC vector and breaking changes in 16s
+   ✓ Security — dependency audit and vulnerability scan in 23s
+   ✓ Central Mock — build and unit tests in 17s
+   - E2E — Playwright
+   - Performance Smoke — k6
+
+   ARTIFACTS
+   backend-reports
+   stack-health
+   frontend-dist
+   mock-reports
+   ```
+   Os dois jobs pulados são os condicionais: a suíte Playwright e os scripts k6 ainda
+   não existem no repositório, e o job `detect` prova isso em vez de fingir verde.
+   O job `smoke` é real: sobe o PostgreSQL 16 do `compose.yaml`, empacota os jars,
+   inicia mock e backend e exige `200` em `/actuator/health` dos dois.
+
+#### Conteúdo Entregue:
+- **`.github/workflows/ci.yml`:** jobs `detect`, `docs`, `backend`, `mock`, `frontend`,
+  `contracts`, `compose`, `smoke`, `e2e`, `k6-smoke` e `security`, com
+  `permissions: contents: read`, `concurrency` por PR e Node 24 / npm 12.0.2 /
+  Temurin 21 fixados.
+- **`.github/workflows/nightly.yml`:** cron diário às 03:00 UTC com `contract-drift`
+  (oasdiff contra `main`), `e2e-full`, `k6-load`, `schemathesis` e `security-images`.
+- **Consolidação:** `ci-docs.yml` e `ci-contracts.yml` removidos; as mesmas
+  verificações vivem nos jobs `docs` e `contracts`, sem duplicar runner.
+- **Cache e artefatos:** Maven via `actions/setup-java`, npm via `actions/setup-node`
+  com `cache-dependency-path: frontend/package-lock.json`; relatórios Surefire,
+  `frontend/dist` e payloads de health anexados ao run.
+
+#### Arquivos Tocados:
+- `.github/workflows/ci.yml`
+- `.github/workflows/nightly.yml`
+- `.github/workflows/ci-docs.yml` (removido)
+- `.github/workflows/ci-contracts.yml` (removido)
+- `pom.xml`
+- `docs/quality/GATES.md`
+- `SDD/specs/PLAN.md`, `SDD/docs/EVIDENCE.md`, `docs/ai-harness/AI_USAGE_LOG.md`

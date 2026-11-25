@@ -380,4 +380,8 @@
    - O job `security` reprovou o primeiro PR: `org.postgresql:postgresql` 42.7.11 com `CVE-2026-54291` (downgrade de SCRAM-SHA-256-PLUS), corrigida em 42.7.12.
    - O driver foi sobrescrito no `pom.xml` para 42.7.15, acima da versão corrigida.
    - O `dependency-review` do GitHub foi removido do job: a API de Dependency Graph está desabilitada neste repositório, e a varredura de filesystem do Trivy já lê `pom.xml` e `package-lock.json`.
-9. **Entrega:** branch `feat/010-ci-pipeline` com commit e PR para `develop`; a task fecha com os jobs verdes deste PR.
+9. **Run Verde do PR (`45622026445`):**
+   - Nove jobs verdes: `docs`, `backend`, `mock`, `frontend`, `contracts`, `compose`, `smoke`, `security` e `detect`.
+   - `E2E — Playwright` e `Performance Smoke — k6` pulados porque as suítes ainda não existem; o job `detect` prova a ausência em vez de fingir verde.
+   - Artefatos anexados: `backend-reports`, `mock-reports`, `frontend-dist` e `stack-health`.
+10. **Entrega:** branch `feat/010-ci-pipeline` com commit e PR #12 para `develop`; task fechada com o run verde acima.
