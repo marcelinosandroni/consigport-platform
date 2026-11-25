@@ -30,7 +30,9 @@
       Branch `feat/004-maven-reactor`. Wrapper 3.3.4 (only-script) apontando para Maven
       3.10.2, reactor com Java 21 e Spring Boot 3.5.16, módulos mínimos `backend` e
       `central-convenios-mock`.
-- [ ] 0.5 — Contratos `consigport-api.yaml`, `central-api.yaml` e vetor HMAC
+- [x] **0.5 — Contratos `consigport-api.yaml`, `central-api.yaml` e vetor HMAC**
+      Branch `feat/005-contracts`. Contrato primeiro: superfície pública em EN,
+      contrato da Central fiel ao edital em PT e vetor compartilhado de assinatura.
 - [ ] 0.6 — Scaffold do backend (pom, aplicação, `application.yml`)
 - [ ] 0.7 — Scaffold do mock (pom, aplicação, `application.yml`)
 - [ ] 0.8 — Base do frontend RSC (package, Vite, TypeScript, Tailwind)

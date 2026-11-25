@@ -518,8 +518,9 @@ Inclui `installments`, `assigneeCreditor`, `receivingAccount`, `rejectionReason`
 ```
 
 Códigos: `VALIDATION_ERROR`, `AUTHORIZATION_NOT_FOUND`, `AUTHORIZATION_REQUIRED`,
-`OPERATION_NOT_FOUND`, `IDEMPOTENCY_KEY_REQUIRED`, `IDEMPOTENCY_CONFLICT`,
-`INSTALLMENT_NOT_ELIGIBLE`, `CENTRAL_UNAVAILABLE`, `INTERNAL_ERROR`.
+`BENEFICIARY_NOT_FOUND`, `OPERATION_NOT_FOUND`, `IDEMPOTENCY_KEY_REQUIRED`,
+`IDEMPOTENCY_CONFLICT`, `INSTALLMENT_NOT_ELIGIBLE`, `CENTRAL_UNAVAILABLE`,
+`INTERNAL_ERROR`.
 
 `message` vem de `messages_pt_BR.properties`, `messages_en.properties` ou
 `messages_es.properties`. `code` nunca é traduzido.
@@ -554,8 +555,10 @@ Sem prefixo de versão; fiel ao edital. `contracts/central-api.yaml`.
 Headers: `X-Signature`, `X-Timestamp`, `Idempotency-Key`. Caos: `X-Mock-Delay-Ms`,
 `X-Mock-Force-Error`.
 
-Erros externos são em PT (`ASSINATURA_INVALIDA`, `IDEMPOTENCIA_CONFLITO`,
-`OPERACAO_NAO_ENCONTRADA`) e mapeados pela ACL para os códigos EN do core.
+Erros externos são em PT (`ASSINATURA_INVALIDA`, `REQUISICAO_INVALIDA`,
+`SEM_AUTORIZACAO`, `BENEFICIARIO_NAO_ENCONTRADO`, `IDEMPOTENCIA_CONFLITO`,
+`PARCELA_INVALIDA`, `OPERACAO_NAO_ENCONTRADA`) e mapeados pela ACL para os códigos EN
+do core.
 
 ---
 
