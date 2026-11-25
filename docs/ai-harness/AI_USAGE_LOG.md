@@ -5,6 +5,39 @@
 
 ---
 
+## Estratégia de Modelos: 100% Free
+
+O ConsigPort é desenvolvido **sem nenhum custo de API**. A escolha do modelo é uma
+decisão de projeto, não um detalhe da ferramenta: toda a Fase 0 roda em modelos
+gratuitos e leves, para que qualquer pessoa possa reproduzir a entrega.
+
+| Sessões | Tarefas | Harness | Provider | Modelo |
+|---|---|---|---|---|
+| #01, #07–#09 | 0.1, 0.4, 0.5 | OpenCode | — | DeepSeek V4.1 Flash |
+| #02–#06 | 0.1 a 0.4 | Antigravity | Google | Gemini 3.8 Flash |
+| #10 em diante | 0.6 em diante | OpenCode | NVIDIA | MiniMax-M3.1-Flash (`nvidia/minimaxai/minimax-m3.1-flash`) |
+
+- **Harness estável:** `OpenCode` cobre a fase inteira; o que muda entre as tasks é o
+  provider e o modelo atendidos por ele.
+- **Modelo leve:** `MiniMax-M3.1-Flash` pertence à família Flash — resposta rápida e
+  consumo de contexto baixo, as duas características que mantêm viável o ciclo SDD
+  (task de até uma hora, evidência colada, commit pequeno) sem pagar por token.
+- **Custo zero:** nenhum modelo pago entra no desenvolvimento. Adotar um exige
+  decisão explícita do desenvolvedor e registro nesta política.
+- **Atribuição real:** o par agente/modelo registrado aqui e o trailer
+  `(Agent: ...)` do commit descrevem a sessão em que o trabalho foi feito, nunca o
+  de uma sessão anterior.
+
+> **Fonte de verdade.** Este diário é o registro autoritativo de atribuição. O
+> trailer `(Agent: ...)` já gravado em commits antigos pode ter ficado desatualizado
+> quando o modelo mudou no meio da fase; quando divergirem, este diário prevalece.
+> O histórico de commits não é reescrito: ele é registro imutável, como a trilha de
+> auditoria do domínio.
+
+Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
+
+---
+
 ## Sessão #01 — Refinamento Inicial e Fundação SDD
 
 - **Data:** 2026-11-23
@@ -231,7 +264,7 @@
 ## Sessão #10 — Task 0.6 (Scaffold do Backend)
 
 - **Data:** 2026-11-25
-- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
 - **Branch:** `feat/006-backend-scaffold`
 - **Objetivo:** Aplicação Spring Boot vazia, compilando e com health `UP`, base para as fatias de domínio seguintes.
 
@@ -260,7 +293,7 @@
 ## Sessão #11 — Task 0.7 (Scaffold do Mock da Central)
 
 - **Data:** 2026-11-25
-- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
 - **Branch:** `feat/007-mock-scaffold`
 - **Objetivo:** Central simulada vazia, sem banco e sem Flyway, compilando e com health `UP` na porta 8081.
 
@@ -286,7 +319,7 @@
 ## Sessão #12 — Task 0.8 (Base do Frontend RSC)
 
 - **Data:** 2026-11-25
-- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
 - **Branch:** `feat/008-frontend-base`
 - **Objetivo:** Projeto React 19.2 com Vite RSC, TypeScript e Tailwind 4, sem Next.js, consumindo os tokens do `DESIGN.md`.
 
@@ -317,7 +350,7 @@
 ## Sessão #13 — Task 0.9 (Shell RSC e tema Matrix)
 
 - **Data:** 2026-11-25
-- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
 - **Branch:** `feat/009-shell-matrix`
 - **Objetivo:** Casca visual navegável dark-only, conforme o `DESIGN.md`, com tokens verbatim, fontes locais e primitivas reutilizáveis.
 
@@ -354,7 +387,7 @@
 ## Sessão #14 — Task 0.10 (Pipeline de Integração Contínua)
 
 - **Data:** 2026-11-25
-- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
 - **Branch:** `feat/010-ci-pipeline`
 - **Objetivo:** Um pipeline único com jobs paralelos que provam cada PR, mais o nightly com os portões pesados.
 
@@ -385,3 +418,81 @@
    - `E2E — Playwright` e `Performance Smoke — k6` pulados porque as suítes ainda não existem; o job `detect` prova a ausência em vez de fingir verde.
    - Artefatos anexados: `backend-reports`, `mock-reports`, `frontend-dist` e `stack-health`.
 10. **Entrega:** branch `feat/010-ci-pipeline` com commit e PR #12 para `develop`; task fechada com o run verde acima.
+
+---
+
+## Sessão #15 — Task 0.11 (Release e Entrega Contínua)
+
+- **Data:** 2026-11-25
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
+- **Branch:** `feat/011-release-cd`
+- **Objetivo:** Conventional Commits viram changelog e tag SemVer, as três imagens são publicadas no GHCR e a tag dispara o deploy de staging.
+
+### Atividades Realizadas:
+1. **Imagens Docker:**
+   - `backend/Dockerfile`, `central-convenios-mock/Dockerfile` e `frontend/Dockerfile` em build de múltiplos estágios, a partir do contexto da raiz (o reactor Maven precisa do `pom.xml` pai).
+   - Estágio de runtime sem privilégio (`eclipse-temurin:21-jre-alpine` com usuário `consigport`; `node:24-alpine` com usuário `node`), `HEALTHCHECK` e `.dockerignore` na raiz.
+2. **Versionamento:**
+   - `release-please-config.json` com o tipo `simple` (uma versão para a plataforma inteira) e `.release-please-manifest.json` começando em `0.0.0`, para que a primeira release seja a `v0.1.0` da fase.
+3. **Publicação no GHCR:**
+   - `.github/workflows/release.yml` roda o `release-please-action` no push em `main` e publica as três imagens quando a tag é criada, com as tags `vX.Y.Z`, `X.Y.Z` e `latest` (a `latest` nunca é movida por uma pré-release).
+4. **Deploy de staging:**
+   - `.github/workflows/cd-staging.yml` dispara na tag, sobe `compose.staging.yaml` com as imagens publicadas, espera os healthchecks e valida backend, mock e frontend.
+5. **Validação:**
+   - `docker build` das três imagens → exit 0; `actionlint` (v1.7.12) sem erros nos quatro workflows; `docker compose config -q` dos dois compose → exit 0.
+   - Stack de staging real com os quatro serviços `healthy`: backend e mock em `UP`, frontend em HTTP 200.
+   - `release-please` em dry-run → `v0.1.0`.
+6. **Defeito Encontrado pelo Dry-Run:**
+   - A primeira execução propôs `1.0.0` em vez de `0.1.0`: sem release anterior, o release-please não usa a versão do manifesto, e sim `initialReleaseVersion()`, cujo padrão é `1.0.0`.
+   - Correção: `initial-version: "0.1.0"` no `release-please-config.json` (commit `de2d260`).
+   - O token nunca entra no argv: o dry-run roda pela API programática (`release-please/build/src/index.js`) com o token vindo de uma variável de ambiente.
+7. **Defeitos Encontrados pelo Deploy de Staging:**
+   - O reactor Maven exigia o `pom.xml` dos dois módulos; a imagem do frontend exigia o `vite.config.ts` e a propriedade de `node_modules`; o healthcheck do frontend precisou de `127.0.0.1` em vez de `localhost` (o busybox resolve `::1` primeiro).
+8. **Entrega:** branch `feat/011-release-cd` com commits e PR [#15](https://github.com/marcelinosandroni/consigport-platform/pull/15) para `develop`; task 0.11 fechada e task 0.12 (promoção da `v0.1.0`) aberta.
+
+---
+
+## Sessão #16 — Correção da Atribuição de Modelo e Política 100% Free
+
+- **Data:** 2026-11-25
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
+- **Branch:** `feat/011-release-cd`
+- **Objetivo:** Corrigir a atribuição de harness, provider e modelo das sessões da Fase 0 e registrar a política de modelos gratuitos do projeto.
+
+### Atividades Realizadas:
+1. **Correção das Sessões #10 a #15:**
+   - As tasks 0.6 a 0.11 foram executadas no harness OpenCode com o provider NVIDIA e o modelo `nvidia/minimaxai/minimax-m3.1-flash` (MiniMax-M3.1-Flash); o diário as registrava como DeepSeek V4.1 Flash.
+   - As sessões #01 a #09 permanecem como DeepSeek V4.1 Flash e Gemini 3.8 Flash, conforme executado.
+2. **Correção das Evidências:**
+   - [`../../SDD/docs/EVIDENCE.md`](../../SDD/docs/EVIDENCE.md) atualizado nas tasks 0.6 a 0.10 com o mesmo par provider/modelo.
+3. **Política de Modelos Gratuitos:**
+   - Nova seção 4 em [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) que fixa a estratégia 100% free: harness OpenCode, provider NVIDIA, modelo leve MiniMax-M3.1-Flash e custo zero de API.
+   - O trailer `(Agent: ...)` passa a exigir o par real (harness e modelo) da sessão, nunca o de uma sessão anterior.
+4. **Exemplos de Formato Corrigidos:**
+   - [`../adr/0006-gitflow-ci-cd-docker-e-performance.md`](../adr/0006-gitflow-ci-cd-docker-e-performance.md), [`../../SDD/specs/BACKLOG.md`](../../SDD/specs/BACKLOG.md) e [`../../SDD/specs/PLAN.md`](../../SDD/specs/PLAN.md) deixam de fixar um modelo antigo.
+5. **Histórico Preservado:**
+   - Os títulos de commit já escritos mantêm a anotação original: o histórico é append-only e não é reescrito. O diário é a fonte de verdade da atribuição.
+6. **Validação:**
+   - `node scripts/check-ai-log.mjs` → log válido.
+   - `node scripts/check-specs.mjs`, `node SDD/SKILLS/check-docs/check-docs.mjs .` e `node scripts/check-architecture.mjs` → exit 0.
+
+---
+
+## Sessão #17 — Fechamento da Task 0.11: Evidência e Gatilho de Publicação
+
+- **Data:** 2026-11-25
+- **Agente / Modelo:** OpenCode (NVIDIA) — MiniMax-M3.1-Flash
+- **Branch:** `fix/011-release-closure`
+- **Objetivo:** Fechar a task 0.11 com a evidência colada e corrigir o gatilho que publica as imagens no GHCR.
+
+### Atividades Realizadas:
+1. **Evidência da Task 0.11:**
+   - Dry-run do release-please propondo `v0.1.0`, build das três imagens, `actionlint`, `compose config -q` e stack de staging com os quatro serviços `healthy`.
+   - Task 0.11 marcada `[x]` e task 0.12 (promoção da `v0.1.0` e arquivamento da fase) aberta no `PLAN.md`.
+2. **Correção do Gatilho de Publicação:**
+   - O job `publish-images` declarava `needs: release-please`. No push da tag, o job `release-please` é pulado (`if: github.ref_type == 'branch'`) e um `needs` pulado leva o dependente junto: o caminho de publicação documentado nunca executava.
+   - O job passou a ser independente, disparado apenas pelo push da tag, com `IMAGE_TAG` vindo de `github.ref_name` e o checkout fixado no commit etiquetado — as imagens nunca saem da branch que disparou o workflow.
+3. **Rollback Real:**
+   - O `workflow_dispatch` de `release.yml` passou a aceitar a tag a republicar, reconstruindo as três imagens a partir do commit etiquetado.
+   - `docs/process/RELEASE.md` ajustado ao comportamento real do workflow.
+4. **Entrega:** branch `fix/011-release-closure` com commits e PR para `develop`.

@@ -37,6 +37,9 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
 | **Performance Load** | k6 load test sustentado + relatório HTML | `k6-load` | ❌ | ❌ | ✅ |
 | **Contrato Dinâmico** | Schemathesis (property-based) | `schemathesis` | ❌ | ✅ (smoke) | ✅ (full) |
 | **Segurança** | `npm audit` + Trivy (fs e imagens) | `security` | ❌ | ✅ | ✅ |
+| **Release** | release-please: PR de release, CHANGELOG e tag `vX.Y.Z` | `release-please` | ❌ | — | ✅ (push em `main`) | — |
+| **Imagens GHCR** | Build e push das três imagens (tag SemVer + `latest`) | `publish-images` | ❌ | — | ✅ (tag) | — |
+| **Deploy de staging** | Stack da tag no GHCR com healthchecks verdes | `deploy-staging` | ❌ | — | ✅ (tag) | — |
 
 > Os jobs `e2e`, `k6-smoke`, `k6-load`, `schemathesis` e `security-images` ficam
 > condicionados à existência da suíte no commit: eles acendem sozinhos quando o
@@ -152,10 +155,36 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
 ### 3.7. Portão de Segurança e Imagens
 - **Execução:**
   - No PR, o job `security` roda `npm audit --omit=dev --audit-level=high` e a varredura de filesystem com Trivy, que lê `pom.xml` e `package-lock.json` e cobre a superfície de dependências do repositório.
-  - No nightly, o job `security-images` escaneia as imagens OCI construídas (`backend`, `central-convenios-mock`, `frontend`).
+  - No nightly, o job `security-images` constrói as três imagens (`backend`, `central-convenios-mock`, `frontend`) a partir da raiz do repositório e escaneia cada uma com Trivy.
 - **Critérios de Aceite:**
   - Nenhuma vulnerabilidade `CRITICAL` ou `HIGH` sem mitigação conhecida nos pacotes base das imagens.
   - Nenhuma dependência de produção com vulnerabilidade `high` ou `critical`.
+
+---
+
+### 3.8. Portão de Release e Entrega Contínua
+- **Workflows:** [`.github/workflows/release.yml`](../../.github/workflows/release.yml) e
+  [`.github/workflows/cd-staging.yml`](../../.github/workflows/cd-staging.yml).
+- **Versionamento:**
+  - `release-please` (tipo `simple`, uma versão para a plataforma) lê os Conventional
+    Commits e abre o PR de release; o merge desse PR cria a tag `vX.Y.Z` e o
+    CHANGELOG. Configuração em
+    [`../../release-please-config.json`](../../release-please-config.json) e
+    [`../../.release-please-manifest.json`](../../.release-please-manifest.json).
+- **Publicação no GHCR:**
+  - Cada tag publica as três imagens em `ghcr.io/marcelinosandroni/consigport-platform/<imagem>`
+    com as tags `vX.Y.Z`, `X.Y.Z` e `latest`. Uma pré-release nunca move a `latest`.
+- **Deploy de staging:**
+  - A tag dispara [`../../compose.staging.yaml`](../../compose.staging.yaml): as imagens
+    publicadas sob aquela tag sobem com PostgreSQL 16 e os healthchecks de backend,
+    mock e frontend são obrigatórios para o run ser verde.
+- **Critérios de Aceite:**
+  - `release-please` em dry-run propõe a próxima versão SemVer.
+  - `docker build` das três imagens e `docker compose config -q` dos dois arquivos de
+    compose com exit 0.
+  - O run de staging mostra `UP` nos três serviços.
+
+Fluxo completo, com rollback e comandos: [`../process/RELEASE.md`](../process/RELEASE.md).
 
 ---
 

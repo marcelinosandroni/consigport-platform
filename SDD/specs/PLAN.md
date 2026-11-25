@@ -52,17 +52,25 @@
       Branch `feat/010-ci-pipeline`. Jobs paralelos `docs`, `backend`, `mock`,
       `frontend`, `contracts`, `compose`, `smoke`, `e2e`, `k6-smoke` e `security`,
       com cache de Maven e npm e artefatos de relatório. Run verde `45622026445`.
-- [ ] 0.11 — `release-please`, `release.yml`, `cd-staging.yml` e imagens GHCR
+- [x] **0.11 — `release-please`, `release.yml`, `cd-staging.yml` e imagens GHCR**
+      Branch `feat/011-release-cd`. Conventional Commits viram changelog e tag
+      SemVer; as três imagens (backend, mock, frontend) são publicadas no GHCR
+      com tag SemVer e `latest`; a tag dispara o deploy de staging.
+      Dry-run propõe `v0.1.0`; stack de staging real com os quatro serviços healthy.
+- [-] **0.12 — Promoção da release `v0.1.0` e arquivamento da Fase 0**
+      Branch `chore/012-phase-0-archive`. `develop` é promovido para `staging` e
+      `main` por PR; o release-please gera a tag `v0.1.0`, as três imagens vão
+      para o GHCR e a fase é arquivada em `specs/history/phases/`.
 
 ### Critérios de saída da fase
 
 - [ ] Todas as tasks `[x]` com evidência colada
-- [ ] `docker compose config -q` verde
-- [ ] `./mvnw -N validate` e scaffolds compilando
-- [ ] `npm ci --prefix frontend && npm run --prefix frontend build` verde
-- [ ] Contratos válidos no Spectral
+- [x] `docker compose config -q` verde
+- [x] `./mvnw -N validate` e scaffolds compilando
+- [x] `npm ci --prefix frontend && npm run --prefix frontend build` verde
+- [x] Contratos válidos no Spectral
 - [ ] Job de documentação verde no PR
-- [ ] `SDD/docs/EVIDENCE.md` atualizado
+- [x] `SDD/docs/EVIDENCE.md` atualizado
 - [ ] Tag `v0.1.0`
 
 ### Como usar este arquivo
@@ -83,7 +91,7 @@
 - (comando da task) → exit 0
 
 **Arquivos tocados:** (lista, no máximo 5)
-**Commit:** `type(scope): descrição. (Agent: OpenCode - DeepSeek V4.1 Flash)`
+**Commit:** `type(scope): descrição. (Agent: OpenCode - MiniMax-M3.1-Flash)`
 ```
 
 Gate completo e o que cada comando prova: [`../../docs/quality/GATES.md`](../../docs/quality/GATES.md).

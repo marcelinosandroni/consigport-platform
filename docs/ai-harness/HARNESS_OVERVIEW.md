@@ -63,6 +63,9 @@ flowchart TD
 4. **Padrão de Mensagens de Commit:**
    - Commits devem seguir o padrão Conventional Commits com anotação do agente:
      `type(scope): descrição detalhada. (Agent: NomeDoAgente - Modelo)`
+   - `NomeDoAgente` e `Modelo` são os da sessão em que o commit foi escrito: o
+     trailer reflete o harness e o modelo realmente usados, nunca os de uma sessão
+     anterior.
 
 5. **Modelo de Idioma:**
    - **Inglês (`en`):** Código-fonte, nomes de classes/métodos, tabelas de banco, identificadores de evento, termos de domínio e mensagens de commit.
@@ -70,12 +73,44 @@ flowchart TD
 
 6. **Diário de Uso de IA Obrigatório:**
    - Toda sessão que altere código, specs, contratos, scripts ou CI deve acrescentar uma entrada em [`AI_USAGE_LOG.md`](./AI_USAGE_LOG.md), com numeração contínua, data, agente/modelo, branch, objetivo e atividades realizadas.
+   - O campo `Agente / Modelo` registra harness, provider e modelo usados de fato, no formato `OpenCode (NVIDIA) — MiniMax-M3.1-Flash`.
    - O portão `node scripts/check-ai-log.mjs` valida a estrutura e, no PR, exige que o log tenha sido alterado e que ao menos uma sessão nova tenha sido acrescentada.
    - Localmente, `git config core.hooksPath .githooks` instala o hook que bloqueia o commit de trabalho sem atualização do log.
 
 ---
 
-## 4. Ferramental e Scripts de Fiscalização
+## 4. Estratégia de Modelos: 100% Free
+
+O ConsigPort é desenvolvido **sem nenhum custo de API**. O modelo é uma decisão de
+projeto: ele precisa caber no ciclo SDD — task de até uma hora, evidência real
+colada, commit pequeno — sem pagar por token.
+
+| Sessões | Tarefas | Harness | Provider | Modelo |
+|---|---|---|---|---|
+| #01, #07–#09 | 0.1, 0.4, 0.5 | OpenCode | — | DeepSeek V4.1 Flash |
+| #02–#06 | 0.1 a 0.4 | Antigravity | Google | Gemini 3.8 Flash |
+| #10 em diante | 0.6 em diante | OpenCode | NVIDIA | MiniMax-M3.1-Flash (`nvidia/minimaxai/minimax-m3.1-flash`) |
+
+- **Harness estável:** `OpenCode` cobre a fase inteira. O que muda entre as tasks é o
+  provider e o modelo atendidos por ele, não o ferramental de execução.
+- **Modelo leve:** `MiniMax-M3.1-Flash` pertence à família Flash — resposta rápida e
+  consumo de contexto baixo. É o que torna o ciclo de evidência sustentável: cada task
+  exige colar a saída real dos testes, e um modelo lento ou caro tornaria esse passo
+  inviável.
+- **Custo zero:** nenhum modelo pago entra no desenvolvimento. Adotar um exige decisão
+  explícita do desenvolvedor e registro nesta política.
+- **Atribuição verificável:** o par harness/provider/modelo usado na sessão é o que vai
+  para o campo `Agente / Modelo` do [`AI_USAGE_LOG.md`](./AI_USAGE_LOG.md) e para o
+  trailer `(Agent: ...)` do commit.
+
+> **Quando a atribuição for corrigida:** o diário registra a correção e os commits já
+> publicados mantêm o trailer original. O histórico é registro imutável, como a trilha
+> de auditoria do domínio; reescrever commits publicados custaria mais do que a
+> imprecisão corrigida.
+
+---
+
+## 5. Ferramental e Scripts de Fiscalização
 
 Os agentes devem executar as ferramentas automatizadas para garantir conformidade antes de submeter alterações:
 

@@ -212,10 +212,11 @@ jobs:
 
       - name: Build the images
         run: |
-          docker build -t consigport-backend:nightly backend
-          docker build -t consigport-central-mock:nightly central-convenios-mock
+          docker build -f backend/Dockerfile -t consigport-backend:nightly .
+          docker build -f central-convenios-mock/Dockerfile -t consigport-central-mock:nightly .
+          docker build -f frontend/Dockerfile -t consigport-frontend:nightly .
 
-      - name: Scan the images with Trivy
+      - name: Scan the backend image with Trivy
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: consigport-backend:nightly
@@ -227,6 +228,14 @@ jobs:
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: consigport-central-mock:nightly
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Scan the frontend image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: consigport-frontend:nightly
           severity: CRITICAL,HIGH
           exit-code: '1'
           ignore-unfixed: true
