@@ -385,3 +385,26 @@
    - `E2E — Playwright` e `Performance Smoke — k6` pulados porque as suítes ainda não existem; o job `detect` prova a ausência em vez de fingir verde.
    - Artefatos anexados: `backend-reports`, `mock-reports`, `frontend-dist` e `stack-health`.
 10. **Entrega:** branch `feat/010-ci-pipeline` com commit e PR #12 para `develop`; task fechada com o run verde acima.
+
+---
+
+## Sessão #15 — Task 0.11 (Release e Entrega Contínua)
+
+- **Data:** 2026-11-25
+- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash
+- **Branch:** `feat/011-release-cd`
+- **Objetivo:** Conventional Commits viram changelog e tag SemVer, as três imagens são publicadas no GHCR e a tag dispara o deploy de staging.
+
+### Atividades Realizadas:
+1. **Imagens Docker:**
+   - `backend/Dockerfile`, `central-convenios-mock/Dockerfile` e `frontend/Dockerfile` em build de múltiplos estágios, a partir do contexto da raiz (o reactor Maven precisa do `pom.xml` pai).
+   - Estágio de runtime sem privilégio (`eclipse-temurin:21-jre-alpine` com usuário `consigport`; `node:24-alpine` com usuário `node`), `HEALTHCHECK` e `.dockerignore` na raiz.
+2. **Versionamento:**
+   - `release-please-config.json` com o tipo `simple` (uma versão para a plataforma inteira) e `.release-please-manifest.json` começando em `0.0.0`, para que a primeira release seja a `v0.1.0` da fase.
+3. **Publicação no GHCR:**
+   - `.github/workflows/release.yml` roda o `release-please-action` no push em `main` e publica as três imagens quando a tag é criada, com as tags `vX.Y.Z`, `X.Y.Z` e `latest` (a `latest` nunca é movida por uma pré-release).
+4. **Deploy de staging:**
+   - `.github/workflows/cd-staging.yml` dispara na tag, sobe `compose.staging.yaml` com as imagens publicadas, espera os healthchecks e valida backend, mock e frontend.
+5. **Validação:**
+   - `release-please` em modo dry-run, `docker build` das três imagens e `docker compose config -q` dos dois arquivos de compose.
+6. **Entrega:** branch `feat/011-release-cd` com commits e PR para `develop`.
