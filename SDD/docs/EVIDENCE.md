@@ -1870,7 +1870,7 @@
 
 - **Data de Conclusão:** 2026-11-26
 - **Branch:** `feat/026-backend-register-authorization`
-- **PR:** a abrir para `develop`
+- **PR:** [#38](https://github.com/marcelinosandroni/consigport-platform/pull/38)
 - **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** caso de uso idempotente do opt-in, com a replicação do consentimento na
