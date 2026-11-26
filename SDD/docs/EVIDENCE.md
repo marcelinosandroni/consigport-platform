@@ -1348,3 +1348,65 @@
 - `central-convenios-mock/src/test/java/br/com/consigport/central/security/HmacFilterTests.java`
 - `central-convenios-mock/src/test/java/br/com/consigport/central/api/IdempotencyTests.java`
 - `.env.example`, `compose.staging.yaml`
+
+---
+
+### Task 1.7 — Caos determinístico e contrato publicado
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/107-mock-chaos`
+- **PR:** [#28](https://github.com/marcelinosandroni/consigport-platform/pull/28)
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** entregar os cenários de rejeição e falha que o E2E consome e publicar o
+  contrato da Central idêntico a `contracts/central-api.yaml`.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Build e testes do módulo:**
+   ```text
+   ./mvnw -B -pl central-convenios-mock -am verify
+   → Tests run: 39, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **Processo real (porta 18087, `MOCK_TIMEOUT_DELAY_MS=800`):**
+   ```text
+   BEN-REJ  → {"status":"REJEITADA","motivoRejeicao":"MARGEM_CONSIGNADA_INSUFICIENTE"}
+   BEN-MARGIN (6000.00) → {"status":"REJEITADA","motivoRejeicao":"MARGEM_CONSIGNADA_INSUFICIENTE"}
+   BEN-TIMEOUT 1ª leitura → HTTP 200 em 0.806 s
+   BEN-TIMEOUT 2ª leitura → HTTP 200 em 0.805 s
+   BEN-TIMEOUT 3ª leitura → HTTP 200 em 0.004 s
+   X-Mock-Delay-Ms: 500 → HTTP 200 em 0.505 s
+   X-Mock-Force-Error: 503 (status) → 503 ERRO_FORCADO
+   X-Mock-Force-Error: 500 (agenda) → 500 ERRO_FORCADO
+   contadores antes do reset → {"leiturasDeStatus": {"PRT-20261126-0003": 4}}
+   POST /_admin/reset → 204
+   contadores após o reset → {"leiturasDeStatus": {}}
+   ```
+3. **Contrato exportado:**
+   ```text
+   diff contracts/central-api.yaml \
+     central-convenios-mock/src/main/resources/openapi/central-api.yaml
+   → sem diferença
+   ```
+4. **MockMvc (`ChaosTests`, `ContractTest`):** headers de atraso e erro, duas primeiras
+   leituras do `-TIMEOUT`, reset dos contadores e contrato byte a byte.
+
+#### Conteúdo Entregue:
+- `ChaosPolicy` — atraso explícito por header, erro forçado `500/502/503` e contador
+  determinístico por operação para beneficiários `-TIMEOUT`.
+- `AgendaController` e `PortabilityController` — aplicam `X-Mock-Delay-Ms` e
+  `X-Mock-Force-Error` somente à requisição que os carrega.
+- `InMemoryCentralStore` — snapshot dos contadores e reset do caos junto com o estado.
+- `central-convenios-mock/src/main/resources/openapi/central-api.yaml` — cópia publicada
+  do contrato, garantida por `ContractTest`.
+- `application.yml` — `mock.timeout-delay-ms` (`MOCK_TIMEOUT_DELAY_MS`, padrão 6000 ms).
+
+#### Arquivos Tocados:
+- `central-convenios-mock/src/main/java/br/com/consigport/central/chaos/ChaosPolicy.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/AgendaController.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/PortabilityController.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/store/InMemoryCentralStore.java`
+- `central-convenios-mock/src/main/resources/openapi/central-api.yaml`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/api/ChaosTests.java`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/ContractTest.java`

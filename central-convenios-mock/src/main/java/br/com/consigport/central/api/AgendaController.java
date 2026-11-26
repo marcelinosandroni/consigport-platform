@@ -1,10 +1,12 @@
 package br.com.consigport.central.api;
 
 import br.com.consigport.central.api.dto.InstallmentResponse;
+import br.com.consigport.central.chaos.ChaosPolicy;
 import br.com.consigport.central.domain.Installment.InstallmentStatus;
 import br.com.consigport.central.store.InMemoryCentralStore;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,14 +26,20 @@ import org.springframework.web.bind.annotation.RestController;
 public class AgendaController {
 
   private final InMemoryCentralStore store;
+  private final ChaosPolicy chaos;
 
-  public AgendaController(InMemoryCentralStore store) {
+  public AgendaController(InMemoryCentralStore store, ChaosPolicy chaos) {
     this.store = store;
+    this.chaos = chaos;
   }
 
   @GetMapping("/{beneficiarioId}/agenda")
   @Operation(summary = "Consulta a agenda de descontos futuros")
-  public List<InstallmentResponse> consultar(@PathVariable String beneficiarioId) {
+  public List<InstallmentResponse> consultar(
+      @PathVariable String beneficiarioId, HttpServletRequest request) {
+    chaos.aplicarErroForcado(request.getHeader("X-Mock-Force-Error"));
+    chaos.aplicarAtraso(request.getHeader("X-Mock-Delay-Ms"));
+
     if (!store.possuiBeneficiario(beneficiarioId)) {
       throw new CentralException(
           HttpStatus.NOT_FOUND, "BENEFICIARIO_NAO_ENCONTRADO", "Beneficiário não encontrado.");

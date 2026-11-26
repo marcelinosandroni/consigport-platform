@@ -3,6 +3,7 @@ package br.com.consigport.central.api;
 import br.com.consigport.central.api.dto.PortabilityAcceptedResponse;
 import br.com.consigport.central.api.dto.PortabilityRequest;
 import br.com.consigport.central.api.dto.StatusResponse;
+import br.com.consigport.central.chaos.ChaosPolicy;
 import br.com.consigport.central.domain.Installment;
 import br.com.consigport.central.domain.Installment.InstallmentStatus;
 import br.com.consigport.central.domain.Operation;
@@ -43,14 +44,17 @@ public class PortabilityController {
   private final InMemoryCentralStore store;
   private final TransitionScheduler scheduler;
   private final IdempotencyRegistry idempotencia;
+  private final ChaosPolicy chaos;
 
   public PortabilityController(
       InMemoryCentralStore store,
       TransitionScheduler scheduler,
-      IdempotencyRegistry idempotencia) {
+      IdempotencyRegistry idempotencia,
+      ChaosPolicy chaos) {
     this.store = store;
     this.scheduler = scheduler;
     this.idempotencia = idempotencia;
+    this.chaos = chaos;
   }
 
   @PostMapping
@@ -95,7 +99,13 @@ public class PortabilityController {
 
   @GetMapping("/{protocolo}")
   @io.swagger.v3.oas.annotations.Operation(summary = "Consulta o status da operação")
-  public ResponseEntity<StatusResponse> consultarStatus(@PathVariable String protocolo) {
+  public ResponseEntity<StatusResponse> consultarStatus(
+      @PathVariable String protocolo,
+      @RequestHeader(value = "X-Mock-Force-Error", required = false) String forceError,
+      @RequestHeader(value = "X-Mock-Delay-Ms", required = false) String delayMs) {
+    chaos.aplicarErroForcado(forceError);
+    chaos.aplicarAtraso(delayMs);
+
     Operation operacao =
         store
             .operacao(protocolo)
@@ -105,6 +115,8 @@ public class PortabilityController {
                         HttpStatus.NOT_FOUND,
                         "OPERACAO_NAO_ENCONTRADA",
                         "Operação não encontrada para o protocolo informado."));
+
+    chaos.aplicarTimeoutDeterministico(operacao.protocolo(), operacao.beneficiarioId());
 
     if (operacao.status() == OperationStatus.PENDENTE) {
       return ResponseEntity.status(HttpStatus.NO_CONTENT)

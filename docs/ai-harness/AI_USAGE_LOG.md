@@ -664,3 +664,25 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - `MOCK_HMAC_SECRET` e `MOCK_HMAC_TOLERANCE_SECONDS` em `application.yml`, `.env.example` e `compose.staging.yaml`.
 5. **Validação:**
    - `./mvnw -B -pl central-convenios-mock -am verify` → 33 testes verdes.
+
+---
+
+## Sessão #25 — Task 1.7 (Caos Determinístico e Contrato Publicado)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/107-mock-chaos`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** simular rejeições e falhas determinísticas e publicar o contrato idêntico ao compartilhado.
+
+### Atividades Realizadas:
+1. **Caos determinístico:**
+   - `ChaosPolicy` atrasa a resposta por `X-Mock-Delay-Ms` e força `500/502/503` por `X-Mock-Force-Error`, sempre somente na requisição que carrega o header.
+   - Beneficiário `-TIMEOUT` dorme `MOCK_TIMEOUT_DELAY_MS` nas duas primeiras leituras de status; a terceira responde normal.
+   - Rejeições por sufixo `-REJ` e soma acima de `5000.00` já vinham da task 1.5 e foram revalidadas.
+2. **Contadores no estado:**
+   - O snapshot `/_admin/state` expõe `contadores.leiturasDeStatus` e o reset zera o caos junto com as fixtures.
+3. **Contrato publicado:**
+   - `resources/openapi/central-api.yaml` é cópia byte a byte de `contracts/central-api.yaml`, garantida por `ContractTest`.
+4. **Validação:**
+   - `./mvnw -B -pl central-convenios-mock -am verify` → 39 testes verdes.

@@ -34,7 +34,7 @@
 ## Fase atual: 1 — Central mock
 
 > Objetivo: Central determinística na porta `8081`, com contrato PT e Swagger.
-> Task em voo: **1.6 — HMAC e idempotência**.
+> Task em voo: **1.7 — Caos determinístico e contrato publicado**.
 
 ### Tasks
 
@@ -55,10 +55,15 @@
 - [x] **1.5 — Consulta de status com `Retry-After`**
       Antes do delay → `204` com `Retry-After: 2`; depois → `200` com `CONFIRMADA` ou
       `REJEITADA`; protocolo desconhecido → `404 OPERACAO_NAO_ENCONTRADA`.
-- [-] **1.6 — HMAC e idempotência**
+- [x] **1.6 — HMAC e idempotência**
       Assinatura inválida ou timestamp fora de ±300 s → `401 ASSINATURA_INVALIDA`; mesma
       `Idempotency-Key` e payload igual → mesmo protocolo; payload diferente →
       `409 IDEMPOTENCIA_CONFLITO`.
+- [-] **1.7 — Caos determinístico e contrato publicado**
+      `-REJ` e soma acima de `5000.00` → `REJEITADA` com
+      `MARGEM_CONSIGNADA_INSUFICIENTE`; `-TIMEOUT` atrasa os dois primeiros GETs; headers
+      `X-Mock-Delay-Ms` e `X-Mock-Force-Error`; contrato exportado idêntico a
+      `contracts/central-api.yaml`.
 
 ### Como usar este arquivo
 

@@ -1,0 +1,593 @@
+openapi: 3.1.0
+info:
+  title: Central de Convênios API
+  version: 1.0.0
+  description: |
+    Contrato externo da Central de Convênios, fiel ao desafio técnico.
+
+    Todos os campos, status e mensagens são em português. As operações de negócio
+    exigem assinatura HMAC-SHA256 nos headers `X-Signature` e `X-Timestamp`; o
+    corpo canônico e o vetor compartilhado estão em `contracts/hmac-vector.json`.
+    A confirmação da portabilidade é assíncrona: `202` com protocolo e consulta de
+    status até `CONFIRMADA` ou `REJEITADA`.
+  contact:
+    name: ConsigPort
+    url: https://github.com/marcelinosandroni/consigport-platform
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://localhost:8081
+    description: Mock local da Central
+tags:
+  - name: Autorizações
+    description: Opt-in do beneficiário por convênio.
+  - name: Agenda
+    description: Parcelas futuras de um beneficiário autorizado.
+  - name: Portabilidade
+    description: Registro e consulta assíncrona de operações.
+  - name: Administração
+    description: Reset e inspeção do estado em memória do mock.
+paths:
+  /autorizacoes:
+    post:
+      tags:
+        - Autorizações
+      operationId: registrarAutorizacao
+      summary: Registra a autorização (opt-in)
+      description: |
+        Registra o consentimento do beneficiário para um convênio. Repetir o mesmo
+        par devolve `200` com a autorização existente.
+      parameters:
+        - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/XTimestamp'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AutorizacaoRequest'
+            examples:
+              optIn:
+                summary: Opt-in de um beneficiário
+                value:
+                  beneficiarioId: BEN-001
+                  convenioId: AGR-001
+      responses:
+        '201':
+          description: Autorização criada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutorizacaoResponse'
+              examples:
+                criada:
+                  summary: Identificador devolvido
+                  value:
+                    autorizacaoId: AUT-20261123-0001
+        '200':
+          description: Autorização já existente para o par beneficiário/convênio.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutorizacaoResponse'
+              examples:
+                existente:
+                  summary: Mesmo identificador, sem duplicar
+                  value:
+                    autorizacaoId: AUT-20261123-0001
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/AssinaturaInvalida'
+  /beneficiarios/{beneficiarioId}/agenda:
+    get:
+      tags:
+        - Agenda
+      operationId: consultarAgenda
+      summary: Consulta a agenda de descontos futuros
+      description: |
+        Devolve as parcelas futuras do beneficiário. Exige autorização prévia;
+        parcelas com status `FECHADA` não são elegíveis.
+      parameters:
+        - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/BeneficiarioIdPath'
+      responses:
+        '200':
+          description: Lista de parcelas futuras.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Parcela'
+              examples:
+                agenda:
+                  summary: Duas parcelas abertas
+                  value:
+                    - parcelaId: PAR-001
+                      convenioId: AGR-001
+                      valor: 450.00
+                      dataDesconto: '2026-12-05'
+                      status: ABERTA
+                    - parcelaId: PAR-002
+                      convenioId: AGR-001
+                      valor: 300.00
+                      dataDesconto: '2027-01-05'
+                      status: ABERTA
+        '401':
+          $ref: '#/components/responses/AssinaturaInvalida'
+        '403':
+          $ref: '#/components/responses/SemAutorizacao'
+        '404':
+          $ref: '#/components/responses/BeneficiarioNaoEncontrado'
+  /operacoes-portabilidade:
+    post:
+      tags:
+        - Portabilidade
+      operationId: registrarOperacaoPortabilidade
+      summary: Registra uma operação de portabilidade
+      description: |
+        Aceita a operação e devolve o protocolo para consulta assíncrona. A
+        `Idempotency-Key` impede duplicidade: o mesmo payload devolve o mesmo
+        protocolo e um payload diferente devolve `409`.
+      parameters:
+        - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/MockDelay'
+        - $ref: '#/components/parameters/MockForceError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperacaoPortabilidadeRequest'
+            examples:
+              duasParcelas:
+                summary: Operação com duas parcelas
+                value:
+                  beneficiarioId: BEN-001
+                  parcelas:
+                    - PAR-001
+                    - PAR-002
+                  credorCessionario: ConsigPort
+                  contaRecebimento:
+                    banco: '001'
+                    agencia: '1234'
+                    conta: 56789-0
+                  assinatura: cfd6a19397032e89d21d7a0321725f71ae78985c6cfdfd71eef2d01d5c49510c
+      responses:
+        '202':
+          description: Operação aceita; confirmação será assíncrona.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProtocoloResponse'
+              examples:
+                aceita:
+                  summary: Protocolo para consulta
+                  value:
+                    protocolo: PRT-20261123-0001
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/AssinaturaInvalida'
+        '409':
+          $ref: '#/components/responses/IdempotenciaConflito'
+        '422':
+          $ref: '#/components/responses/ParcelaInvalida'
+  /operacoes-portabilidade/{protocolo}:
+    get:
+      tags:
+        - Portabilidade
+      operationId: consultarStatusOperacao
+      summary: Consulta o status da operação
+      description: |
+        Enquanto o processamento não termina, devolve `204` com `Retry-After`.
+        Quando termina, devolve `200` com `CONFIRMADA` ou `REJEITADA`.
+      parameters:
+        - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/ProtocoloPath'
+        - $ref: '#/components/parameters/MockDelay'
+        - $ref: '#/components/parameters/MockForceError'
+      responses:
+        '200':
+          description: Status final da operação.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOperacao'
+              examples:
+                confirmada:
+                  summary: Portabilidade confirmada
+                  value:
+                    status: CONFIRMADA
+                    motivoRejeicao: null
+                rejeitada:
+                  summary: Margem consignável insuficiente
+                  value:
+                    status: REJEITADA
+                    motivoRejeicao: MARGEM_CONSIGNADA_INSUFICIENTE
+        '204':
+          description: Operação ainda pendente; repetir após o intervalo indicado.
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/RetryAfter'
+        '401':
+          $ref: '#/components/responses/AssinaturaInvalida'
+        '404':
+          $ref: '#/components/responses/OperacaoNaoEncontrada'
+  /_admin/reset:
+    post:
+      tags:
+        - Administração
+      operationId: resetarEstado
+      summary: Restaura as fixtures e zera operações
+      description: Reinicia o estado em memória do mock. Uso exclusivo de teste.
+      responses:
+        '204':
+          description: Estado restaurado.
+  /_admin/state:
+    get:
+      tags:
+        - Administração
+      operationId: consultarEstado
+      summary: Inspeciona o estado em memória
+      description: Devolve o estado completo do mock para depuração e testes determinísticos.
+      responses:
+        '200':
+          description: Estado atual do mock.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EstadoMock'
+components:
+  parameters:
+    XSignature:
+      name: X-Signature
+      in: header
+      required: true
+      description: HMAC-SHA256 em hexadecimal minúsculo sobre a requisição canônica.
+      schema:
+        type: string
+        pattern: '^[a-f0-9]{64}$'
+    XTimestamp:
+      name: X-Timestamp
+      in: header
+      required: true
+      description: Epoch em segundos UTC; tolerância de ±300 s.
+      schema:
+        type: integer
+        format: int64
+        minimum: 0
+        example: 1795555200
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: UUID que identifica a tentativa de registro.
+      schema:
+        type: string
+        format: uuid
+    BeneficiarioIdPath:
+      name: beneficiarioId
+      in: path
+      required: true
+      description: Identificador do beneficiário.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+        example: BEN-001
+    ProtocoloPath:
+      name: protocolo
+      in: path
+      required: true
+      description: Protocolo devolvido no aceite.
+      schema:
+        type: string
+        pattern: '^PRT-[0-9]{8}-[0-9]{4}$'
+        example: PRT-20261123-0001
+    MockDelay:
+      name: X-Mock-Delay-Ms
+      in: header
+      required: false
+      description: Atrasa somente esta resposta pelo valor informado, em milissegundos.
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 60000
+    MockForceError:
+      name: X-Mock-Force-Error
+      in: header
+      required: false
+      description: Força um status HTTP de erro somente nesta requisição.
+      schema:
+        type: integer
+        enum:
+          - 500
+          - 502
+          - 503
+  headers:
+    RetryAfter:
+      description: Segundos até a próxima consulta de status.
+      schema:
+        type: integer
+        minimum: 1
+        example: 2
+  responses:
+    RequisicaoInvalida:
+      description: Requisição inválida.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErroCentral'
+          examples:
+            invalida:
+              summary: Campo obrigatório ausente
+              value:
+                codigo: REQUISICAO_INVALIDA
+                mensagem: O campo beneficiarioId é obrigatório.
+                timestamp: '2026-11-23T12:00:06Z'
+    AssinaturaInvalida:
+      description: Assinatura ausente, divergente ou fora da janela de tempo.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErroCentral'
+          examples:
+            assinatura:
+              summary: HMAC divergente
+              value:
+                codigo: ASSINATURA_INVALIDA
+                mensagem: A assinatura da requisição não confere.
+                timestamp: '2026-11-23T12:00:06Z'
+    SemAutorizacao:
+      description: Beneficiário sem autorização registrada.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErroCentral'
+          examples:
+            semAutorizacao:
+              summary: Opt-in ausente
+              value:
+                codigo: SEM_AUTORIZACAO
+                mensagem: O beneficiário não possui autorização para este convênio.
+                timestamp: '2026-11-23T12:00:06Z'
+    BeneficiarioNaoEncontrado:
+      description: Beneficiário desconhecido.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErroCentral'
+          examples:
+            naoEncontrado:
+              summary: Beneficiário inexistente
+              value:
+                codigo: BENEFICIARIO_NAO_ENCONTRADO
+                mensagem: Beneficiário não encontrado.
+                timestamp: '2026-11-23T12:00:06Z'
+    IdempotenciaConflito:
+      description: A chave já foi usada com outro conteúdo.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErroCentral'
+          examples:
+            conflito:
+              summary: Payload divergente
+              value:
+                codigo: IDEMPOTENCIA_CONFLITO
+                mensagem: A chave de idempotência já foi usada com outro conteúdo.
+                timestamp: '2026-11-23T12:00:06Z'
+    ParcelaInvalida:
+      description: Parcela inexistente ou não elegível.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErroCentral'
+          examples:
+            parcela:
+              summary: Parcela fechada
+              value:
+                codigo: PARCELA_INVALIDA
+                mensagem: A parcela PAR-003 não está aberta.
+                timestamp: '2026-11-23T12:00:06Z'
+    OperacaoNaoEncontrada:
+      description: Protocolo desconhecido.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErroCentral'
+          examples:
+            naoEncontrada:
+              summary: Protocolo inexistente
+              value:
+                codigo: OPERACAO_NAO_ENCONTRADA
+                mensagem: Operação não encontrada para o protocolo informado.
+                timestamp: '2026-11-23T12:00:06Z'
+  schemas:
+    AutorizacaoRequest:
+      type: object
+      required:
+        - beneficiarioId
+        - convenioId
+      properties:
+        beneficiarioId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Identificador do beneficiário.
+          example: BEN-001
+        convenioId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Identificador do convênio.
+          example: AGR-001
+    AutorizacaoResponse:
+      type: object
+      required:
+        - autorizacaoId
+      properties:
+        autorizacaoId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Identificador da autorização.
+          example: AUT-20261123-0001
+    Parcela:
+      type: object
+      required:
+        - parcelaId
+        - convenioId
+        - valor
+        - dataDesconto
+        - status
+      properties:
+        parcelaId:
+          type: string
+          description: Identificador da parcela.
+          example: PAR-001
+        convenioId:
+          type: string
+          description: Convênio de origem.
+          example: AGR-001
+        valor:
+          type: number
+          format: double
+          minimum: 0
+          description: Valor da parcela.
+          example: 450.00
+        dataDesconto:
+          type: string
+          format: date
+          description: Data do desconto futuro.
+          example: '2026-12-05'
+        status:
+          type: string
+          description: Situação da parcela.
+          enum:
+            - ABERTA
+            - FECHADA
+    OperacaoPortabilidadeRequest:
+      type: object
+      required:
+        - beneficiarioId
+        - parcelas
+        - credorCessionario
+        - contaRecebimento
+        - assinatura
+      properties:
+        beneficiarioId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Beneficiário titular das parcelas.
+          example: BEN-001
+        parcelas:
+          type: array
+          minItems: 1
+          description: Identificadores das parcelas elegíveis.
+          items:
+            type: string
+            minLength: 1
+          example:
+            - PAR-001
+            - PAR-002
+        credorCessionario:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Credor que passa a receber as parcelas.
+          example: ConsigPort
+        contaRecebimento:
+          $ref: '#/components/schemas/ContaRecebimento'
+        assinatura:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+          description: Espelho do header X-Signature, comparado após a validação.
+    ContaRecebimento:
+      type: object
+      required:
+        - banco
+        - agencia
+        - conta
+      properties:
+        banco:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Banco de destino.
+          example: '001'
+        agencia:
+          type: string
+          minLength: 1
+          maxLength: 32
+          description: Agência de destino.
+          example: '1234'
+        conta:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Conta de destino.
+          example: 56789-0
+    ProtocoloResponse:
+      type: object
+      required:
+        - protocolo
+      properties:
+        protocolo:
+          type: string
+          pattern: '^PRT-[0-9]{8}-[0-9]{4}$'
+          description: Protocolo para consulta de status.
+          example: PRT-20261123-0001
+    StatusOperacao:
+      type: object
+      required:
+        - status
+        - motivoRejeicao
+      properties:
+        status:
+          type: string
+          description: Status final da operação.
+          enum:
+            - PENDENTE
+            - CONFIRMADA
+            - REJEITADA
+        motivoRejeicao:
+          type:
+            - string
+            - 'null'
+          description: Motivo devolvido em caso de rejeição; nulo nos demais.
+          example: MARGEM_CONSIGNADA_INSUFICIENTE
+    ErroCentral:
+      type: object
+      required:
+        - codigo
+        - mensagem
+        - timestamp
+      properties:
+        codigo:
+          type: string
+          description: |
+            Código estável em português. Valores possíveis:
+            `REQUISICAO_INVALIDA`, `ASSINATURA_INVALIDA`, `SEM_AUTORIZACAO`,
+            `BENEFICIARIO_NAO_ENCONTRADO`, `IDEMPOTENCIA_CONFLITO`,
+            `PARCELA_INVALIDA`, `OPERACAO_NAO_ENCONTRADA`.
+          example: ASSINATURA_INVALIDA
+        mensagem:
+          type: string
+          description: Mensagem legível em português.
+        timestamp:
+          type: string
+          format: date-time
+          description: Instante do erro.
+    EstadoMock:
+      type: object
+      description: Estado em memória do mock, sem estrutura estável.
+      additionalProperties: true
