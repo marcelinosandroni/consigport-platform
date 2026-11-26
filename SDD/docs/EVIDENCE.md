@@ -1713,7 +1713,7 @@
 
 - **Data de Conclusão:** 2026-11-26
 - **Branch:** `feat/024-backend-portability-aggregate`
-- **PR:** a abrir para `develop`
+- **PR:** [#36](https://github.com/marcelinosandroni/consigport-platform/pull/36)
 - **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** concentrar no domínio as invariantes da operação e as transições do
