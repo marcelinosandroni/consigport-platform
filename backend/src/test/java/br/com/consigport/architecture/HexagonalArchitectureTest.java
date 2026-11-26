@@ -61,8 +61,11 @@ class HexagonalArchitectureTest {
           .resideInAPackage("..application..")
           .should()
           .dependOnClassesThat()
-          .resideOutsideOfPackages("br.com.consigport.domain..", "java..")
-          .because("the application layer talks to the domain and to the JDK only");
+          .resideOutsideOfPackages(
+              "br.com.consigport.domain..", "br.com.consigport.application..", "java..")
+          .because(
+              "the application layer talks to the domain, to its own types and to the JDK"
+                  + " only, never to the adapters or to a framework");
 
   private static final ArchRule DOMAIN_AND_APPLICATION_NEVER_REACH_ADAPTERS =
       noClasses()
@@ -80,11 +83,7 @@ class HexagonalArchitectureTest {
           .should()
           .dependOnClassesThat()
           .resideInAPackage("..adapters.out..")
-          .because("the HTTP edge talks to use cases, never to outbound adapters")
-          // The HTTP edge is born in task 2.9. The rule is empty until then and bites
-          // from the first inbound adapter on; the fixture below proves it rejects a
-          // violation as soon as a subject exists.
-          .allowEmptyShould(true);
+          .because("the HTTP edge talks to use cases, never to outbound adapters");
 
   private static final ArchRule ONLY_THE_COMPOSITION_ROOT_IS_SHARED =
       noClasses()

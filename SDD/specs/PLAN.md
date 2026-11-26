@@ -71,7 +71,7 @@
 
 > Objetivo: core DDD/hexagonal na porta `8080`, com PostgreSQL, Flyway, ACL, i18n,
 > polling resiliente e Swagger.
-> Task em voo: **2.9 — Início da operação com idempotência**.
+> Task em voo: **2.10 — Assinatura HMAC e envio à Central**.
 
 ### Tasks
 
@@ -101,10 +101,14 @@
 - [x] **2.8 — Persistência e migração V1**
       DDL do `ARCHITECTURE.md` §6 com três tabelas, índices, constraints e trigger
       append-only; status restrito por `CHECK`; snapshot em JSONB não vazio.
-- [-] **2.9 — Início da operação com idempotência**
+- [x] **2.9 — Início da operação com idempotência**
       `POST /portability-operations` exige `Idempotency-Key`; o replay devolve `202` com
       `Idempotent-Replay: true`; payload divergente → `409 IDEMPOTENCY_CONFLICT`; parcela
       inelegível → `422`.
+- [-] **2.10 — Assinatura HMAC e envio à Central**
+      `HmacSigner` reproduz o vetor de `contracts/hmac-vector.json`; `CentralHttpClient`
+      submete a operação assinada; `CREATED` → `PENDING` com `protocol`; falha após
+      retries → `INTEGRATION_ERROR`.
 
 ### Como usar este arquivo
 

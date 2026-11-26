@@ -966,3 +966,43 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - `./mvnw -B -pl backend test -Dtest=PersistenceConstraintsTest` → 11 testes verdes.
    - `./mvnw -B -pl backend test -Dtest=JpaRepositoriesTest` → 10 testes verdes.
    - `./mvnw -B verify` → reactor verde (backend 186 testes, mock 39 testes).
+
+---
+
+## Sessão #35 — Task 2.9 (Início da Operação com Idempotência)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/029-backend-start-operation-idempotency`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** criar a operação, congelar o snapshot das parcelas e responder `202`, com
+  a idempotência da chave e o replay sinalizado no header.
+
+### Atividades Realizadas:
+1. **Domínio:**
+   - `OperationRequest` (o pedido e a regra do "mesmo payload") e `OperationPolicy`
+     (elegibilidade e congelamento do snapshot).
+   - `IdempotencyKeyAlreadyUsedException` e a porta `TransactionRunner`.
+   - `DomainError` selado com `IdempotencyConflict`, `IdempotencyKeyRequired`,
+     `InstallmentNotEligible` e `CentralUnavailable`.
+2. **Aplicação:**
+   - `StartOperation`: replay, conflito, elegibilidade, snapshot, evento de criação e a
+     corrida da chave de idempotência.
+3. **Aresta HTTP:**
+   - `PortabilityOperationResource` com o header `Idempotent-Replay` e
+     `ApiExceptionHandler` com `code`, `message`, `locale`, `timestamp`, `path` e
+     `details`.
+   - DTOs do pedido, da resposta aceita e do erro.
+4. **Persistência:**
+   - `SpringTransactionRunner` (operação + evento na mesma transação) e
+     `UniqueViolations` (SQLSTATE `23505` com o nome da constraint).
+5. **Testes:** 9 unitários do caso de uso e 8 de integração HTTP sobre PostgreSQL 16, com
+   duas chamadas concorrentes e uma divergente.
+6. **Prova de vida:** a comparação de payload das parcelas virando `true` quebrou o
+   build (`Tests run: 9, Failures: 2`); a comparação foi restaurada e a suíte voltou a
+   ficar verde.
+7. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest=StartOperationTest` → 9 testes verdes.
+   - `./mvnw -B -pl backend test -Dtest=PortabilityOperationResourceTest` → 8 testes
+     verdes.
+   - `./mvnw -B verify` → reactor verde (backend 203 testes, mock 39 testes).
