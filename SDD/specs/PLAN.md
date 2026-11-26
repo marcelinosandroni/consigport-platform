@@ -71,16 +71,20 @@
 
 > Objetivo: core DDD/hexagonal na porta `8080`, com PostgreSQL, Flyway, ACL, i18n,
 > polling resiliente e Swagger.
-> Task em voo: **2.2 — Value objects compartilhados**.
+> Task em voo: **2.3 — Agregado de autorização**.
 
 ### Tasks
 
 - [x] **2.1 — Esqueleto hexagonal e regras ArchUnit**
       `domain` sem Spring, JPA, Jackson ou HTTP; `application` só importa `domain`;
       `config` é o único composition root; regra verificada por `HexagonalArchitectureTest`.
-- [-] **2.2 — Value objects compartilhados**
+- [x] **2.2 — Value objects compartilhados**
       `BeneficiaryId`, `AgreementId`, `InstallmentId`, `IdempotencyKey`, `Money` e
       `ReceivingAccount` com validação no construtor e igualdade por valor.
+- [-] **2.3 — Agregado de autorização**
+      `Authorization` com identidade, beneficiário, convênio e `createdAt`;
+      `AuthorizationRepository` com `findByBeneficiaryAndAgreement` e `save`, sem anotação
+      de framework.
 
 ### Como usar este arquivo
 

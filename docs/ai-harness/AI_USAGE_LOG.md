@@ -740,3 +740,32 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
 4. **Validação:**
    - `./mvnw -q -pl backend test -Dtest=HexagonalArchitectureTest` → 9 testes verdes.
    - `./mvnw -B verify` → reactor verde (backend + mock).
+
+---
+
+## Sessão #28 — Task 2.2 (Value Objects Compartilhados)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/022-backend-value-objects`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** substituir `String` e `BigDecimal` soltos por tipos fortes com invariante
+  validada na construção.
+
+### Atividades Realizadas:
+1. **Identificadores (`domain/shared/`):**
+   - `BeneficiaryId`, `AgreementId` e `InstallmentId`: não vazios, no máximo 64
+     caracteres, normalizados com `trim`, igualdade por valor.
+   - `IdempotencyKey`: UUID obrigatório (BR-07), com `parse` do texto e forma canônica.
+2. **Valores de portabilidade (`domain/portability/`):**
+   - `Money`: `BigDecimal` com exatamente 2 casas, nunca negativo, escala normalizada.
+   - `ReceivingAccount`: `bank`, `branch` e `account` obrigatórios nos limites do
+     contrato.
+3. **Testes:** `SharedValueObjectsTest` e `PortabilityValueObjectsTest` — 28 testes de
+   unidade cobrindo os casos válidos, inválidos e de igualdade por valor.
+4. **Prova de vida:** remoção temporária do guard de valor negativo em `Money` quebrou o
+   build (`Tests run: 6, Failures: 1`); o guard foi restaurado e a suíte voltou a ficar
+   verde.
+5. **Validação:**
+   - `./mvnw -B -pl backend test` → 39 testes verdes no backend.
+   - `./mvnw -B verify` → reactor verde (backend 39 testes, mock 39 testes).
