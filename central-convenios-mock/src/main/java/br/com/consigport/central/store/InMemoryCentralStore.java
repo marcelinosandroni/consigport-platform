@@ -39,14 +39,17 @@ public class InMemoryCentralStore {
   private final ConcurrentMap<String, Integer> leiturasDeStatus = new ConcurrentHashMap<>();
   private final AtomicLong sequenciaAutorizacao = new AtomicLong();
   private final AtomicLong sequenciaOperacao = new AtomicLong();
+  private final IdempotencyRegistry idempotencia;
 
-  public InMemoryCentralStore() {
+  public InMemoryCentralStore(IdempotencyRegistry idempotencia) {
+    this.idempotencia = idempotencia;
     reset();
   }
 
-  /** Restores the fixtures and clears every operation and counter. */
+  /** Restores the fixtures and clears every operation, counter and idempotency key. */
   public synchronized void reset() {
     agenda.clear();
+    idempotencia.clear();
     autorizacoes.clear();
     autorizacaoPorChave.clear();
     operacoes.clear();

@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.consigport.central.store.InMemoryCentralStore;
 import com.jayway.jsonpath.JsonPath;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +24,7 @@ import org.springframework.test.web.servlet.MvcResult;
  * protocol, the initial {@code PENDENTE} state and the {@code 422} for an unknown
  * installment.
  */
-@SpringBootTest
+@SpringBootTest(properties = "mock.hmac.enabled=false")
 @AutoConfigureMockMvc
 class PortabilityControllerTests {
 
@@ -51,6 +52,7 @@ class PortabilityControllerTests {
     MvcResult result =
         mvc.perform(
                 post("/operacoes-portabilidade")
+                    .header("Idempotency-Key", UUID.randomUUID().toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(OPERACAO))
             .andExpect(status().isAccepted())
@@ -79,6 +81,7 @@ class PortabilityControllerTests {
   void unknownInstallmentReturnsUnprocessableEntity() throws Exception {
     mvc.perform(
             post("/operacoes-portabilidade")
+                    .header("Idempotency-Key", UUID.randomUUID().toString())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(OPERACAO.replace("PAR-002", "PAR-999")))
         .andExpect(status().isUnprocessableEntity())
@@ -90,6 +93,7 @@ class PortabilityControllerTests {
   void blankBeneficiaryReturnsBadRequest() throws Exception {
     mvc.perform(
             post("/operacoes-portabilidade")
+                    .header("Idempotency-Key", UUID.randomUUID().toString())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(OPERACAO.replace("\"BEN-001\"", "\"\"")))
         .andExpect(status().isBadRequest())
@@ -100,6 +104,7 @@ class PortabilityControllerTests {
     MvcResult result =
         mvc.perform(
                 post("/operacoes-portabilidade")
+                    .header("Idempotency-Key", UUID.randomUUID().toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(payload))
             .andExpect(status().isAccepted())

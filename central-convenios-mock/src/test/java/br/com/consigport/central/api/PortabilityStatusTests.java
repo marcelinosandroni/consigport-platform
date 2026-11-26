@@ -13,6 +13,7 @@ import br.com.consigport.central.store.InMemoryCentralStore;
 import com.jayway.jsonpath.JsonPath;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +28,8 @@ import org.springframework.test.web.servlet.MvcResult;
  * {@code 200} with the terminal status afterwards, and {@code 404} for an unknown
  * protocol. The delay is shortened to 200 ms to keep the test fast.
  */
-@SpringBootTest(properties = "mock.confirmation-delay-ms=200")
+@SpringBootTest(
+    properties = {"mock.confirmation-delay-ms=200", "mock.hmac.enabled=false"})
 @AutoConfigureMockMvc
 class PortabilityStatusTests {
 
@@ -112,6 +114,7 @@ class PortabilityStatusTests {
     MvcResult result =
         mvc.perform(
                 post("/operacoes-portabilidade")
+                    .header("Idempotency-Key", UUID.randomUUID().toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(payload))
             .andExpect(status().isAccepted())

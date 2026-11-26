@@ -21,7 +21,7 @@ import org.springframework.test.web.servlet.MvcResult;
  * Covers the opt-in: creation, repetition and validation, plus the agenda unlock that
  * the consent produces (BR-01, BR-02).
  */
-@SpringBootTest
+@SpringBootTest(properties = "mock.hmac.enabled=false")
 @AutoConfigureMockMvc
 class AuthorizationControllerTests {
 
