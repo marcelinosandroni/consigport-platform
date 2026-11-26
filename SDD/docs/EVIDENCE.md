@@ -1945,7 +1945,7 @@
 
 - **Data de Conclusão:** 2026-11-26
 - **Branch:** `feat/027-backend-agenda-acl`
-- **PR:** a abrir para `develop`
+- **PR:** [#39](https://github.com/marcelinosandroni/consigport-platform/pull/39)
 - **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** traduzir o contrato PT da Central para o domínio EN, sem deixar o DTO
