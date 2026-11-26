@@ -35,6 +35,11 @@ mock:
   # Delay before the asynchronous confirmation. Until it elapses, the status endpoint
   # answers 204 with Retry-After, as the edital contract requires.
   confirmation-delay-ms: ${MOCK_CONFIRMATION_DELAY_MS:2000}
+  hmac:
+    # Shared secret and tolerance from contracts/hmac-vector.json.
+    enabled: ${MOCK_HMAC_ENABLED:true}
+    secret: ${MOCK_HMAC_SECRET:consigport-hmac-test-secret-2026}
+    tolerance-seconds: ${MOCK_HMAC_TOLERANCE_SECONDS:300}
 
 ---
 # Local profile: mock on the compose.yaml network, verbose project logs.

@@ -638,3 +638,29 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - A transição compara a instância da operação, então um reset invalida tarefas antigas.
 4. **Validação:**
    - `./mvnw -B -pl central-convenios-mock -am verify` → 22 testes verdes.
+
+---
+
+## Sessão #24 — Task 1.6 (HMAC e Idempotência)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/106-mock-hmac`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** validar integridade das requisições com HMAC-SHA256 e evitar operações duplicadas.
+
+### Atividades Realizadas:
+1. **Assinatura canônica:**
+   - `CanonicalRequest` ordena as chaves do JSON, remove `assinatura` e monta `METHOD\nPATH_WITH_QUERY\nTIMESTAMP\nSHA256_HEX(body)`.
+   - `HmacValidator` reproduz o vetor de `contracts/hmac-vector.json` e aplica tolerância de ±300 s.
+2. **Filtro de proteção:**
+   - `HmacFilter` exige `X-Signature` e `X-Timestamp` em `/autorizacoes`, `/beneficiarios/**` e `/operacoes-portabilidade/**`.
+   - Assinatura ausente, divergente ou expirada → `401 ASSINATURA_INVALIDA`.
+3. **Idempotência (BR-07):**
+   - `IdempotencyRegistry` guarda o hash do payload e o protocolo por `Idempotency-Key`.
+   - Mesma key + mesmo payload → mesmo protocolo; payload diferente → `409 IDEMPOTENCIA_CONFLITO`; key ausente → `400 REQUISICAO_INVALIDA`.
+   - O reset limpa o registry junto com o estado.
+4. **Configuração:**
+   - `MOCK_HMAC_SECRET` e `MOCK_HMAC_TOLERANCE_SECONDS` em `application.yml`, `.env.example` e `compose.staging.yaml`.
+5. **Validação:**
+   - `./mvnw -B -pl central-convenios-mock -am verify` → 33 testes verdes.

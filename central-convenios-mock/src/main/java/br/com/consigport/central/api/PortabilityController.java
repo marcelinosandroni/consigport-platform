@@ -7,9 +7,12 @@ import br.com.consigport.central.domain.Installment;
 import br.com.consigport.central.domain.Installment.InstallmentStatus;
 import br.com.consigport.central.domain.Operation;
 import br.com.consigport.central.domain.OperationStatus;
+import br.com.consigport.central.security.CanonicalRequest;
+import br.com.consigport.central.store.IdempotencyRegistry;
 import br.com.consigport.central.store.InMemoryCentralStore;
 import br.com.consigport.central.store.TransitionScheduler;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.List;
@@ -20,6 +23,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -38,20 +42,52 @@ public class PortabilityController {
 
   private final InMemoryCentralStore store;
   private final TransitionScheduler scheduler;
+  private final IdempotencyRegistry idempotencia;
 
-  public PortabilityController(InMemoryCentralStore store, TransitionScheduler scheduler) {
+  public PortabilityController(
+      InMemoryCentralStore store,
+      TransitionScheduler scheduler,
+      IdempotencyRegistry idempotencia) {
     this.store = store;
     this.scheduler = scheduler;
+    this.idempotencia = idempotencia;
   }
 
   @PostMapping
   @io.swagger.v3.oas.annotations.Operation(summary = "Registra uma operação de portabilidade")
-  public ResponseEntity<PortabilityAcceptedResponse> registrar(
-      @Valid @RequestBody PortabilityRequest request) {
+  public synchronized ResponseEntity<PortabilityAcceptedResponse> registrar(
+      @Valid @RequestBody PortabilityRequest request,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+      HttpServletRequest servletRequest) {
+    if (idempotencyKey == null || idempotencyKey.isBlank()) {
+      throw new CentralException(
+          HttpStatus.BAD_REQUEST,
+          "REQUISICAO_INVALIDA",
+          "O header Idempotency-Key é obrigatório.");
+    }
+
+    String canonicalBody =
+        (String) servletRequest.getAttribute(CanonicalRequest.CANONICAL_BODY_ATTRIBUTE);
+    String payloadHash = CanonicalRequest.sha256Hex(canonicalBody == null ? "" : canonicalBody);
+
+    var existente = idempotencia.buscar(idempotencyKey);
+    if (existente.isPresent()) {
+      if (!existente.get().payloadHash().equals(payloadHash)) {
+        throw new CentralException(
+            HttpStatus.CONFLICT,
+            "IDEMPOTENCIA_CONFLITO",
+            "A Idempotency-Key já foi usada com outro payload.");
+      }
+      return ResponseEntity.status(HttpStatus.ACCEPTED)
+          .body(new PortabilityAcceptedResponse(existente.get().protocolo()));
+    }
+
     validarParcelas(request.beneficiarioId(), request.parcelas());
 
     Operation operacao =
         store.criarOperacao(request.beneficiarioId(), request.parcelas(), Instant.now());
+    idempotencia.registrar(
+        idempotencyKey, new IdempotencyRegistry.Entry(payloadHash, operacao.protocolo()));
     scheduler.agendar(operacao);
     return ResponseEntity.status(HttpStatus.ACCEPTED)
         .body(new PortabilityAcceptedResponse(operacao.protocolo()));

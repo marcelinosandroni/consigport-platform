@@ -12,8 +12,8 @@
 |---|---|
 | Bootstrap do repositório | ✅ `main` com commit inicial |
 | Fase 0 — Fundação | ✅ concluída e arquivada, tag `v0.1.0` |
-| Fase em andamento | Fase 1 — Central mock (task 1.5 em voo) |
-| Próxima task | 1.6 — HMAC e idempotência |
+| Fase em andamento | Fase 1 — Central mock (task 1.6 em voo) |
+| Próxima task | 1.7 — Caos determinístico e contrato publicado |
 | Versão | `v0.1.0` (a Fase 1 fecha em `v0.2.0`) |
 
 A Fase 0 entregou specs, ADRs, harness, gates, contratos, scaffolds, CI/CD e a

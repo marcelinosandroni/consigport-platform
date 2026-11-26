@@ -19,7 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * Covers the agenda endpoint: the happy path with opt-in, the unknown beneficiary and
  * the beneficiary that has not granted consent yet (BR-01).
  */
-@SpringBootTest
+@SpringBootTest(properties = "mock.hmac.enabled=false")
 @AutoConfigureMockMvc
 class AgendaControllerTests {
 

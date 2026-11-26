@@ -1284,3 +1284,67 @@
 - `central-convenios-mock/src/main/java/br/com/consigport/central/store/InMemoryCentralStore.java`
 - `central-convenios-mock/src/main/resources/application.yml`
 - `central-convenios-mock/src/test/java/br/com/consigport/central/api/PortabilityStatusTests.java`
+
+---
+
+### Task 1.6 — HMAC e idempotência
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/106-mock-hmac`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** garantir integridade das mensagens com HMAC-SHA256 (BR-06) e impedir
+  operações duplicadas com `Idempotency-Key` (BR-07).
+
+#### Comandos de Verificação e Saídas:
+
+1. **Build e testes do módulo:**
+   ```text
+   ./mvnw -B -pl central-convenios-mock -am verify
+   → Tests run: 33, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **Vetor compartilhado (`contracts/hmac-vector.json`):**
+   ```text
+   HmacValidatorTests → reproduz canônico e assinatura de todos os vetores
+   ```
+3. **Processo real (porta 18086):**
+   ```text
+   POST assinado (X-Signature + X-Timestamp + Idempotency-Key)
+     → 202 {"protocolo":"PRT-20261126-0001"}
+   POST mesma key + mesmo payload        → 202 {"protocolo":"PRT-20261126-0001"}
+   POST mesma key + payload diferente    → 409 IDEMPOTENCIA_CONFLITO
+   POST assinatura divergente            → 401 ASSINATURA_INVALIDA
+   POST timestamp expirado (-400 s)      → 401 ASSINATURA_INVALIDA
+   GET  /beneficiarios/BEN-001/agenda    → 401 ASSINATURA_INVALIDA (sem assinatura)
+   ```
+
+#### Conteúdo Entregue:
+- `CanonicalRequest` — JSON com chaves ordenadas, sem espaços e sem o campo `assinatura`;
+  canônico `METHOD\nPATH_WITH_QUERY\nTIMESTAMP\nSHA256_HEX(body)`.
+- `HmacValidator` — HMAC-SHA256 hexadecimal minúsculo, segredo e tolerância de ±300 s
+  vindos do vetor compartilhado.
+- `HmacFilter` — protege `/autorizacoes`, `/beneficiarios/**` e
+  `/operacoes-portabilidade/**`, devolve `401 ASSINATURA_INVALIDA` e mantém o corpo
+  legível para os controllers.
+- `IdempotencyRegistry` — guarda hash do payload e protocolo por `Idempotency-Key`; o
+  reset limpa o registry.
+- `PortabilityController` — key obrigatória (`400 REQUISICAO_INVALIDA`), mesmo payload
+  devolve o mesmo protocolo e payload divergente devolve `409 IDEMPOTENCIA_CONFLITO`.
+- `application.yml`, `.env.example` e `compose.staging.yaml` — `MOCK_HMAC_SECRET` e
+  `MOCK_HMAC_TOLERANCE_SECONDS`.
+
+#### Arquivos Tocados:
+- `central-convenios-mock/src/main/java/br/com/consigport/central/security/CanonicalRequest.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/security/HmacValidator.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/security/HmacFilter.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/security/CachedBodyHttpServletRequest.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/store/IdempotencyRegistry.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/store/InMemoryCentralStore.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/PortabilityController.java`
+- `central-convenios-mock/src/main/resources/application.yml`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/security/HmacValidatorTests.java`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/security/HmacFilterTests.java`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/api/IdempotencyTests.java`
+- `.env.example`, `compose.staging.yaml`
