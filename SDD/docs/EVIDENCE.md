@@ -2029,3 +2029,130 @@
 - `backend/src/test/java/br/com/consigport/application/agenda/InMemoryAgendaGateway.java`
 - `backend/src/test/java/br/com/consigport/architecture/HexagonalArchitectureTest.java`
 - `backend/src/test/java/br/com/consigport/architecture/fixture/application/ApplicationUsingCentralDto.java`
+
+---
+
+### Task 2.8 — Persistência e migração V1
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/028-backend-persistence-v1`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** criar as três tabelas, os índices, as constraints e o trigger append-only
+  do `ARCHITECTURE.md` §6, com as entidades JPA e os repositórios de autorização e
+  portabilidade.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Migração e constraints (Testcontainers PostgreSQL 16):**
+   ```text
+   ./mvnw -B -pl backend test -Dtest=PersistenceConstraintsTest
+   → Successfully applied 1 migration to schema "public", now at version v1
+     (execution time 00:00.055s)
+   → Initialized JPA EntityManagerFactory for persistence unit 'default'
+   → Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 26.24 s -- in
+     br.com.consigport.adapters.out.persistence.PersistenceConstraintsTest
+   → Tests run: 11, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **Round trip dos agregados sobre o schema V1:**
+   ```text
+   ./mvnw -B -pl backend test -Dtest=JpaRepositoriesTest
+   → Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 25.16 s -- in
+     br.com.consigport.adapters.out.persistence.JpaRepositoriesTest
+   → Tests run: 10, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+3. **Reator completo:**
+   ```text
+   ./mvnw -B verify
+   → Tests run: 186, Failures: 0, Errors: 0, Skipped: 0
+   → Tests run: 39, Failures: 0, Errors: 0, Skipped: 0
+   → Reactor Summary for ConsigPort Platform 0.1.0-SNAPSHOT:
+   → ConsigPort Platform ................................ SUCCESS [  0.003 s]
+   → ConsigPort Backend ................................. SUCCESS [ 57.110 s]
+   → Central de Convênios Mock .......................... SUCCESS [ 32.209 s]
+   → BUILD SUCCESS
+   → EXIT=0
+   ```
+4. **Prova de vida da constraint de status (`CHECK` virado em `status IS NOT NULL`):**
+   ```text
+   → CHECK de status quebrado temporariamente
+   → ./mvnw -B -pl backend test -Dtest=PersistenceConstraintsTest
+   → Tests run: 11, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 18.85 s
+     <<< FAILURE! -- in br.com.consigport.adapters.out.persistence.PersistenceConstraintsTest
+   → PersistenceConstraintsTest.refusesAStatusOutsideTheStateMachine:47
+     Expecting code to raise a throwable.
+   → BUILD FAILURE
+   → CHECK de status restaurado
+   → ./mvnw -B verify → Tests run: 186, Failures: 0, Errors: 0, Skipped: 0 → BUILD SUCCESS
+   ```
+5. **Gates locais:**
+   ```text
+   node scripts/check-specs.mjs               → OK
+   node SDD/SKILLS/check-docs/check-docs.mjs  → OK
+   node scripts/check-architecture.mjs        → OK
+   node scripts/check-ai-log.mjs              → OK
+   node scripts/check-theme-tokens.mjs        → OK
+   ```
+
+#### Conteúdo Entregue:
+- `backend/src/main/resources/db/migration/V1__create_schema.sql` — o DDL do
+  `ARCHITECTURE.md` §6: `authorizations`, `portability_operations` e `operation_events`,
+  os dois índices, a `CHECK` de status, a `CHECK` de snapshot não vazio, a `CHECK` de
+  total não negativo e o trigger append-only.
+- `domain/portability/PortabilityOperationRepository` — a porta de armazenamento das
+  operações, com `save`, `findById`, `findByIdempotencyKey` e `findByProtocol`.
+- `adapters/out/persistence/AuthorizationJpaEntity` e `JpaAuthorizationRepository` — a
+  entidade e o adaptador da porta `AuthorizationRepository`.
+- `adapters/out/persistence/PortabilityOperationJpaEntity` e
+  `JpaPortabilityOperationRepository` — a entidade, o mapeamento do snapshot em JSONB e
+  o adaptador da porta de operações.
+- `adapters/out/persistence/InstallmentSnapshotRow` — a linha do snapshot no formato do
+  `ARCHITECTURE.md` §6.
+- `adapters/out/persistence/OperationEventJpaEntity` e `JpaOperationEventRepository` — a
+  terceira tabela, mapeada e com a trilha growing only.
+- `adapters/out/persistence/RawPayloadCodec` — a codificação do payload bruto da
+  Central em JSONB.
+- `backend/src/test/java/br/com/consigport/support/PostgreSqlTestSupport.java` — o
+  PostgreSQL 16 compartilhado pelos testes de integração.
+- `PersistenceConstraintsTest` e `JpaRepositoriesTest` — 21 testes de integração.
+
+#### Descobertas e Decisões:
+- O trigger append-only rejeita `UPDATE` e `DELETE` com SQLSTATE `P0001`, traduzido pelo
+  driver como `UncategorizedSQLException`. O isolamento dos testes usa `TRUNCATE`, que
+  não dispara trigger de linha: a garantia append-only sobrevive à limpeza.
+- Dentro do método do adaptador a falha do banco ainda é a exceção do Hibernate; a
+  tradução para o erro de domínio só acontece na fronteira do bean. A constraint
+  única do par é reconhecida pelo SQLSTATE `23505` e traduzida em
+  `AuthorizationAlreadyExistsException`.
+- O JSONB do PostgreSQL normaliza o documento: reordena as chaves de um objeto e
+  recusa um texto que não é JSON. Como o payload bruto da Central é a evidência do que
+  a Central respondeu, ele é guardado como string JSON (o `RawPayloadCodec`), e volta
+  byte a byte — inclusive quando não é JSON.
+- O schema do `ARCHITECTURE.md` §6 não tem coluna de convênio na operação: o convênio
+  é o da primeira parcela do snapshot, e o pedido escolhe parcelas de um só convênio.
+- Um container por classe de teste quebrava os contextos Spring: o contexto guardava a
+  porta do container anterior. Passou a haver um container por JVM, com as propriedades
+  do datasource apontadas por `@DynamicPropertySource`.
+- O teste de scaffold (`ConsigPortApplicationTests`) usava H2 com o Flyway desligado, e
+  o próprio arquivo avisava que a task de persistência o substituiria. Hoje ele sobe
+  contra o PostgreSQL 16 real, e a dependência do H2 saiu do `backend/pom.xml`.
+
+#### Arquivos Tocados:
+- `backend/src/main/resources/db/migration/V1__create_schema.sql`
+- `backend/src/main/java/br/com/consigport/domain/portability/PortabilityOperationRepository.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/persistence/AuthorizationJpaEntity.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/persistence/JpaAuthorizationRepository.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/persistence/PortabilityOperationJpaEntity.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/persistence/InstallmentSnapshotRow.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/persistence/JpaPortabilityOperationRepository.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/persistence/OperationEventJpaEntity.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/persistence/JpaOperationEventRepository.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/persistence/RawPayloadCodec.java`
+- `backend/src/test/java/br/com/consigport/support/PostgreSqlTestSupport.java`
+- `backend/src/test/java/br/com/consigport/adapters/out/persistence/PersistenceConstraintsTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/out/persistence/JpaRepositoriesTest.java`
+- `backend/src/test/java/br/com/consigport/ConsigPortApplicationTests.java`
+- `backend/pom.xml`

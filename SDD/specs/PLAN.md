@@ -71,7 +71,7 @@
 
 > Objetivo: core DDD/hexagonal na porta `8080`, com PostgreSQL, Flyway, ACL, i18n,
 > polling resiliente e Swagger.
-> Task em voo: **2.8 — Persistência e migração V1**.
+> Task em voo: **2.9 — Início da operação com idempotência**.
 
 ### Tasks
 
@@ -98,9 +98,13 @@
 - [x] **2.7 — Consulta de agenda com ACL**
       `AgendaGateway` e `Installment` no domínio; `CentralAcl` traduz o contrato PT da
       Central para o domínio EN; `403` sem autorização e `404` repassado.
-- [-] **2.8 — Persistência e migração V1**
+- [x] **2.8 — Persistência e migração V1**
       DDL do `ARCHITECTURE.md` §6 com três tabelas, índices, constraints e trigger
       append-only; status restrito por `CHECK`; snapshot em JSONB não vazio.
+- [-] **2.9 — Início da operação com idempotência**
+      `POST /portability-operations` exige `Idempotency-Key`; o replay devolve `202` com
+      `Idempotent-Replay: true`; payload divergente → `409 IDEMPOTENCY_CONFLICT`; parcela
+      inelegível → `422`.
 
 ### Como usar este arquivo
 
