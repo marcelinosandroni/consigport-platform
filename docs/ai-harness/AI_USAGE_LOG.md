@@ -709,3 +709,34 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - `PLAN.md` com a Fase 1 concluída e a task 2.1 em voo; `ROADMAP.md` com a `v0.2.0` publicada.
 4. **Validação:**
    - `./mvnw -B verify` → reactor verde (backend + mock, 39 testes no mock).
+
+---
+
+## Sessão #27 — Task 2.1 (Esqueleto Hexagonal e Regras ArchUnit)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/021-backend-hexagonal-skeleton`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** criar as camadas do backend e travar as dependências proibidas desde o
+  primeiro commit.
+
+### Atividades Realizadas:
+1. **Camadas do backend:**
+   - `domain`, `application`, `adapters` e `config` declaradas com `package-info.java` que
+     documenta a fronteira e as dependências permitidas de cada uma.
+   - `config/CompositionRoot` com o bean `Clock.systemUTC()`: o único lugar que conhece
+     implementações concretas.
+2. **Regras ArchUnit:**
+   - Domínio sem Spring, JPA, Jackson, HTTP ou logger; aplicação importando apenas
+     `domain` e o JDK; domínio e aplicação nunca alcançando adaptadores; adaptadores de
+     entrada nunca alcançando adaptadores de saída; `config` privado; camadas sem ciclos.
+3. **Guard que não pode ficar verde por ausência:**
+   - O engine JUnit 5 do ArchUnit 1.4.2 não descobre campos `@ArchTest` sob o JUnit
+     Platform 1.12.2 (uma regra inválida passou sem rodar). As regras passaram a ser
+     avaliadas em métodos `@Test` comuns.
+   - Fixtures com violações deliberadas provam que cada regra rejeita o defeito que
+     descreve, e uma violação temporária no código de produção quebrou o build.
+4. **Validação:**
+   - `./mvnw -q -pl backend test -Dtest=HexagonalArchitectureTest` → 9 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend + mock).
