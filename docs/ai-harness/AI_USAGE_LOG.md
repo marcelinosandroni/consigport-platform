@@ -895,3 +895,37 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - `./mvnw -B -pl backend test -Dtest='RegisterAuthorizationTest,FindAuthorizationTest'`
      → 9 testes verdes.
    - `./mvnw -B verify` → reactor verde (backend 148 testes, mock 39 testes).
+
+---
+
+## Sessão #33 — Task 2.7 (Consulta de Agenda com ACL)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/027-backend-agenda-acl`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** traduzir o contrato PT da Central para o domínio EN, sem deixar o DTO
+  externo escapar do adaptador.
+
+### Atividades Realizadas:
+1. **Domínio da agenda:**
+   - `Installment`, `InstallmentStatus` (`OPEN`/`CLOSED`) e `BeneficiaryAgenda` com
+     `openInstallments()` para a elegibilidade (BR-03).
+   - `AgendaGateway` como porta de leitura da agenda na Central.
+   - `DomainError` selado em `domain/shared/`, com os códigos estáveis da API pública.
+2. **Aplicação:**
+   - `QueryAgenda` lê a agenda pela porta e repassa as recusas da Central.
+3. **Anti-corruption layer:**
+   - `AgendaResponse` no adaptador de saída, com os nomes JSON em português.
+   - `CentralAcl` traduz `ABERTA ↔ OPEN`, `FECHADA ↔ CLOSED` e converte `403` e `404` em
+     erros de domínio.
+4. **Guarda de arquitetura:**
+   - Nova regra no `HexagonalArchitectureTest`: nenhum DTO externo fora do adaptador de
+     saída da Central, com fixture que prova que a regra morde.
+5. **Testes:** 26 casos na task — mapeamento nos dois sentidos, recusas e guarda.
+6. **Prova de vida:** o mapeamento `ABERTA → CLOSED` quebrou o build (`Tests run: 7,
+   Failures: 2`); o mapeamento foi restaurado e a suíte voltou a ficar verde.
+7. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest='HexagonalArchitectureTest,CentralAclTest,QueryAgendaTest'`
+     → 26 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend 165 testes, mock 39 testes).

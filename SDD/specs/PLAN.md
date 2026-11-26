@@ -71,7 +71,7 @@
 
 > Objetivo: core DDD/hexagonal na porta `8080`, com PostgreSQL, Flyway, ACL, i18n,
 > polling resiliente e Swagger.
-> Task em voo: **2.7 — Consulta de agenda com ACL**.
+> Task em voo: **2.8 — Persistência e migração V1**.
 
 ### Tasks
 
@@ -95,9 +95,12 @@
       `RegisterAuthorization` idempotente: repetir o opt-in devolve o registro existente e
       replica o consentimento na Central pela porta; `FindAuthorization` consulta o
       registro; `Clock` injetado.
-- [-] **2.7 — Consulta de agenda com ACL**
+- [x] **2.7 — Consulta de agenda com ACL**
       `AgendaGateway` e `Installment` no domínio; `CentralAcl` traduz o contrato PT da
       Central para o domínio EN; `403` sem autorização e `404` repassado.
+- [-] **2.8 — Persistência e migração V1**
+      DDL do `ARCHITECTURE.md` §6 com três tabelas, índices, constraints e trigger
+      append-only; status restrito por `CHECK`; snapshot em JSONB não vazio.
 
 ### Como usar este arquivo
 

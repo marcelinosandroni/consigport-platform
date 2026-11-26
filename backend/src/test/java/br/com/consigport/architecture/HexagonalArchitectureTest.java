@@ -98,6 +98,15 @@ class HexagonalArchitectureTest {
   private static final ArchRule LAYERS_HAVE_NO_CYCLES =
       slices().matching("br.com.consigport.(*)..").should().beFreeOfCycles();
 
+  private static final ArchRule EXTERNAL_DTOS_STAY_IN_THE_OUTBOUND_ADAPTER =
+      noClasses()
+          .that()
+          .resideOutsideOfPackage("..adapters.out.central..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAPackage("..adapters.out.central.dto..")
+          .because("the DTOs of the Central never leave the outbound adapter");
+
   @Test
   void the_layers_are_declared() {
     Path javaRoot = moduleRoot().resolve("src/main/java/br/com/consigport");
@@ -145,11 +154,17 @@ class HexagonalArchitectureTest {
   }
 
   @Test
+  void the_external_dtos_stay_in_the_outbound_adapter() {
+    assertHolds(EXTERNAL_DTOS_STAY_IN_THE_OUTBOUND_ADAPTER);
+  }
+
+  @Test
   void the_rules_reject_the_broken_fixtures() {
     assertRejects(DOMAIN_IS_FREE_OF_FRAMEWORKS);
     assertRejects(APPLICATION_IMPORTS_THE_DOMAIN_ONLY);
     assertRejects(DOMAIN_AND_APPLICATION_NEVER_REACH_ADAPTERS);
     assertRejects(INBOUND_ADAPTERS_NEVER_REACH_OUTBOUND_ADAPTERS);
+    assertRejects(EXTERNAL_DTOS_STAY_IN_THE_OUTBOUND_ADAPTER);
   }
 
   private static void assertHolds(ArchRule rule) {
