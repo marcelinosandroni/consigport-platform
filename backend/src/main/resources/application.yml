@@ -2,6 +2,10 @@ spring:
   application:
     name: consigport-backend
 
+  # pt-BR is the default locale of the API (BR-16); Accept-Language still wins.
+  web:
+    locale: pt-BR
+
   # Single .env drives both Docker Compose and a bare-metal run: the URL points
   # at localhost by default and Compose overrides it with the service hostname.
   datasource:

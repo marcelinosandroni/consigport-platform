@@ -14,7 +14,12 @@ public interface PortabilityOperationRepository {
   /**
    * Stores the operation.
    *
+   * <p>The idempotency key is unique (BR-07): the same key never creates a second
+   * operation.
+   *
    * @param operation the operation to store
+   * @throws IdempotencyKeyAlreadyUsedException when another operation already holds the
+   *     idempotency key
    */
   void save(PortabilityOperation operation);
 

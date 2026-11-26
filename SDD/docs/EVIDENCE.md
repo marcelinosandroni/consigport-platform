@@ -2156,3 +2156,145 @@
 - `backend/src/test/java/br/com/consigport/adapters/out/persistence/JpaRepositoriesTest.java`
 - `backend/src/test/java/br/com/consigport/ConsigPortApplicationTests.java`
 - `backend/pom.xml`
+
+---
+
+### Task 2.9 — Início da operação com idempotência
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/029-backend-start-operation-idempotency`
+- **PR:** #41 — https://github.com/marcelinosandroni/consigport-platform/pull/41
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** criar a operação, congelar o snapshot das parcelas e responder `202`, com
+  a idempotência da chave e o replay sinalizado no header.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Caso de uso (unitário):**
+   ```text
+   ./mvnw -B -pl backend test -Dtest=StartOperationTest
+   → Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.038 s -- in
+     br.com.consigport.application.portability.StartOperationTest
+   → BUILD SUCCESS
+   ```
+2. **Recurso HTTP sobre PostgreSQL 16 (Testcontainers):**
+   ```text
+   ./mvnw -B -pl backend test -Dtest=PortabilityOperationResourceTest
+   → Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 29.08 s -- in
+     br.com.consigport.adapters.in.web.PortabilityOperationResourceTest
+   → BUILD SUCCESS
+   ```
+3. **Reator completo:**
+   ```text
+   ./mvnw -B verify
+   → Tests run: 203, Failures: 0, Errors: 0, Skipped: 0
+   → Tests run: 39, Failures: 0, Errors: 0, Skipped: 0
+   → Reactor Summary for ConsigPort Platform 0.1.0-SNAPSHOT:
+   → ConsigPort Platform ................................ SUCCESS [  0.002 s]
+   → ConsigPort Backend ................................. SUCCESS [01:55 min]
+   → Central de Convênios Mock .......................... SUCCESS
+   → BUILD SUCCESS
+   → EXIT=0
+   ```
+4. **Prova de vida da comparação de payload (comparação das parcelas virando `true`):**
+   ```text
+   → comparação de payload quebrada temporariamente
+   → ./mvnw -B -pl backend test -Dtest=StartOperationTest
+   → Tests run: 9, Failures: 2, Errors: 0, Skipped: 0, Time elapsed: 0.822 s
+     <<< FAILURE! -- in br.com.consigport.application.portability.StartOperationTest
+   → StartOperationTest.refusesTheKeyWhenThePayloadIsAnother:120
+     Expecting code to raise a throwable.
+   → BUILD FAILURE
+   → comparação de payload restaurada
+   → ./mvnw -B -pl backend test -Dtest=StartOperationTest
+   → Tests run: 9, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+5. **Gates locais:**
+   ```text
+   node scripts/check-specs.mjs               → OK
+   node SDD/SKILLS/check-docs/check-docs.mjs  → OK
+   node scripts/check-architecture.mjs        → OK
+   node scripts/check-ai-log.mjs              → OK
+   node scripts/check-theme-tokens.mjs        → OK
+   ```
+
+#### Conteúdo Entregue:
+- `domain/portability/OperationRequest` — o pedido da operação, com a regra que diz o
+  que faz dois pedidos serem o mesmo.
+- `domain/portability/OperationPolicy` — a regra de elegibilidade (BR-03, BR-04) e o
+  congelamento do snapshot (BR-05).
+- `domain/portability/IdempotencyKeyAlreadyUsedException` — o sinal do repositório
+  quando a chave já foi tomada.
+- `domain/shared/DomainError` — a hierarquia selada ganhou `IdempotencyConflict`,
+  `IdempotencyKeyRequired`, `InstallmentNotEligible` e `CentralUnavailable`.
+- `domain/shared/TransactionRunner` — a porta da fronteira transacional, para escrever a
+  operação e o evento de criação na mesma transação (BR-12).
+- `application/portability/StartOperation` — o caso de uso: replay, conflito, elegibilidade,
+  snapshot congelado, evento de criação e a corrida da chave.
+- `adapters/in/web/PortabilityOperationResource` — a aresta HTTP do
+  `POST /api/v1/portability-operations`, com o header `Idempotent-Replay`.
+- `adapters/in/web/ApiExceptionHandler` — a tradução das falhas em erros da API, com
+  `code`, `message`, `locale`, `timestamp`, `path` e `details`.
+- `adapters/in/web/dto/` — `PortabilityOperationRequest`, `ReceivingAccountRequest`,
+  `OperationAcceptedResponse`, `ErrorResponse` e `ErrorDetail`.
+- `adapters/out/persistence/SpringTransactionRunner` — a implementação transacional da
+  porta.
+- `adapters/out/persistence/UniqueViolations` — o reconhecimento da violação única do
+  PostgreSQL (SQLSTATE `23505`), com o nome da constraint.
+- `CompositionRoot` — o wiring do caso de uso e da porta da agenda.
+- `application.yml` — `spring.web.locale: pt-BR`, o locale padrão do contrato (BR-16).
+- Testes: 9 unitários do caso de uso e 8 de integração HTTP, com duas chamadas
+  concorrentes e uma divergente.
+
+#### Descobertas e Decisões:
+- O "mesmo payload" da idempotência é derivado do que o pedido carrega: beneficiário,
+  convênio, conjunto de parcelas, credor cessionário e conta de recebimento. A ordem
+  das parcelas não conta e os valores não contam: eles pertencem ao snapshot, que muda
+  com a agenda, e o pedido nunca os carrega.
+- A corrida da chave é resolvida pelo próprio banco: o segundo `INSERT` espera o
+  primeiro commit e falha com a violação única; o adaptador traduz o SQLSTATE `23505`
+  da constraint `uk_portability_operations_idempotency_key` e o caso de uso relê a
+  operação vencedora e responde com ela.
+- O instante da criação é truncado para microssegundos, a precisão do `TIMESTAMPTZ`:
+  sem isso, a resposta da criação e a resposta do replay divergiam nos nanossegundos.
+- A regra ArchUnit da camada de aplicação proibia a camada de depender de si mesma, e o
+  record do resultado do caso de uso vivia nela. A regra agora permite as dependências
+  intra-camada e continua proibindo os adaptadores e os frameworks; a regra da camada
+  HTTP, que estava vazia com `allowEmptyShould(true)`, deixou de ser vazia quando a
+  aresta HTTP nasceu e a exceção foi removida.
+- O `TransactionRunner` vive no domínio porque a garantia de escrever a operação e o
+  evento na mesma transação é do domínio (BR-12); a camada de aplicação continua
+  usando apenas o domínio e o JDK.
+- O cliente HTTP da Central chega na task 2.10, com o assinante que a Central exige.
+  Até lá, o `AgendaGateway` do composition root responde `503 CENTRAL_UNAVAILABLE`; o
+  teste de integração serve a agenda no lugar da Central.
+- As mensagens do erro são os padrões pt-BR do handler; os bundles dos locales chegam
+  com a task de i18n e trocam as mensagens sem mudar a forma da resposta.
+
+#### Arquivos Tocados:
+- `backend/src/main/java/br/com/consigport/domain/portability/OperationRequest.java`
+- `backend/src/main/java/br/com/consigport/domain/portability/OperationPolicy.java`
+- `backend/src/main/java/br/com/consigport/domain/portability/IdempotencyKeyAlreadyUsedException.java`
+- `backend/src/main/java/br/com/consigport/domain/portability/PortabilityOperationRepository.java`
+- `backend/src/main/java/br/com/consigport/domain/shared/DomainError.java`
+- `backend/src/main/java/br/com/consigport/domain/shared/TransactionRunner.java`
+- `backend/src/main/java/br/com/consigport/application/portability/StartOperation.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/PortabilityOperationResource.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/ApiExceptionHandler.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/PortabilityOperationRequest.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/ReceivingAccountRequest.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/OperationAcceptedResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/ErrorResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/ErrorDetail.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/persistence/SpringTransactionRunner.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/persistence/UniqueViolations.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/persistence/JpaAuthorizationRepository.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/persistence/JpaPortabilityOperationRepository.java`
+- `backend/src/main/java/br/com/consigport/config/CompositionRoot.java`
+- `backend/src/main/resources/application.yml`
+- `backend/src/test/java/br/com/consigport/application/portability/StartOperationTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/in/web/PortabilityOperationResourceTest.java`
+- `backend/src/test/java/br/com/consigport/domain/portability/InMemoryPortabilityOperationRepository.java`
+- `backend/src/test/java/br/com/consigport/architecture/HexagonalArchitectureTest.java`

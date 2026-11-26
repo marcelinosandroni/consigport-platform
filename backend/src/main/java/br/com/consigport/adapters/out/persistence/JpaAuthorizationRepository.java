@@ -7,7 +7,6 @@ import br.com.consigport.domain.shared.AgreementId;
 import br.com.consigport.domain.shared.BeneficiaryId;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceException;
-import java.sql.SQLException;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,9 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Repository
 public class JpaAuthorizationRepository implements AuthorizationRepository {
-
-  /** The SQLSTATE of a unique violation in PostgreSQL. */
-  private static final String UNIQUE_VIOLATION_SQL_STATE = "23505";
 
   private final EntityManager entityManager;
 
@@ -81,16 +77,7 @@ public class JpaAuthorizationRepository implements AuthorizationRepository {
    * @return {@code true} when the write broke a unique constraint
    */
   private static boolean isUniqueViolation(Throwable exception) {
-    for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
-      if (cause instanceof SQLException sqlException
-          && UNIQUE_VIOLATION_SQL_STATE.equals(sqlException.getSQLState())) {
-        return true;
-      }
-      if (cause.getCause() == cause) {
-        return false;
-      }
-    }
-    return false;
+    return UniqueViolations.isUniqueViolation(exception);
   }
 
   private static Authorization toDomain(AuthorizationJpaEntity entity) {

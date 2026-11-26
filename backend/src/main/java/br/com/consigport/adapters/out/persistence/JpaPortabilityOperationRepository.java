@@ -1,5 +1,6 @@
 package br.com.consigport.adapters.out.persistence;
 
+import br.com.consigport.domain.portability.IdempotencyKeyAlreadyUsedException;
 import br.com.consigport.domain.portability.InstallmentSnapshot;
 import br.com.consigport.domain.portability.Money;
 import br.com.consigport.domain.portability.OperationStatus;
@@ -12,6 +13,7 @@ import br.com.consigport.domain.shared.BeneficiaryId;
 import br.com.consigport.domain.shared.IdempotencyKey;
 import br.com.consigport.domain.shared.InstallmentId;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -30,6 +32,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public class JpaPortabilityOperationRepository implements PortabilityOperationRepository {
 
+  /** The unique constraint of the idempotency key, as PostgreSQL names it. */
+  private static final String IDEMPOTENCY_KEY_CONSTRAINT =
+      "uk_portability_operations_idempotency_key";
+
   private final EntityManager entityManager;
   private final Clock clock;
 
@@ -47,6 +53,21 @@ public class JpaPortabilityOperationRepository implements PortabilityOperationRe
   @Override
   @Transactional
   public void save(PortabilityOperation operation) {
+    try {
+      saveRow(operation);
+      // The flush is inside the guard: the unique constraint of the idempotency key
+      // is checked by PostgreSQL, and only the flush reaches the database.
+      entityManager.flush();
+    } catch (PersistenceException exception) {
+      if (UniqueViolations.isUniqueViolationOn(
+          exception, IDEMPOTENCY_KEY_CONSTRAINT)) {
+        throw new IdempotencyKeyAlreadyUsedException(operation.idempotencyKey());
+      }
+      throw exception;
+    }
+  }
+
+  private void saveRow(PortabilityOperation operation) {
     PortabilityOperationJpaEntity entity =
         entityManager.find(PortabilityOperationJpaEntity.class, operation.id().value());
     if (entity == null) {
