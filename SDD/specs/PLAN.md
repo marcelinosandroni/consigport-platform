@@ -71,7 +71,7 @@
 
 > Objetivo: core DDD/hexagonal na porta `8080`, com PostgreSQL, Flyway, ACL, i18n,
 > polling resiliente e Swagger.
-> Task em voo: **2.4 — Agregado de portabilidade e máquina de estados**.
+> Task em voo: **2.5 — Evento de auditoria append-only**.
 
 ### Tasks
 
@@ -85,9 +85,12 @@
       `Authorization` com identidade, beneficiário, convênio e `createdAt`;
       `AuthorizationRepository` com `findByBeneficiaryAndAgreement` e `save`, sem anotação
       de framework.
-- [-] **2.4 — Agregado de portabilidade e máquina de estados**
+- [x] **2.4 — Agregado de portabilidade e máquina de estados**
       `PortabilityOperation` com ao menos uma parcela, total igual à soma e snapshot
       imutável; transições apenas as da tabela de estados do `ARCHITECTURE.md` §7.
+- [-] **2.5 — Evento de auditoria append-only**
+      `OperationEvent` com os campos do `ARCHITECTURE.md` §2, sem mutadores públicos;
+      `eventType` restrito ao enum; porta de repositório apenas com `append` e consultas.
 
 ### Como usar este arquivo
 

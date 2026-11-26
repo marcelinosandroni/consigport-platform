@@ -13,8 +13,8 @@
 | Bootstrap do repositório | ✅ `main` com commit inicial |
 | Fase 0 — Fundação | ✅ concluída e arquivada, tag `v0.1.0` |
 | Fase 1 — Central mock | ✅ concluída e arquivada, tag `v0.2.0` |
-| Fase em andamento | Fase 2 — Backend core (task 2.4 em voo) |
-| Próxima task | 2.5 — Evento de auditoria append-only |
+| Fase em andamento | Fase 2 — Backend core (task 2.5 em voo) |
+| Próxima task | 2.6 — Registro e consulta de autorização |
 | Versão | `v0.2.0` (a Fase 2 fecha em `v0.3.0`) |
 
 A Fase 0 entregou specs, ADRs, harness, gates, contratos, scaffolds, CI/CD e a
