@@ -1471,3 +1471,84 @@
 - `SDD/specs/ROADMAP.md`
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 2.1 — Esqueleto hexagonal e regras ArchUnit
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/021-backend-hexagonal-skeleton`
+- **PR:** [#33](https://github.com/marcelinosandroni/consigport-platform/pull/33)
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** criar as camadas do backend e impedir dependências proibidas desde o
+  primeiro commit (domínio puro, aplicação só no domínio, `config` como único composition
+  root).
+
+#### Comandos de Verificação e Saídas:
+
+1. **Verificação da task (comando do BACKLOG):**
+   ```text
+   ./mvnw -q -pl backend test -Dtest=HexagonalArchitectureTest
+   → Tests run: 9, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **Módulo backend completo:**
+   ```text
+   ./mvnw -B -pl backend test
+   → HexagonalArchitectureTest: Tests run: 9, Failures: 0, Errors: 0, Skipped: 0
+   → ConsigPortApplicationTests: Tests run: 2, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+3. **Reator completo:**
+   ```text
+   ./mvnw -B verify
+   → ConsigPort Platform ................................ SUCCESS
+   → ConsigPort Backend ................................. SUCCESS
+   → Central de Convênios Mock .......................... SUCCESS
+   → BUILD SUCCESS (39 testes no mock)
+   ```
+4. **Prova de vida do guard (violação temporária no código de produção):**
+   ```text
+   → class domain/authorization/TemporaryViolation.java com @Component (Spring)
+   → Tests run: 9, Failures: 1, Errors: 0, Skipped: 0
+   → Architecture Violation [Priority: MEDIUM] - Rule 'no classes that reside in a
+     package '..domain..' should depend on classes that reside in any package
+     ['org.springframework..', ...]' was violated (2 times)
+   → BUILD FAILURE
+   → arquivo temporário removido após a prova
+   ```
+
+#### Conteúdo Entregue:
+- `domain`, `application`, `adapters` e `config` — as quatro camadas declaradas com
+  `package-info.java` que documenta a fronteira de cada uma.
+- `config/CompositionRoot` — composition root com o bean `Clock.systemUTC()`; único lugar
+  que conhece implementações concretas.
+- `HexagonalArchitectureTest` — seis regras ArchUnit verificadas explicitamente:
+  domínio sem framework/ORM/HTTP/logger, aplicação importando apenas `domain` e o JDK,
+  domínio e aplicação nunca alcançando adaptadores, adaptadores de entrada nunca
+  alcançando adaptadores de saída, `config` privado e ausência de ciclos entre camadas.
+- Fixtures em `br.com.consigport.architecture.fixture` — violações deliberadas que
+  provam que cada regra rejeita o defeito que descreve.
+- `backend/pom.xml` — dependência de teste `archunit-junit5` (versão gerenciada no
+  reactor).
+
+#### Descobertas e Decisões:
+- O engine JUnit 5 do ArchUnit 1.4.2 **não descobre** os campos `@ArchTest` sob o JUnit
+  Platform 1.12.2: uma regra deliberadamente inválida passou sem rodar. Por isso as regras
+  são declaradas como constantes e avaliadas em métodos `@Test` comuns — o mesmo conjunto
+  de regras, sem depender da descoberta do engine.
+- O ArchUnit falha por padrão quando uma regra não tem classes para checar
+  (`failOnEmptyShould`). Só a regra "adaptador de entrada não alcança adaptador de saída"
+  usa `allowEmptyShould(true)`: a camada HTTP nasce na task 2.9 e a regra passa a valer
+  a partir do primeiro adaptador de entrada — o fixture prova que ela rejeita a violação.
+
+#### Arquivos Tocados:
+- `backend/src/main/java/br/com/consigport/domain/package-info.java`
+- `backend/src/main/java/br/com/consigport/application/package-info.java`
+- `backend/src/main/java/br/com/consigport/adapters/package-info.java`
+- `backend/src/main/java/br/com/consigport/config/package-info.java`
+- `backend/src/main/java/br/com/consigport/config/CompositionRoot.java`
+- `backend/src/test/java/br/com/consigport/architecture/HexagonalArchitectureTest.java`
+- `backend/src/test/java/br/com/consigport/architecture/fixture/` (4 fixtures)
+- `backend/pom.xml`
