@@ -593,3 +593,26 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - Teste prova que o opt-in libera `GET /beneficiarios/BEN-001/agenda`.
 5. **Validação geral:**
    - `./mvnw -B -pl central-convenios-mock -am verify` → 13 testes verdes.
+
+---
+
+## Sessão #22 — Task 1.4 (Submissão de Portabilidade)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/104-mock-portability`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Aceitar operações de portabilidade com protocolo único e estado inicial `PENDENTE`.
+
+### Atividades Realizadas:
+1. **Endpoint de submissão:**
+   - `POST /operacoes-portabilidade` devolve `202` com `protocolo` no padrão `PRT-yyyyMMdd-NNNN`.
+   - A operação nasce `PENDENTE` no `ConcurrentHashMap` e fica disponível para a consulta de status.
+2. **Validação de parcelas (BR-04):**
+   - Parcela inexistente ou fora de `ABERTA` → `422 PARCELA_INVALIDA`, com mensagem específica.
+3. **DTOs e validação:**
+   - `PortabilityRequest` com `@NotBlank`, `@NotEmpty`, `@Size` e `@Valid` na conta de recebimento.
+4. **Base para o polling:**
+   - `InMemoryCentralStore.operacao(protocolo)` preparado para a task 1.5.
+5. **Validação geral:**
+   - `./mvnw -B -pl central-convenios-mock -am verify` → 17 testes verdes.

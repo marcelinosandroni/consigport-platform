@@ -1183,3 +1183,51 @@
 - `central-convenios-mock/src/main/java/br/com/consigport/central/api/dto/AuthorizationResponse.java`
 - `central-convenios-mock/src/main/java/br/com/consigport/central/store/InMemoryCentralStore.java`
 - `central-convenios-mock/src/test/java/br/com/consigport/central/api/AuthorizationControllerTests.java`
+
+---
+
+### Task 1.4 — Submissão de portabilidade
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/104-mock-portability`
+- **PR:** [#25](https://github.com/marcelinosandroni/consigport-platform/pull/25)
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Aceitar a operação de portabilidade com protocolo único, estado inicial
+  `PENDENTE` e `422` para parcela inexistente ou não elegível (BR-04).
+
+#### Comandos de Verificação e Saídas:
+
+1. **Build e testes do módulo:**
+   ```text
+   ./mvnw -B -pl central-convenios-mock -am verify
+   → Tests run: 17, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **Processo real (porta 18084):**
+   ```text
+   POST /operacoes-portabilidade (1ª) → 202 {"protocolo":"PRT-20261126-0001"}
+   POST /operacoes-portabilidade (2ª) → 202 {"protocolo":"PRT-20261126-0002"}
+   POST /operacoes-portabilidade (PAR-999)
+     → 422 {"codigo":"PARCELA_INVALIDA","mensagem":"A parcela PAR-999 não existe.",...}
+   GET /_admin/state → operação com status PENDENTE
+   ```
+3. **MockMvc (`PortabilityControllerTests`):** `202` com protocolo no padrão, estado
+   `PENDENTE` no snapshot, protocolos únicos (`-0001`, `-0002`), `422` e `400`.
+
+#### Conteúdo Entregue:
+- `PortabilityController` — `POST /operacoes-portabilidade` valida as parcelas do
+  beneficiário e devolve `202` com o protocolo.
+- `PortabilityRequest` — DTO com `beneficiarioId`, `parcelas`, `credorCessionario`,
+  `contaRecebimento` (aninhado) e `assinatura`, com Bean Validation.
+- `PortabilityAcceptedResponse` — corpo `{"protocolo": "..."}`.
+- `InMemoryCentralStore.criarOperacao` — protocolo determinístico
+  `PRT-yyyyMMdd-NNNN`, operação `PENDENTE` e sequência zerada pelo reset.
+- `operacao(protocolo)` — leitura usada pela consulta de status da task 1.5.
+
+#### Arquivos Tocados:
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/PortabilityController.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/dto/PortabilityRequest.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/dto/PortabilityAcceptedResponse.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/store/InMemoryCentralStore.java`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/api/PortabilityControllerTests.java`

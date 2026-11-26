@@ -3,12 +3,14 @@ package br.com.consigport.central.store;
 import br.com.consigport.central.domain.Authorization;
 import br.com.consigport.central.domain.Installment;
 import br.com.consigport.central.domain.Operation;
+import br.com.consigport.central.domain.OperationStatus;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -33,6 +35,7 @@ public class InMemoryCentralStore {
   private final ConcurrentMap<String, Operation> operacoes = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, Integer> leiturasDeStatus = new ConcurrentHashMap<>();
   private final AtomicLong sequenciaAutorizacao = new AtomicLong();
+  private final AtomicLong sequenciaOperacao = new AtomicLong();
 
   public InMemoryCentralStore() {
     reset();
@@ -46,6 +49,7 @@ public class InMemoryCentralStore {
     operacoes.clear();
     leiturasDeStatus.clear();
     sequenciaAutorizacao.set(0);
+    sequenciaOperacao.set(0);
     SeedData.fixtures().forEach((beneficiarioId, parcelas) -> agenda.put(beneficiarioId, parcelas));
   }
 
@@ -101,6 +105,33 @@ public class InMemoryCentralStore {
 
   /** Outcome of an opt-in request: the authorization and whether it was just created. */
   public record RegistroAutorizacao(Authorization autorizacao, boolean criada) {}
+
+  /**
+   * Accepts a portability operation with a fresh protocol and the {@code PENDENTE} status.
+   *
+   * <p>The protocol follows the contract pattern {@code PRT-yyyyMMdd-NNNN}; the sequence
+   * is zeroed by {@link #reset()}.
+   */
+  public synchronized Operation criarOperacao(
+      String beneficiarioId, List<String> parcelas, Instant criadaEm) {
+    String dia = DIA.format(criadaEm.atZone(ZoneOffset.UTC));
+    String protocolo = "PRT-%s-%04d".formatted(dia, sequenciaOperacao.incrementAndGet());
+    Operation operacao =
+        new Operation(
+            protocolo,
+            beneficiarioId,
+            parcelas,
+            OperationStatus.PENDENTE,
+            null,
+            criadaEm);
+    operacoes.put(protocolo, operacao);
+    return operacao;
+  }
+
+  /** Returns an operation by protocol, when it exists. */
+  public Optional<Operation> operacao(String protocolo) {
+    return Optional.ofNullable(operacoes.get(protocolo));
+  }
 
   /**
    * Returns the complete state for {@code GET /_admin/state}.
