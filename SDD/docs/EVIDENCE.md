@@ -1238,7 +1238,7 @@
 
 - **Data de Conclusão:** 2026-11-26
 - **Branch:** `feat/105-mock-status`
-- **PR:** a abrir para `develop`
+- **PR:** [#26](https://github.com/marcelinosandroni/consigport-platform/pull/26)
 - **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** Simular a confirmação assíncrona: `204` com `Retry-After` enquanto
