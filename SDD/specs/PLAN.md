@@ -34,14 +34,18 @@
 ## Fase atual: 1 — Central mock
 
 > Objetivo: Central determinística na porta `8081`, com contrato PT e Swagger.
-> Task em voo: **1.1 — Store em memória, fixtures e administração**.
+> Task em voo: **1.2 — Consulta de agenda**.
 
 ### Tasks
 
-- [-] **1.1 — Store em memória, fixtures e administração**
+- [x] **1.1 — Store em memória, fixtures e administração**
       Estado determinístico reiniciável com `ConcurrentHashMap`; fixtures do
       `ARCHITECTURE.md` §4; `POST /_admin/reset` → `204` e `GET /_admin/state` com o
       estado completo.
+- [-] **1.2 — Consulta de agenda**
+      `GET /beneficiarios/{id}/agenda` em PT com `parcelaId`, `convenioId`, `valor`,
+      `dataDesconto` e `status`; `404` para beneficiário desconhecido e `403` sem
+      autorização registrada (BR-01).
 
 ### Como usar este arquivo
 

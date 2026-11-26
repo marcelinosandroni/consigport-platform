@@ -49,6 +49,17 @@ public class InMemoryCentralStore {
     return agenda.containsKey(beneficiarioId);
   }
 
+  /** Records an opt-in so the agenda of the beneficiary can be consulted. */
+  public void registrarAutorizacao(Authorization authorization) {
+    autorizacoes.put(authorization.autorizacaoId(), authorization);
+  }
+
+  /** Tells whether the beneficiary has at least one opt-in registered. */
+  public boolean possuiAutorizacao(String beneficiarioId) {
+    return autorizacoes.values().stream()
+        .anyMatch(autorizacao -> autorizacao.beneficiarioId().equals(beneficiarioId));
+  }
+
   /**
    * Returns the complete state for {@code GET /_admin/state}.
    *
