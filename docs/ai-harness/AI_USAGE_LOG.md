@@ -496,3 +496,29 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - O `workflow_dispatch` de `release.yml` passou a aceitar a tag a republicar, reconstruindo as três imagens a partir do commit etiquetado.
    - `docs/process/RELEASE.md` ajustado ao comportamento real do workflow.
 4. **Entrega:** branch `fix/011-release-closure` com commits e PR para `develop`.
+
+---
+
+## Sessão #18 — Fechamento da Task 0.12 e Arquivamento da Fase 0
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `chore/012-phase-0-archive`
+- **Ambiente:** harness remoto em **EC2 (AWS)**; o desenvolvedor ficou sem o notebook e operou apenas pelo celular.
+- **Objetivo:** Fechar a task 0.12 com o arquivamento da Fase 0, sincronizar os documentos de estado e corrigir as inconsistências levantadas na análise do SDD.
+
+### Atividades Realizadas:
+1. **Harness remoto:**
+   - Provisionamento do ambiente de desenvolvimento em uma instância **EC2 (AWS)** com OpenCode no provider **ZEN** e o modelo **DeepSeek V4.1 Flash Free**, porque o desenvolvedor ficou sem o notebook e passou a operar apenas pelo celular.
+   - Instalação de Node.js 24, Java 21 (Corretto), Python 3.13, Docker + Compose e GitHub CLI para permitir o ciclo completo (build, testes, PR e merge) a partir do celular.
+2. **Arquivamento da Fase 0:**
+   - Criado `SDD/specs/history/phases/phase-0-finished.md` com as 12 tasks, os critérios de saída, a evidência da `v0.1.0` e as dívidas conhecidas.
+3. **Sincronização do plano e do roadmap:**
+   - `SDD/specs/PLAN.md` marca a Fase 0 como concluída e registra a próxima task (1.1, `[ ]`).
+   - `SDD/specs/ROADMAP.md` passa a refletir `v0.1.0`, Fase 0 fechada, 12 tasks na fase e 51 no total.
+4. **Correção do CHANGELOG:**
+   - Removidas as entradas duplicadas produzidas pelos merges `develop → staging → main`; cada feature permanece uma única vez.
+5. **Governança:**
+   - `docs/process/GITFLOW.md` registra que a proteção de branches está desativada por decisão do responsável e que os merges são integrados via `gh pr merge`.
+6. **Validação:**
+   - `node scripts/check-specs.mjs`, `node SDD/SKILLS/check-docs/check-docs.mjs .`, `node scripts/check-architecture.mjs`, `node scripts/check-ai-log.mjs` e `node scripts/check-theme-tokens.mjs` → exit 0.
