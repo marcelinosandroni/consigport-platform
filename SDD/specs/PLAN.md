@@ -34,7 +34,7 @@
 ## Fase atual: 1 — Central mock
 
 > Objetivo: Central determinística na porta `8081`, com contrato PT e Swagger.
-> Task em voo: **1.3 — Opt-in de autorização**.
+> Task em voo: **1.4 — Submissão de portabilidade**.
 
 ### Tasks
 
@@ -46,9 +46,12 @@
       `GET /beneficiarios/{id}/agenda` em PT com `parcelaId`, `convenioId`, `valor`,
       `dataDesconto` e `status`; `404` para beneficiário desconhecido e `403` sem
       autorização registrada (BR-01).
-- [-] **1.3 — Opt-in de autorização**
+- [x] **1.3 — Opt-in de autorização**
       `POST /autorizacoes` → `201` com `autorizacaoId`; repetição devolve `200` com o
       mesmo id (BR-02); campos vazios → `400 REQUISICAO_INVALIDA`.
+- [-] **1.4 — Submissão de portabilidade**
+      `POST /operacoes-portabilidade` → `202` com protocolo `PRT-yyyyMMdd-NNNN`; estado
+      inicial `PENDENTE`; parcelas inexistentes ou fechadas → `422 PARCELA_INVALIDA`.
 
 ### Como usar este arquivo
 
