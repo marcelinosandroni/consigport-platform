@@ -966,3 +966,57 @@
 - `docs/ai-harness/AI_USAGE_LOG.md`, `docs/ai-harness/HARNESS_OVERVIEW.md`
 - `docs/adr/0006-gitflow-ci-cd-docker-e-performance.md`
 - `SDD/specs/PLAN.md`, `SDD/specs/BACKLOG.md`, `SDD/docs/EVIDENCE.md`
+
+---
+
+### Task 0.12 — Promoção da release `v0.1.0` e arquivamento da Fase 0
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `chore/012-phase-0-archive`
+- **PR:** a abrir para `develop` (back-merge da `main` + arquivamento)
+- **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash (Free)
+- **Objetivo:** Promover a `v0.1.0` até a `main`, publicar as três imagens no GHCR,
+  validar o staging e arquivar a Fase 0 em `specs/history/phases/`.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Tag e release publicadas:**
+   ```text
+   git tag --list "v*"        → v0.1.0
+   gh release view v0.1.0     → v0.1.0 (published 2026-11-25T16:58:02Z)
+   ```
+2. **Imagens no GHCR (tags `v0.1.0`, `0.1.0` e `latest`):**
+   ```text
+   gh api user/packages/container/consigport-platform%2Fbackend/versions \
+     --jq '.[0].metadata.container.tags[]'  → latest 0.1.0 v0.1.0
+   ```
+   Digests: backend `sha256:bc42cbb3…c452a1`, mock `sha256:caadf344…a37cb5`,
+   frontend `sha256:278a1113…2bc2f3`.
+3. **Staging real (run `45661533860`, tag `v0.1.0`):** os quatro containers
+   `healthy`, `/actuator/health` do backend e do mock → `{"status":"UP"}`, teardown
+   verde.
+4. **Gates de especificação, links, arquitetura e diário:**
+   ```text
+   node scripts/check-specs.mjs                        → exit 0
+   node SDD/SKILLS/check-docs/check-docs.mjs .         → exit 0
+   node scripts/check-architecture.mjs                 → exit 0 (22/22)
+   node scripts/check-ai-log.mjs                       → exit 0 (18 sessões)
+   node scripts/check-theme-tokens.mjs                 → exit 0
+   ```
+
+#### Conteúdo Entregue:
+- Fase 0 arquivada em `SDD/specs/history/phases/phase-0-finished.md`.
+- `PLAN.md` limpo, com a Fase 0 concluída e a próxima task (1.1) registrada.
+- `ROADMAP.md` sincronizado com a realidade: `v0.1.0`, Fase 0 fechada, 51 tasks.
+- `CHANGELOG.md` sem as entradas duplicadas geradas pelos merges
+  `develop → staging → main`.
+- `docs/process/GITFLOW.md` registra que a proteção de branches permanece desativada
+  por decisão do responsável, com merges integrados via `gh pr merge`.
+
+#### Arquivos Tocados:
+- `SDD/specs/history/phases/phase-0-finished.md`
+- `SDD/specs/PLAN.md`, `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`
+- `docs/process/GITFLOW.md`
+- `CHANGELOG.md`
