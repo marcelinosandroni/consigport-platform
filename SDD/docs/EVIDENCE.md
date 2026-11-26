@@ -1021,3 +1021,59 @@
 - `docs/ai-harness/AI_USAGE_LOG.md`
 - `docs/process/GITFLOW.md`
 - `CHANGELOG.md`
+
+---
+
+### Task 1.1 — Store em memória, fixtures e administração
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/101-mock-store`
+- **PR:** [#22](https://github.com/marcelinosandroni/consigport-platform/pull/22)
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Estado determinístico reiniciável com `ConcurrentHashMap`, fixtures do
+  `ARCHITECTURE.md` §4 e os endpoints administrativos de reset e inspeção.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Build e testes do módulo:**
+   ```text
+   ./mvnw -B -pl central-convenios-mock -am verify
+   → Tests run: 5, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **`POST /_admin/reset` e `GET /_admin/state` no processo real (porta 18081):**
+   ```text
+   POST /_admin/reset → HTTP 204
+   GET /_admin/state  → 200 com as quatro fixtures
+   {"beneficiarios":{"BEN-001":[{"parcelaId":"PAR-001","convenioId":"AGR-001","valor":450.00,"dataDesconto":"2026-12-05","status":"ABERTA"}, …],"BEN-MARGIN":[…],"BEN-REJ":[…],"BEN-TIMEOUT":[…]},"autorizacoes":{},"operacoes":{},"contadores":{"leiturasDeStatus":{}}}
+   ```
+3. **Determinismo (dois resets comparados byte a byte):**
+   ```text
+   curl -s /_admin/state > s1.json
+   curl -s -X POST /_admin/reset
+   curl -s /_admin/state > s2.json
+   diff -q s1.json s2.json → estados idênticos
+   ```
+
+#### Conteúdo Entregue:
+- `store/InMemoryCentralStore.java` — `ConcurrentHashMap` para agenda, autorizações,
+  operações e contadores; `reset()` restaura as fixtures e `snapshot()` devolve o estado
+  com chaves ordenadas.
+- `store/SeedData.java` — as quatro fixtures do `ARCHITECTURE.md` §4 (`BEN-001`,
+  `BEN-REJ`, `BEN-MARGIN`, `BEN-TIMEOUT`), todas `ABERTA` e com valores em `BigDecimal`.
+- `api/AdminController.java` — `POST /_admin/reset` → `204` e `GET /_admin/state` → `200`.
+- `domain/` — `Installment`, `Authorization`, `Operation` e `OperationStatus`, base das
+  tasks 1.2–1.5.
+- `InMemoryCentralStoreTests` — 3 testes de integração, incluindo os dois resets
+  comparados.
+
+#### Arquivos Tocados:
+- `central-convenios-mock/src/main/java/br/com/consigport/central/store/InMemoryCentralStore.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/store/SeedData.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/AdminController.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/domain/Installment.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/domain/Authorization.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/domain/Operation.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/domain/OperationStatus.java`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/store/InMemoryCentralStoreTests.java`

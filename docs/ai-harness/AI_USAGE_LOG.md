@@ -522,3 +522,27 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - `docs/process/GITFLOW.md` registra que a proteção de branches está desativada por decisão do responsável e que os merges são integrados via `gh pr merge`.
 6. **Validação:**
    - `node scripts/check-specs.mjs`, `node SDD/SKILLS/check-docs/check-docs.mjs .`, `node scripts/check-architecture.mjs`, `node scripts/check-ai-log.mjs` e `node scripts/check-theme-tokens.mjs` → exit 0.
+
+---
+
+## Sessão #19 — Task 1.1 (Store em Memória, Fixtures e Administração)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/101-mock-store`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Entregar a primeira task da Fase 1: estado determinístico reiniciável, fixtures do `ARCHITECTURE.md` §4 e os endpoints administrativos.
+
+### Atividades Realizadas:
+1. **Store em memória:**
+   - `InMemoryCentralStore` com `ConcurrentHashMap` para agenda, autorizações, operações e contadores de status.
+   - `reset()` restaura as fixtures e zera tudo; `snapshot()` devolve o estado com chaves ordenadas para JSON determinístico.
+2. **Fixtures:**
+   - `SeedData` reproduz `BEN-001` (3 parcelas), `BEN-REJ` (`PAR-101`), `BEN-MARGIN` (`PAR-301`, 6.000,00) e `BEN-TIMEOUT` (`PAR-201`), todas `ABERTA` e com `BigDecimal`.
+3. **Administração:**
+   - `AdminController` expõe `POST /_admin/reset` → `204` e `GET /_admin/state` → `200`, conforme `contracts/central-api.yaml`.
+4. **Domínio base:**
+   - `Installment`, `Authorization`, `Operation` e `OperationStatus`, reutilizados pelas tasks 1.2–1.5.
+5. **Validação:**
+   - `./mvnw -B -pl central-convenios-mock -am verify` → 5 testes verdes.
+   - Dois resets consecutivos produzem estados byte a byte idênticos.
