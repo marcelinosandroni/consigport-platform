@@ -1552,3 +1552,84 @@
 - `backend/src/test/java/br/com/consigport/architecture/HexagonalArchitectureTest.java`
 - `backend/src/test/java/br/com/consigport/architecture/fixture/` (4 fixtures)
 - `backend/pom.xml`
+
+---
+
+### Task 2.2 — Value objects compartilhados
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/022-backend-value-objects`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** trocar `String` e `BigDecimal` soltos por tipos fortes, com invariante
+  validada na construção e igualdade por valor.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Módulo backend completo:**
+   ```text
+   ./mvnw -B -pl backend test
+   → PortabilityValueObjectsTest$MoneyTest: Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+   → PortabilityValueObjectsTest$ReceivingAccountTest: Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+   → SharedValueObjectsTest$BeneficiaryIdTest: Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+   → SharedValueObjectsTest$AgreementIdTest: Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+   → SharedValueObjectsTest$InstallmentIdTest: Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+   → SharedValueObjectsTest$IdempotencyKeyTest: Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+   → HexagonalArchitectureTest: Tests run: 9, Failures: 0, Errors: 0, Skipped: 0
+   → ConsigPortApplicationTests: Tests run: 2, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **Reator completo:**
+   ```text
+   ./mvnw -B verify
+   → ConsigPort Backend: Tests run: 39, Failures: 0, Errors: 0, Skipped: 0
+   → Central de Convênios Mock: Tests run: 39, Failures: 0, Errors: 0, Skipped: 0
+   → Reactor Summary for ConsigPort Platform 0.1.0-SNAPSHOT:
+   → ConsigPort Platform ................................ SUCCESS [  0.008 s]
+   → ConsigPort Backend ................................. SUCCESS [ 25.484 s]
+   → Central de Convênios Mock .......................... SUCCESS
+   → BUILD SUCCESS
+   ```
+3. **Prova de vida dos invariantes (remoção temporária da validação de valor negativo):**
+   ```text
+   → guard `amount.signum() < 0` removido de domain/portability/Money.java
+   → ./mvnw -B -pl backend test -Dtest=PortabilityValueObjectsTest
+   → Tests run: 6, Failures: 1, Errors: 0, Skipped: 0 -- in
+     br.com.consigport.domain.portability.PortabilityValueObjectsTest$MoneyTest
+   → BUILD FAILURE
+   → guard restaurado; suíte verde de novo
+   ```
+
+#### Conteúdo Entregue:
+- `domain/shared/BeneficiaryId`, `AgreementId`, `InstallmentId` — identificadores não
+  vazios, no máximo 64 caracteres, normalizados com `trim` e comparados por valor.
+- `domain/shared/IdempotencyKey` — UUID obrigatório (BR-07), com `parse` a partir do
+  texto e forma canônica em `toString`.
+- `domain/portability/Money` — `BigDecimal` com exatamente 2 casas, nunca negativo,
+  escala normalizada (`10` e `10.00` são o mesmo valor).
+- `domain/portability/ReceivingAccount` — `bank`, `branch` e `account` obrigatórios,
+  com os limites do contrato (`64`, `32`, `64` caracteres).
+- `SharedValueObjectsTest` e `PortabilityValueObjectsTest` — 28 testes de unidade,
+  incluindo todos os casos inválidos.
+
+#### Descobertas e Decisões:
+- `ARCHITECTURE.md` §3 posiciona `Money` e `ReceivingAccount` em `domain/portability/` e
+  `BeneficiaryId`, `AgreementId`, `InstallmentId` e `IdempotencyKey` em `domain/shared/`.
+  A árvore do `ARCHITECTURE.md` foi seguida; a linha de arquivos do `BACKLOG.md` lista os
+  seis nomes em sequência sob o prefixo de `domain/shared/`.
+- O invariante de valor não negativo foi provado com uma mutação temporária do código de
+  produção: sem o guard, o teste de `Money` falha. O guard foi restaurado e a suíte
+  voltou a ficar verde.
+- Nenhum VO depende de framework: `domain/` continua obeying as regras do
+  `HexagonalArchitectureTest` da task 2.1.
+
+#### Arquivos Tocados:
+- `backend/src/main/java/br/com/consigport/domain/shared/BeneficiaryId.java`
+- `backend/src/main/java/br/com/consigport/domain/shared/AgreementId.java`
+- `backend/src/main/java/br/com/consigport/domain/shared/InstallmentId.java`
+- `backend/src/main/java/br/com/consigport/domain/shared/IdempotencyKey.java`
+- `backend/src/main/java/br/com/consigport/domain/portability/Money.java`
+- `backend/src/main/java/br/com/consigport/domain/portability/ReceivingAccount.java`
+- `backend/src/test/java/br/com/consigport/domain/shared/SharedValueObjectsTest.java`
+- `backend/src/test/java/br/com/consigport/domain/portability/PortabilityValueObjectsTest.java`
