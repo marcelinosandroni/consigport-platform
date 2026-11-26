@@ -1,5 +1,6 @@
 package br.com.consigport.central.store;
 
+import br.com.consigport.central.chaos.ChaosPolicy;
 import br.com.consigport.central.domain.Authorization;
 import br.com.consigport.central.domain.Installment;
 import br.com.consigport.central.domain.Operation;
@@ -36,13 +37,14 @@ public class InMemoryCentralStore {
   private final ConcurrentMap<String, Authorization> autorizacoes = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, String> autorizacaoPorChave = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, Operation> operacoes = new ConcurrentHashMap<>();
-  private final ConcurrentMap<String, Integer> leiturasDeStatus = new ConcurrentHashMap<>();
   private final AtomicLong sequenciaAutorizacao = new AtomicLong();
   private final AtomicLong sequenciaOperacao = new AtomicLong();
   private final IdempotencyRegistry idempotencia;
+  private final ChaosPolicy chaos;
 
-  public InMemoryCentralStore(IdempotencyRegistry idempotencia) {
+  public InMemoryCentralStore(IdempotencyRegistry idempotencia, ChaosPolicy chaos) {
     this.idempotencia = idempotencia;
+    this.chaos = chaos;
     reset();
   }
 
@@ -50,10 +52,10 @@ public class InMemoryCentralStore {
   public synchronized void reset() {
     agenda.clear();
     idempotencia.clear();
+    chaos.reset();
     autorizacoes.clear();
     autorizacaoPorChave.clear();
     operacoes.clear();
-    leiturasDeStatus.clear();
     sequenciaAutorizacao.set(0);
     sequenciaOperacao.set(0);
     SeedData.fixtures().forEach((beneficiarioId, parcelas) -> agenda.put(beneficiarioId, parcelas));
@@ -186,7 +188,7 @@ public class InMemoryCentralStore {
     estado.put("beneficiarios", new TreeMap<>(agenda));
     estado.put("autorizacoes", new TreeMap<>(autorizacoes));
     estado.put("operacoes", new TreeMap<>(operacoes));
-    estado.put("contadores", Map.of("leiturasDeStatus", new TreeMap<>(leiturasDeStatus)));
+    estado.put("contadores", Map.of("leiturasDeStatus", chaos.contadores()));
     return estado;
   }
 }

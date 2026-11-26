@@ -35,6 +35,8 @@ mock:
   # Delay before the asynchronous confirmation. Until it elapses, the status endpoint
   # answers 204 with Retry-After, as the edital contract requires.
   confirmation-delay-ms: ${MOCK_CONFIRMATION_DELAY_MS:2000}
+  # Delay injected on the first two status reads of a -TIMEOUT beneficiary.
+  timeout-delay-ms: ${MOCK_TIMEOUT_DELAY_MS:6000}
   hmac:
     # Shared secret and tolerance from contracts/hmac-vector.json.
     enabled: ${MOCK_HMAC_ENABLED:true}
