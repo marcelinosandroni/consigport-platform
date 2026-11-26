@@ -973,7 +973,7 @@
 
 - **Data de Conclusão:** 2026-11-26
 - **Branch:** `chore/012-phase-0-archive`
-- **PR:** a abrir para `develop` (back-merge da `main` + arquivamento)
+- **PR:** [#21](https://github.com/marcelinosandroni/consigport-platform/pull/21) (back-merge da `main` + arquivamento)
 - **Agente / Modelo:** OpenCode — DeepSeek V4.1 Flash (Free)
 - **Objetivo:** Promover a `v0.1.0` até a `main`, publicar as três imagens no GHCR,
   validar o staging e arquivar a Fase 0 em `specs/history/phases/`.
