@@ -1355,7 +1355,7 @@
 
 - **Data de Conclusão:** 2026-11-26
 - **Branch:** `feat/107-mock-chaos`
-- **PR:** a abrir para `develop`
+- **PR:** [#28](https://github.com/marcelinosandroni/consigport-platform/pull/28)
 - **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** entregar os cenários de rejeição e falha que o E2E consome e publicar o
