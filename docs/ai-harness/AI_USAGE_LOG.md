@@ -546,3 +546,27 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
 5. **Validação:**
    - `./mvnw -B -pl central-convenios-mock -am verify` → 5 testes verdes.
    - Dois resets consecutivos produzem estados byte a byte idênticos.
+
+---
+
+## Sessão #20 — Task 1.2 (Consulta de Agenda)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/102-mock-agenda`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Expor a agenda de parcelas futuras com o gate de autorização do contrato.
+
+### Atividades Realizadas:
+1. **Endpoint de agenda:**
+   - `GET /beneficiarios/{beneficiarioId}/agenda` devolve um array de `Parcela` em PT, fiel ao `contracts/central-api.yaml` (sem envelope).
+   - Apenas parcelas `ABERTA` são retornadas; a ordem das fixtures é preservada.
+2. **Gate de autorização:**
+   - Beneficiário desconhecido → `404 BENEFICIARIO_NAO_ENCONTRADO`.
+   - Beneficiário sem opt-in → `403 SEM_AUTORIZACAO` (BR-01).
+3. **Erros padronizados:**
+   - `CentralException` + `ApiExceptionHandler` produzem o corpo `ErroCentral` (`codigo`, `mensagem`, `timestamp`).
+4. **Base para o opt-in:**
+   - `InMemoryCentralStore` ganhou `registrarAutorizacao` e `possuiAutorizacao`.
+5. **Validação:**
+   - `./mvnw -B -pl central-convenios-mock -am verify` → 8 testes verdes.

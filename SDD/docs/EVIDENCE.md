@@ -1077,3 +1077,55 @@
 - `central-convenios-mock/src/main/java/br/com/consigport/central/domain/Operation.java`
 - `central-convenios-mock/src/main/java/br/com/consigport/central/domain/OperationStatus.java`
 - `central-convenios-mock/src/test/java/br/com/consigport/central/store/InMemoryCentralStoreTests.java`
+
+---
+
+### Task 1.2 — Consulta de agenda
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/102-mock-agenda`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Expor as parcelas futuras de um beneficiário autorizado, com `404` para
+  beneficiário desconhecido e `403` sem opt-in (BR-01).
+
+#### Comandos de Verificação e Saídas:
+
+1. **Build e testes do módulo:**
+   ```text
+   ./mvnw -B -pl central-convenios-mock -am verify
+   → Tests run: 8, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **MockMvc (`AgendaControllerTests`):**
+   ```text
+   BEN-001 com opt-in   → 200, 3 parcelas (PAR-001, PAR-002, PAR-003)
+   BEN-UNKNOWN          → 404 BENEFICIARIO_NAO_ENCONTRADO
+   BEN-REJ sem opt-in   → 403 SEM_AUTORIZACAO
+   ```
+3. **Processo real (porta 18082):**
+   ```text
+   GET /beneficiarios/BEN-001/agenda     → 403 {"codigo":"SEM_AUTORIZACAO","mensagem":"O beneficiário não possui autorização para este convênio.","timestamp":"..."}
+   GET /beneficiarios/BEN-UNKNOWN/agenda → 404 {"codigo":"BENEFICIARIO_NAO_ENCONTRADO","mensagem":"Beneficiário não encontrado.","timestamp":"..."}
+   ```
+
+#### Conteúdo Entregue:
+- `AgendaController` — `GET /beneficiarios/{beneficiarioId}/agenda` devolve o array de
+  `Parcela` exatamente como o contrato define; por isso não há envelope `AgendaResponse`.
+  Apenas parcelas `ABERTA` são devolvidas (BR-03).
+- `InstallmentResponse` — DTO da `Parcela` com `BigDecimal` e `LocalDate`.
+- `CentralException` + `ApiExceptionHandler` — erros no formato `ErroCentral`
+  (`codigo`, `mensagem`, `timestamp`), reutilizados pelas próximas tasks.
+- `InMemoryCentralStore` ganhou `registrarAutorizacao` e `possuiAutorizacao`, base do
+  opt-in da task 1.3.
+- `AgendaControllerTests` — 3 testes MockMvc cobrindo `200`, `403` e `404`.
+
+#### Arquivos Tocados:
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/AgendaController.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/ApiExceptionHandler.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/CentralException.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/dto/InstallmentResponse.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/dto/ErroCentralResponse.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/store/InMemoryCentralStore.java`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/api/AgendaControllerTests.java`
