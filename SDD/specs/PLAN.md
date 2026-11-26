@@ -34,11 +34,11 @@
 ## Fase atual: 1 — Central mock
 
 > Objetivo: Central determinística na porta `8081`, com contrato PT e Swagger.
-> Nenhuma task em voo; a próxima é a 1.1.
+> Task em voo: **1.1 — Store em memória, fixtures e administração**.
 
 ### Tasks
 
-- [ ] **1.1 — Store em memória, fixtures e administração**
+- [-] **1.1 — Store em memória, fixtures e administração**
       Estado determinístico reiniciável com `ConcurrentHashMap`; fixtures do
       `ARCHITECTURE.md` §4; `POST /_admin/reset` → `204` e `GET /_admin/state` com o
       estado completo.
