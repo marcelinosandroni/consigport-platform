@@ -1084,7 +1084,7 @@
 
 - **Data de Conclusão:** 2026-11-26
 - **Branch:** `feat/102-mock-agenda`
-- **PR:** a abrir para `develop`
+- **PR:** [#23](https://github.com/marcelinosandroni/consigport-platform/pull/23)
 - **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** Expor as parcelas futuras de um beneficiário autorizado, com `404` para
