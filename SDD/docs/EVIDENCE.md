@@ -2163,7 +2163,7 @@
 
 - **Data de Conclusão:** 2026-11-26
 - **Branch:** `feat/029-backend-start-operation-idempotency`
-- **PR:** a abrir para `develop`
+- **PR:** #41 — https://github.com/marcelinosandroni/consigport-platform/pull/41
 - **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** criar a operação, congelar o snapshot das parcelas e responder `202`, com
