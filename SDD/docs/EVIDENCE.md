@@ -1291,7 +1291,7 @@
 
 - **Data de Conclusão:** 2026-11-26
 - **Branch:** `feat/106-mock-hmac`
-- **PR:** a abrir para `develop`
+- **PR:** [#27](https://github.com/marcelinosandroni/consigport-platform/pull/27)
 - **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** garantir integridade das mensagens com HMAC-SHA256 (BR-06) e impedir
