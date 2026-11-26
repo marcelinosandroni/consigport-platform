@@ -1863,3 +1863,78 @@
 - `backend/src/test/java/br/com/consigport/domain/audit/OperationEventRepositoryContractTest.java`
 - `backend/src/test/java/br/com/consigport/domain/audit/EventTypeTest.java`
 - `backend/src/test/java/br/com/consigport/domain/audit/InMemoryOperationEventRepository.java`
+
+---
+
+### Task 2.6 — Registro e consulta de autorização
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/026-backend-register-authorization`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** caso de uso idempotente do opt-in, com a replicação do consentimento na
+  Central e o relógio injetado.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Testes da task:**
+   ```text
+   ./mvnw -B -pl backend test -Dtest='RegisterAuthorizationTest,FindAuthorizationTest'
+   → FindAuthorizationTest: Tests run: 3, Failures: 0, Errors: 0, Skipped: 0
+   → RegisterAuthorizationTest: Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **Reator completo:**
+   ```text
+   ./mvnw -B verify
+   → ConsigPort Backend: Tests run: 148, Failures: 0, Errors: 0, Skipped: 0
+   → Central de Convênios Mock: Tests run: 39, Failures: 0, Errors: 0, Skipped: 0
+   → Reactor Summary for ConsigPort Platform 0.1.0-SNAPSHOT:
+   → ConsigPort Platform ................................ SUCCESS [  0.002 s]
+   → ConsigPort Backend ................................. SUCCESS [ 26.218 s]
+   → Central de Convênios Mock .......................... SUCCESS
+   → BUILD SUCCESS
+   ```
+3. **Prova de vida da idempotência (retorno do registro existente removido):**
+   ```text
+   → guarda `if (existing.isPresent()) return existing.get();` removida de
+     RegisterAuthorization.java
+   → ./mvnw -B -pl backend test -Dtest=RegisterAuthorizationTest
+   → Tests run: 6, Failures: 1, Errors: 0, Skipped: 0 -- in
+     br.com.consigport.application.authorization.RegisterAuthorizationTest
+   → BUILD FAILURE
+   → guarda restaurada; suíte verde de novo
+   ```
+
+#### Conteúdo Entregue:
+- `application/authorization/RegisterAuthorization` — caso de uso idempotente: repete o
+  opt-in, devolve o registro existente e replica o consentimento na Central.
+- `application/authorization/FindAuthorization` — consulta do registro do par.
+- `domain/authorization/CentralAuthorizationPort` — porta da replicação do opt-in na
+  Central.
+- Testes: 9 casos com o repositório e a porta em memória, incluindo a corrida entre dois
+  registros do mesmo par.
+
+#### Descobertas e Decisões:
+- A replicação na Central acontece **antes** do armazenamento local: se a chamada
+  falhar, não fica autorização local que a Central desconhece — o caso oposto deixaria o
+  beneficiário sem agenda depois de um retry, porque a repetição devolveria o registro
+  existente sem replicar. A replicação da Central é idempotente por par, então o retry
+  é seguro.
+- Na repetição do opt-in a Central não é chamada de novo: o registro local só existe
+  depois de uma replicação bem-sucedida.
+- Quando o armazenamento perde a corrida para outro registro do mesmo par, o caso de uso
+  devolve o registro vencedor em vez de propagar o erro.
+- O `BACKLOG.md` não lista a porta da replicação entre os arquivos da task 2.6; ela foi
+  criada em `domain/authorization/`, seguindo o padrão das outras portas do domínio
+  (`AgendaGateway` em `domain/agenda/` e `CentralPortabilityPort` em
+  `domain/portability/`).
+
+#### Arquivos Tocados:
+- `backend/src/main/java/br/com/consigport/application/authorization/RegisterAuthorization.java`
+- `backend/src/main/java/br/com/consigport/application/authorization/FindAuthorization.java`
+- `backend/src/main/java/br/com/consigport/domain/authorization/CentralAuthorizationPort.java`
+- `backend/src/test/java/br/com/consigport/application/authorization/RegisterAuthorizationTest.java`
+- `backend/src/test/java/br/com/consigport/application/authorization/FindAuthorizationTest.java`
+- `backend/src/test/java/br/com/consigport/application/authorization/InMemoryCentralAuthorizationPort.java`

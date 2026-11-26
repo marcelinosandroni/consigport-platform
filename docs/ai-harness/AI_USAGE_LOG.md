@@ -865,3 +865,33 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - `./mvnw -B -pl backend test -Dtest='OperationEventTest,OperationEventRepositoryContractTest,EventTypeTest'`
      → 19 testes verdes.
    - `./mvnw -B verify` → reactor verde (backend 139 testes, mock 39 testes).
+
+---
+
+## Sessão #32 — Task 2.6 (Registro e Consulta de Autorização)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/026-backend-register-authorization`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** caso de uso idempotente do opt-in, com replicação na Central e relógio
+  injetado.
+
+### Atividades Realizadas:
+1. **Casos de uso:**
+   - `RegisterAuthorization`: repete o opt-in, devolve o registro existente, replica o
+     consentimento na Central e data o registro com o `Clock` injetado.
+   - `FindAuthorization`: consulta o registro do par e devolve `Optional`.
+2. **Porta:**
+   - `CentralAuthorizationPort` em `domain/authorization/`, seguindo o padrão das outras
+     portas do domínio.
+3. **Ordem das operações:** a replicação na Central vem antes do armazenamento local, para
+   que uma falha nunca deixe autorização local que a Central desconhece.
+4. **Testes:** 9 casos com repositório e porta em memória, incluindo a corrida entre dois
+   registros do mesmo par — o caso de uso devolve o vencedor.
+5. **Prova de vida:** a remoção do retorno do registro existente quebrou o build
+   (`Tests run: 6, Failures: 1`); a guarda foi restaurada e a suíte voltou a ficar verde.
+6. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest='RegisterAuthorizationTest,FindAuthorizationTest'`
+     → 9 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend 148 testes, mock 39 testes).
