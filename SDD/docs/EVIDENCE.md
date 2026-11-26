@@ -1633,3 +1633,76 @@
 - `backend/src/main/java/br/com/consigport/domain/portability/ReceivingAccount.java`
 - `backend/src/test/java/br/com/consigport/domain/shared/SharedValueObjectsTest.java`
 - `backend/src/test/java/br/com/consigport/domain/portability/PortabilityValueObjectsTest.java`
+
+---
+
+### Task 2.3 — Agregado de autorização
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/023-backend-authorization-aggregate`
+- **PR:** [#35](https://github.com/marcelinosandroni/consigport-platform/pull/35)
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** modelar o opt-in único por beneficiário e convênio (BR-02), com a porta de
+  persistência declarada no domínio.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Testes da task:**
+   ```text
+   ./mvnw -B -pl backend test -Dtest='AuthorizationTest,AuthorizationRepositoryContractTest'
+   → AuthorizationRepositoryContractTest: Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+   → AuthorizationTest: Tests run: 7, Failures: 0, Errors: 0, Skipped: 0
+   → AuthorizationTest$AuthorizationIdTest: Tests run: 5, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **Reator completo:**
+   ```text
+   ./mvnw -B verify
+   → ConsigPort Backend: Tests run: 57, Failures: 0, Errors: 0, Skipped: 0
+   → Central de Convênios Mock: Tests run: 39, Failures: 0, Errors: 0, Skipped: 0
+   → Reactor Summary for ConsigPort Platform 0.1.0-SNAPSHOT:
+   → ConsigPort Platform ................................ SUCCESS [  0.006 s]
+   → ConsigPort Backend ................................. SUCCESS [ 25.636 s]
+   → Central de Convênios Mock .......................... SUCCESS
+   → BUILD SUCCESS
+   ```
+3. **Prova de vida do invariante (remoção temporária da validação do convênio):**
+   ```text
+   → guard `agreementId == null` removido de domain/authorization/Authorization.java
+   → ./mvnw -B -pl backend test -Dtest=AuthorizationTest
+   → Tests run: 7, Failures: 1, Errors: 0, Skipped: 0 -- in
+     br.com.consigport.domain.authorization.AuthorizationTest
+   → BUILD FAILURE
+   → guard restaurado; suíte verde de novo
+   ```
+
+#### Conteúdo Entregue:
+- `domain/authorization/Authorization` — agregado imutável com `AuthorizationId`
+  (UUID), `BeneficiaryId`, `AgreementId` e `createdAt`; a fábrica `register` cria a
+  identidade e o chamador injeta o instante lido do relógio.
+- `domain/authorization/AuthorizationRepository` — porta com
+  `findByBeneficiaryAndAgreement` e `save`, sem anotação de framework.
+- `domain/authorization/AuthorizationAlreadyExistsException` — erro de domínio para o par
+  já autorizado; o adaptador de persistência traduz a constraint única para ele.
+- `AuthorizationTest` e `AuthorizationRepositoryContractTest` — 18 testes de unidade: o
+  agregado e o contrato da porta, com o fake em memória
+  `InMemoryAuthorizationRepository` (sem mocks).
+
+#### Descobertas e Decisões:
+- `AuthorizationId` é um record aninhado em `Authorization`: a árvore do
+  `ARCHITECTURE.md` §3 mantém `domain/shared/` para os identificadores compartilhados e o
+  `BACKLOG.md` lista apenas três arquivos para a task 2.3.
+- A unicidade do par `(beneficiaryId, agreementId)` é invariante do repositório: o
+  agregado não conhece outras autorizações. O caso de uso da task 2.6 vai consultar a
+  porta antes de gravar e devolver o registro existente (BR-02).
+- O fake da porta é escrito à mão, conforme `stacks/java.md`: o contrato da porta é
+  verificado em tempo de compilação, e não escondido atrás de stubs de runtime.
+
+#### Arquivos Tocados:
+- `backend/src/main/java/br/com/consigport/domain/authorization/Authorization.java`
+- `backend/src/main/java/br/com/consigport/domain/authorization/AuthorizationRepository.java`
+- `backend/src/main/java/br/com/consigport/domain/authorization/AuthorizationAlreadyExistsException.java`
+- `backend/src/test/java/br/com/consigport/domain/authorization/AuthorizationTest.java`
+- `backend/src/test/java/br/com/consigport/domain/authorization/AuthorizationRepositoryContractTest.java`
+- `backend/src/test/java/br/com/consigport/domain/authorization/InMemoryAuthorizationRepository.java`
