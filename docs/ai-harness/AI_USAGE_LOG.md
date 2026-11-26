@@ -929,3 +929,40 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - `./mvnw -B -pl backend test -Dtest='HexagonalArchitectureTest,CentralAclTest,QueryAgendaTest'`
      → 26 testes verdes.
    - `./mvnw -B verify` → reactor verde (backend 165 testes, mock 39 testes).
+
+---
+
+## Sessão #34 — Task 2.8 (Persistência e Migração V1)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/028-backend-persistence-v1`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** criar as três tabelas, os índices, as constraints e o trigger append-only
+  do `ARCHITECTURE.md` §6, com as entidades JPA e os repositórios.
+
+### Atividades Realizadas:
+1. **Migração V1:**
+   - `V1__create_schema.sql` com `authorizations`, `portability_operations` e
+     `operation_events`, os dois índices, a `CHECK` de status, a `CHECK` de snapshot não
+     vazio, a `CHECK` de total não negativo e o trigger append-only.
+2. **Domínio e adaptadores:**
+   - Porta `PortabilityOperationRepository` no domínio.
+   - `JpaAuthorizationRepository`, `JpaPortabilityOperationRepository` e
+     `JpaOperationEventRepository` sobre as entidades JPA, com o mapeamento do snapshot
+     em JSONB e o `Clock` injetado para o `updated_at`.
+   - `RawPayloadCodec` guarda o payload bruto da Central como string JSON, byte a byte.
+3. **Infraestrutura de teste:**
+   - `PostgreSqlTestSupport` com um PostgreSQL 16 por JVM, apontado por
+     `@DynamicPropertySource`.
+   - `ConsigPortApplicationTests` passou do H2 para o PostgreSQL real, e o H2 saiu do
+     `backend/pom.xml`.
+4. **Testes:** 21 casos de integração — 11 de constraints (status, snapshot, chaves
+   únicas, trigger) e 10 de round trip dos agregados.
+5. **Prova de vida:** a `CHECK` de status virada em `status IS NOT NULL` quebrou o build
+   (`Tests run: 11, Failures: 1`); a constraint foi restaurada e o reactor voltou a ficar
+   verde (186 testes no backend, 39 no mock).
+6. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest=PersistenceConstraintsTest` → 11 testes verdes.
+   - `./mvnw -B -pl backend test -Dtest=JpaRepositoriesTest` → 10 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend 186 testes, mock 39 testes).
