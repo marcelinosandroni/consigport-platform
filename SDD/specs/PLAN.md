@@ -71,7 +71,7 @@
 
 > Objetivo: core DDD/hexagonal na porta `8080`, com PostgreSQL, Flyway, ACL, i18n,
 > polling resiliente e Swagger.
-> Task em voo: **2.5 — Evento de auditoria append-only**.
+> Task em voo: **2.6 — Registro e consulta de autorização**.
 
 ### Tasks
 
@@ -88,9 +88,13 @@
 - [x] **2.4 — Agregado de portabilidade e máquina de estados**
       `PortabilityOperation` com ao menos uma parcela, total igual à soma e snapshot
       imutável; transições apenas as da tabela de estados do `ARCHITECTURE.md` §7.
-- [-] **2.5 — Evento de auditoria append-only**
+- [x] **2.5 — Evento de auditoria append-only**
       `OperationEvent` com os campos do `ARCHITECTURE.md` §2, sem mutadores públicos;
       `eventType` restrito ao enum; porta de repositório apenas com `append` e consultas.
+- [-] **2.6 — Registro e consulta de autorização**
+      `RegisterAuthorization` idempotente: repetir o opt-in devolve o registro existente e
+      replica o consentimento na Central pela porta; `FindAuthorization` consulta o
+      registro; `Clock` injetado.
 
 ### Como usar este arquivo
 

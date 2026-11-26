@@ -837,3 +837,31 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - `./mvnw -B -pl backend test -Dtest='PortabilityOperationTest,InstallmentSnapshotTest,RejectionReasonTest'`
      → 63 testes verdes.
    - `./mvnw -B verify` → reactor verde (backend 120 testes, mock 39 testes).
+
+---
+
+## Sessão #31 — Task 2.5 (Evento de Auditoria Append-Only)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/025-backend-audit-event`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** registrar cada mudança de estado em uma trilha imutável.
+
+### Atividades Realizadas:
+1. **Evento:**
+   - `OperationEvent` com os campos do `ARCHITECTURE.md` §2: `eventId`, `operationId`,
+     `previousStatus`, `newStatus`, `eventType`, `details`, `rawPayload` e `createdAt`.
+   - `EventType` com os oito tipos estáveis do contrato público.
+2. **Porta:**
+   - `OperationEventRepository` expõe apenas `append` e `findByOperationId` — não existe
+     caminho para alterar ou apagar um evento.
+3. **Testes:** 19 casos, incluindo a prova por reflexão de que o evento não expõe mutador
+   público, de que todo campo de instância é final e de que a porta só expõe `append` e a
+   consulta; fake em memória, sem mocks.
+4. **Prova de vida:** um mutador público temporário em `OperationEvent` quebrou o build
+   (`Tests run: 12, Failures: 1`); o mutador foi removido e a suíte voltou a ficar verde.
+5. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest='OperationEventTest,OperationEventRepositoryContractTest,EventTypeTest'`
+     → 19 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend 139 testes, mock 39 testes).
