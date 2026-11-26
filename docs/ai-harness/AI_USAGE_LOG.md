@@ -800,3 +800,40 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - `./mvnw -B -pl backend test -Dtest='AuthorizationTest,AuthorizationRepositoryContractTest'`
      → 18 testes verdes.
    - `./mvnw -B verify` → reactor verde (backend 57 testes, mock 39 testes).
+
+---
+
+## Sessão #30 — Task 2.4 (Agregado de Portabilidade e Máquina de Estados)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/024-backend-portability-aggregate`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** concentrar no domínio as invariantes da operação e as transições do
+  ciclo de vida.
+
+### Atividades Realizadas:
+1. **Agregado:**
+   - `PortabilityOperation`: record imutável com identidade, chave de idempotência,
+     snapshot, conta de recebimento, total, status, protocolo, motivo, tentativas e
+     instantes; cada transição devolve uma nova instância.
+   - Invariantes no construtor: ao menos uma parcela, total igual à soma, credor
+     cessionário não vazio, protocolo nulo em `CREATED`, motivo obrigatório apenas em
+     `REJECTED`.
+2. **Máquina de estados:**
+   - `submit`, `registerIntegrationFailure`, `pollAttempt`, `confirm`, `reject` e
+     `complete`, com as origens aceitas da tabela do `ARCHITECTURE.md` §7.
+   - `OperationStatus.isTerminal()` garante que `COMPLETED` e `REJECTED` não saiam do
+     estado; a recusa vem de `InvalidTransitionException`.
+3. **Tipos de apoio:**
+   - `InstallmentSnapshot` (retrato congelado da parcela) e `RejectionReason` selado com
+     `MARGIN_INSUFFICIENT`.
+4. **Testes:** 36 casos parametrizados cobrindo 6 estados × 6 gatilhos, mais 27 casos de
+   invariantes — 63 testes na task.
+5. **Prova de vida:** a transição `CREATED → CONFIRMED`, fora da tabela, quebrou o build
+   (`Tests run: 43, Failures: 1`); a máquina foi restaurada e a suíte voltou a ficar
+   verde.
+6. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest='PortabilityOperationTest,InstallmentSnapshotTest,RejectionReasonTest'`
+     → 63 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend 120 testes, mock 39 testes).

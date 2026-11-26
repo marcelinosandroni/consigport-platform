@@ -1706,3 +1706,87 @@
 - `backend/src/test/java/br/com/consigport/domain/authorization/AuthorizationTest.java`
 - `backend/src/test/java/br/com/consigport/domain/authorization/AuthorizationRepositoryContractTest.java`
 - `backend/src/test/java/br/com/consigport/domain/authorization/InMemoryAuthorizationRepository.java`
+
+---
+
+### Task 2.4 — Agregado de portabilidade e máquina de estados
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/024-backend-portability-aggregate`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** concentrar no domínio as invariantes da operação e as transições do
+  ciclo de vida, recusando qualquer transição fora da tabela do `ARCHITECTURE.md` §7.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Testes da task:**
+   ```text
+   ./mvnw -B -pl backend test -Dtest='PortabilityOperationTest,InstallmentSnapshotTest,RejectionReasonTest'
+   → InstallmentSnapshotTest: Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+   → PortabilityOperationTest: Tests run: 43, Failures: 0, Errors: 0, Skipped: 0
+   → PortabilityOperationTest$Creation: Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+   → PortabilityOperationTest$OperationIdTest: Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+   → RejectionReasonTest: Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **Reator completo:**
+   ```text
+   ./mvnw -B verify
+   → ConsigPort Backend: Tests run: 120, Failures: 0, Errors: 0, Skipped: 0
+   → Central de Convênios Mock: Tests run: 39, Failures: 0, Errors: 0, Skipped: 0
+   → Reactor Summary for ConsigPort Platform 0.1.0-SNAPSHOT:
+   → ConsigPort Platform ................................ SUCCESS [  0.006 s]
+   → ConsigPort Backend ................................. SUCCESS [ 26.897 s]
+   → Central de Convênios Mock .......................... SUCCESS
+   → BUILD SUCCESS
+   ```
+3. **Prova de vida da máquina de estados (transição indevida liberada temporariamente):**
+   ```text
+   → `CREATED` incluído como origem válida de `confirm()` em PortabilityOperation.java
+   → ./mvnw -B -pl backend test -Dtest=PortabilityOperationTest
+   → Tests run: 43, Failures: 1, Errors: 0, Skipped: 0 -- in
+     br.com.consigport.domain.portability.PortabilityOperationTest
+   → BUILD FAILURE
+   → máquina de estados restaurada; suíte verde de novo
+   ```
+
+#### Conteúdo Entregue:
+- `domain/portability/PortabilityOperation` — agregado imutável: identidade
+  (`OperationId`), `IdempotencyKey`, beneficiário, convênio, snapshot das parcelas,
+  credor cessionário, conta de recebimento, total, status, protocolo, motivo de rejeição,
+  contador de tentativas, próxima consulta e instante de atualização da conta.
+- Invariantes no construtor: ao menos uma parcela, total igual à soma do snapshot,
+  credor cessionário não vazio, protocolo nulo enquanto `CREATED`, motivo obrigatório
+  apenas em `REJECTED` e contador de tentativas não negativo.
+- Transições: `submit`, `registerIntegrationFailure`, `pollAttempt`, `confirm`, `reject` e
+  `complete` — cada uma devolve uma nova instância e recusa as combinações ausentes da
+  tabela do `ARCHITECTURE.md` §7 com `InvalidTransitionException`.
+- `domain/portability/OperationStatus` — o vocabulário do ciclo de vida, com
+  `isTerminal()` para `COMPLETED` e `REJECTED`.
+- `domain/portability/InstallmentSnapshot` — o retrato congelado da parcela (BR-05).
+- `domain/portability/RejectionReason` — hierarquia selada com o motivo conhecido
+  (`MARGIN_INSUFFICIENT`), resolvido pelo código público.
+- Testes: 36 casos parametrizados (6 estados × 6 gatilhos) mais 27 casos de invariantes.
+
+#### Descobertas e Decisões:
+- `submit` e `pollAttempt` têm o mesmo destino (`PENDING`); a distinção da tabela é o
+  gatilho, então cada método declara as origens aceitas e a máquina fica em um único
+  lugar.
+- Os estados terminais não aparecem como origem em nenhuma transição, e o guard
+  consulta `isTerminal()` antes de aceitar: um estado terminal nunca sai do lugar.
+- O total nunca é informado pelo chamador: `create` soma o snapshot e o construtor
+  recusa qualquer total divergente, então a invariante vale também para as operações
+  reconstruídas pela persistência.
+- O snapshot é copiado com `List.copyOf`: a lista recebida pelo chamador não altera o
+  agregado.
+
+#### Arquivos Tocados:
+- `backend/src/main/java/br/com/consigport/domain/portability/PortabilityOperation.java`
+- `backend/src/main/java/br/com/consigport/domain/portability/OperationStatus.java`
+- `backend/src/main/java/br/com/consigport/domain/portability/InstallmentSnapshot.java`
+- `backend/src/main/java/br/com/consigport/domain/portability/RejectionReason.java`
+- `backend/src/test/java/br/com/consigport/domain/portability/PortabilityOperationTest.java`
+- `backend/src/test/java/br/com/consigport/domain/portability/InstallmentSnapshotTest.java`
+- `backend/src/test/java/br/com/consigport/domain/portability/RejectionReasonTest.java`
