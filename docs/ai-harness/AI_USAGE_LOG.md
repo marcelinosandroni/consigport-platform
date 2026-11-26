@@ -616,3 +616,25 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - `InMemoryCentralStore.operacao(protocolo)` preparado para a task 1.5.
 5. **Validação geral:**
    - `./mvnw -B -pl central-convenios-mock -am verify` → 17 testes verdes.
+
+---
+
+## Sessão #23 — Task 1.5 (Consulta de Status com Retry-After)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/105-mock-status`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Simular a confirmação assíncrona da Central com `Retry-After` e status terminal.
+
+### Atividades Realizadas:
+1. **Consulta de status:**
+   - `GET /operacoes-portabilidade/{protocolo}` devolve `204` com `Retry-After: 2` enquanto a operação está `PENDENTE`.
+   - Depois do delay, devolve `200` com `CONFIRMADA` ou `REJEITADA` e o motivo; protocolo desconhecido → `404 OPERACAO_NAO_ENCONTRADA`.
+2. **Transição assíncrona:**
+   - `TransitionScheduler` agenda a transição em `mock.confirmation-delay-ms` (`MOCK_CONFIRMATION_DELAY_MS`, padrão 2000 ms) em uma thread daemon.
+3. **Regras de rejeição (BR-14):**
+   - Sufixo `-REJ` ou soma das parcelas acima de `5000.00` → `REJEITADA` com `MARGEM_CONSIGNADA_INSUFICIENTE`.
+   - A transição compara a instância da operação, então um reset invalida tarefas antigas.
+4. **Validação:**
+   - `./mvnw -B -pl central-convenios-mock -am verify` → 22 testes verdes.

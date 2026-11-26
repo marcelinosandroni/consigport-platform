@@ -34,7 +34,7 @@
 ## Fase atual: 1 — Central mock
 
 > Objetivo: Central determinística na porta `8081`, com contrato PT e Swagger.
-> Task em voo: **1.4 — Submissão de portabilidade**.
+> Task em voo: **1.5 — Consulta de status com `Retry-After`**.
 
 ### Tasks
 
@@ -49,9 +49,12 @@
 - [x] **1.3 — Opt-in de autorização**
       `POST /autorizacoes` → `201` com `autorizacaoId`; repetição devolve `200` com o
       mesmo id (BR-02); campos vazios → `400 REQUISICAO_INVALIDA`.
-- [-] **1.4 — Submissão de portabilidade**
+- [x] **1.4 — Submissão de portabilidade**
       `POST /operacoes-portabilidade` → `202` com protocolo `PRT-yyyyMMdd-NNNN`; estado
       inicial `PENDENTE`; parcelas inexistentes ou fechadas → `422 PARCELA_INVALIDA`.
+- [-] **1.5 — Consulta de status com `Retry-After`**
+      Antes do delay → `204` com `Retry-After: 2`; depois → `200` com `CONFIRMADA` ou
+      `REJEITADA`; protocolo desconhecido → `404 OPERACAO_NAO_ENCONTRADA`.
 
 ### Como usar este arquivo
 
