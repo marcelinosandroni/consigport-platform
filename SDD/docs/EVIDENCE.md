@@ -1640,7 +1640,7 @@
 
 - **Data de Conclusão:** 2026-11-26
 - **Branch:** `feat/023-backend-authorization-aggregate`
-- **PR:** a abrir para `develop`
+- **PR:** [#35](https://github.com/marcelinosandroni/consigport-platform/pull/35)
 - **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** modelar o opt-in único por beneficiário e convênio (BR-02), com a porta de
