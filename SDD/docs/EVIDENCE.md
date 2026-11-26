@@ -1790,3 +1790,76 @@
 - `backend/src/test/java/br/com/consigport/domain/portability/PortabilityOperationTest.java`
 - `backend/src/test/java/br/com/consigport/domain/portability/InstallmentSnapshotTest.java`
 - `backend/src/test/java/br/com/consigport/domain/portability/RejectionReasonTest.java`
+
+---
+
+### Task 2.5 — Evento de auditoria append-only
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/025-backend-audit-event`
+- **PR:** [#37](https://github.com/marcelinosandroni/consigport-platform/pull/37)
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** registrar cada mudança de estado em uma trilha imutável, sem caminho no
+  domínio para alterar ou apagar um evento.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Testes da task:**
+   ```text
+   ./mvnw -B -pl backend test -Dtest='OperationEventTest,OperationEventRepositoryContractTest,EventTypeTest'
+   → EventTypeTest: Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+   → OperationEventRepositoryContractTest: Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+   → OperationEventTest: Tests run: 12, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **Reator completo:**
+   ```text
+   ./mvnw -B verify
+   → ConsigPort Backend: Tests run: 139, Failures: 0, Errors: 0, Skipped: 0
+   → Central de Convênios Mock: Tests run: 39, Failures: 0, Errors: 0, Skipped: 0
+   → Reactor Summary for ConsigPort Platform 0.1.0-SNAPSHOT:
+   → ConsigPort Platform ................................ SUCCESS [  0.003 s]
+   → ConsigPort Backend ................................. SUCCESS [ 27.333 s]
+   → Central de Convênios Mock .......................... SUCCESS
+   → BUILD SUCCESS
+   ```
+3. **Prova de vida do guard append-only (mutador público exposto temporariamente):**
+   ```text
+   → método público `setDetails` added a OperationEvent.java
+   → ./mvnw -B -pl backend test -Dtest=OperationEventTest
+   → Tests run: 12, Failures: 1, Errors: 0, Skipped: 0 -- in
+     br.com.consigport.domain.audit.OperationEventTest
+   → OperationEventTest.exposesNoPublicMutator — "setDetails", ["setDetails"]
+   → BUILD FAILURE
+   → mutador removido; suíte verde de novo
+   ```
+
+#### Conteúdo Entregue:
+- `domain/audit/OperationEvent` — evento imutável com os campos do `ARCHITECTURE.md` §2:
+  `eventId`, `operationId`, `previousStatus`, `newStatus`, `eventType`, `details`,
+  `rawPayload` e `createdAt`.
+- `domain/audit/EventType` — o vocabulário fechado de oito tipos, igual ao enum do
+  contrato público.
+- `domain/audit/OperationEventRepository` — porta com `append` e `findByOperationId`; não
+  existe método de atualização nem de remoção.
+- Testes: 19 casos, incluindo a prova por reflexão de que o evento não expõe mutador
+  público, de que todo campo de instância é final e de que a porta só expõe `append` e a
+  consulta.
+
+#### Descobertas e Decisões:
+- O `eventId` é sequencial no banco (`BIGSERIAL`), então o evento nasce sem identificador
+  e a porta devolve o evento já armazenado, com o id atribuído pelo armazenamento.
+- O `rawPayload` é o JSON bruto da Central e fica no domínio como texto: o domínio não
+  conhece Jackson nem o tipo da coluna `JSONB`.
+- O `previousStatus` é nulo apenas no evento de criação, como mostra o exemplo do
+  `ARCHITECTURE.md` §8.
+
+#### Arquivos Tocados:
+- `backend/src/main/java/br/com/consigport/domain/audit/OperationEvent.java`
+- `backend/src/main/java/br/com/consigport/domain/audit/OperationEventRepository.java`
+- `backend/src/main/java/br/com/consigport/domain/audit/EventType.java`
+- `backend/src/test/java/br/com/consigport/domain/audit/OperationEventTest.java`
+- `backend/src/test/java/br/com/consigport/domain/audit/OperationEventRepositoryContractTest.java`
+- `backend/src/test/java/br/com/consigport/domain/audit/EventTypeTest.java`
+- `backend/src/test/java/br/com/consigport/domain/audit/InMemoryOperationEventRepository.java`
