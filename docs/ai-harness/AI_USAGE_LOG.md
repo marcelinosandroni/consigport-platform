@@ -686,3 +686,26 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - `resources/openapi/central-api.yaml` é cópia byte a byte de `contracts/central-api.yaml`, garantida por `ContractTest`.
 4. **Validação:**
    - `./mvnw -B -pl central-convenios-mock -am verify` → 39 testes verdes.
+
+---
+
+## Sessão #26 — Arquivamento da Fase 1 e release v0.2.0
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `chore/017-phase-1-archive`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** fechar a Fase 1, promover a `v0.2.0` e abrir a Fase 2 (backend core).
+
+### Atividades Realizadas:
+1. **Promoção da release:**
+   - PR #29 `develop → staging` e PR #30 `staging → main`, ambos com CI verde.
+   - PR #31 `chore(main): release 0.2.0` mergeado; tag `v0.2.0` e release publicadas.
+2. **Imagens e staging:**
+   - As três imagens foram publicadas no GHCR por `workflow_dispatch` (o `release-please` cria a tag pela API e não dispara o evento `push` da tag).
+   - `CD Staging` verde: backend e mock com `{"status":"UP"}` e frontend respondendo.
+3. **Arquivamento da fase:**
+   - `SDD/specs/history/phases/phase-1-finished.md` com as 7 tasks, PRs, critérios de saída, digests e dívidas.
+   - `PLAN.md` com a Fase 1 concluída e a task 2.1 em voo; `ROADMAP.md` com a `v0.2.0` publicada.
+4. **Validação:**
+   - `./mvnw -B verify` → reactor verde (backend + mock, 39 testes no mock).

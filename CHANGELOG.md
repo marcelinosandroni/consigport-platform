@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.2.0](https://github.com/marcelinosandroni/consigport-platform/compare/v0.1.0...v0.2.0) (2026-11-26)
+
+
+### Features
+
+* **mock:** accept portability operations with a unique protocol. (Agent: OpenCode - DeepSeek V4.1 Flash Free) ([26dd9e8](https://github.com/marcelinosandroni/consigport-platform/commit/26dd9e82b8198e3accdc648af3ea54180f671857))
+* **mock:** add deterministic chaos and publish the contract. (Agent: OpenCode - DeepSeek V4.1 Flash Free) ([d820e95](https://github.com/marcelinosandroni/consigport-platform/commit/d820e950d8eca440bb8f43c8503a9e190de7bc77))
+* **mock:** add the deterministic in-memory store and admin endpoints. (Agent: OpenCode - DeepSeek V4.1 Flash Free) ([96e652a](https://github.com/marcelinosandroni/consigport-platform/commit/96e652a0f321e65180a48dd11f7760e105257af0))
+* **mock:** asynchronous status with Retry-After ([9fa29bd](https://github.com/marcelinosandroni/consigport-platform/commit/9fa29bd10d5577240b4e9d7f02a1c8e8366e41dc))
+* **mock:** beneficiary agenda with the authorization gate ([f507196](https://github.com/marcelinosandroni/consigport-platform/commit/f5071961ed4bda14071c3eb9851794da440e55ea))
+* **mock:** beneficiary opt-in and agenda unlock ([ec3e69e](https://github.com/marcelinosandroni/consigport-platform/commit/ec3e69ef925ceace8fa03071161499e48ddc3696))
+* **mock:** confirm portability asynchronously with retry-after. (Agent: OpenCode - DeepSeek V4.1 Flash Free) ([34d62e0](https://github.com/marcelinosandroni/consigport-platform/commit/34d62e03d5064a9a2e000402c881c21c8da608b0))
+* **mock:** deterministic chaos and published contract ([2521e76](https://github.com/marcelinosandroni/consigport-platform/commit/2521e76469a39b3a883de1fd0726d3f1fac7e921))
+* **mock:** deterministic in-memory store and admin endpoints ([53f62ad](https://github.com/marcelinosandroni/consigport-platform/commit/53f62ad85a6c9567f9f22d77eed492850eed6b32))
+* **mock:** expose the beneficiary agenda with the authorization gate. (Agent: OpenCode - DeepSeek V4.1 Flash Free) ([9d70cff](https://github.com/marcelinosandroni/consigport-platform/commit/9d70cffd58ffd2f4462ad791cabb677c1fadf808))
+* **mock:** HMAC signature and idempotency enforcement ([7f6a487](https://github.com/marcelinosandroni/consigport-platform/commit/7f6a4874df028bbb808ca0331a0a60ee5c0463bf))
+* **mock:** portability submission with protocol and PENDENTE state ([e4f992f](https://github.com/marcelinosandroni/consigport-platform/commit/e4f992fff822ea8493254b88e517960a333cc6e0))
+* **mock:** register the beneficiary opt-in and unlock the agenda. (Agent: OpenCode - DeepSeek V4.1 Flash Free) ([ea1768b](https://github.com/marcelinosandroni/consigport-platform/commit/ea1768baf0fc312e2b78ce26246855f6c65e5bf9))
+* **mock:** validate HMAC signatures and enforce idempotency. (Agent: OpenCode - DeepSeek V4.1 Flash Free) ([949bba2](https://github.com/marcelinosandroni/consigport-platform/commit/949bba241783938abdac3a5d16ab5e2dd4b7e340))
+
 ## 0.1.0 (2026-11-25)
 
 
