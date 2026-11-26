@@ -1231,3 +1231,56 @@
 - `central-convenios-mock/src/main/java/br/com/consigport/central/api/dto/PortabilityAcceptedResponse.java`
 - `central-convenios-mock/src/main/java/br/com/consigport/central/store/InMemoryCentralStore.java`
 - `central-convenios-mock/src/test/java/br/com/consigport/central/api/PortabilityControllerTests.java`
+
+---
+
+### Task 1.5 — Consulta de status com `Retry-After`
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/105-mock-status`
+- **PR:** [#26](https://github.com/marcelinosandroni/consigport-platform/pull/26)
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Simular a confirmação assíncrona: `204` com `Retry-After` enquanto
+  `PENDENTE`, `200` com o status terminal depois do delay e `404` para protocolo
+  desconhecido.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Build e testes do módulo:**
+   ```text
+   ./mvnw -B -pl central-convenios-mock -am verify
+   → Tests run: 22, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **Processo real com `MOCK_CONFIRMATION_DELAY_MS=200` (porta 18085):**
+   ```text
+   POST /operacoes-portabilidade → 202 {"protocolo":"PRT-20261126-0001"}
+   GET  /operacoes-portabilidade/PRT-20261126-0001 (imediato)
+     → 204, Retry-After: 2
+   GET  /operacoes-portabilidade/PRT-20261126-0001 (após 600 ms)
+     → 200 {"status":"CONFIRMADA","motivoRejeicao":null}
+   GET  /operacoes-portabilidade/PRT-20260101-9999
+     → 404 {"codigo":"OPERACAO_NAO_ENCONTRADA",...}
+   ```
+3. **MockMvc (`PortabilityStatusTests`):** `204` + `Retry-After`, `CONFIRMADA`,
+   `REJEITADA` por sufixo `-REJ`, `REJEITADA` por soma acima de `5000.00` e `404`.
+
+#### Conteúdo Entregue:
+- `PortabilityController.consultarStatus` — `GET /operacoes-portabilidade/{protocolo}`
+  com `204` + `Retry-After: 2` enquanto pendente e `200` no estado terminal.
+- `TransitionScheduler` — executor agendado de thread única que aplica a transição após
+  `mock.confirmation-delay-ms` (env `MOCK_CONFIRMATION_DELAY_MS`, padrão 2000 ms).
+- `InMemoryCentralStore.concluir` — `CONFIRMADA` no caminho feliz; `REJEITADA` com
+  `MARGEM_CONSIGNADA_INSUFICIENTE` para sufixo `-REJ` ou soma acima de `5000.00`
+  (BR-14). A comparação por identidade impede que uma tarefa antiga altere uma operação
+  nova criada após o reset.
+- `StatusResponse` — corpo `StatusOperacao` do contrato.
+
+#### Arquivos Tocados:
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/PortabilityController.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/dto/StatusResponse.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/store/TransitionScheduler.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/store/InMemoryCentralStore.java`
+- `central-convenios-mock/src/main/resources/application.yml`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/api/PortabilityStatusTests.java`

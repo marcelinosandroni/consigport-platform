@@ -4,6 +4,7 @@ import br.com.consigport.central.domain.Authorization;
 import br.com.consigport.central.domain.Installment;
 import br.com.consigport.central.domain.Operation;
 import br.com.consigport.central.domain.OperationStatus;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -28,6 +29,8 @@ import org.springframework.stereotype.Component;
 public class InMemoryCentralStore {
 
   private static final DateTimeFormatter DIA = DateTimeFormatter.ofPattern("yyyyMMdd");
+  private static final BigDecimal LIMITE_MARGEM = new BigDecimal("5000.00");
+  private static final String MOTIVO_MARGEM = "MARGEM_CONSIGNADA_INSUFICIENTE";
 
   private final ConcurrentMap<String, List<Installment>> agenda = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, Authorization> autorizacoes = new ConcurrentHashMap<>();
@@ -131,6 +134,42 @@ public class InMemoryCentralStore {
   /** Returns an operation by protocol, when it exists. */
   public Optional<Operation> operacao(String protocolo) {
     return Optional.ofNullable(operacoes.get(protocolo));
+  }
+
+  /**
+   * Applies the terminal status to a previously accepted operation.
+   *
+   * <p>The instance is compared by identity so a task scheduled before a {@link #reset()}
+   * cannot mutate a fresh operation that happens to reuse the same protocol.
+   * Deterministic rejection: beneficiary ending in {@code -REJ} or installments summing
+   * more than {@code 5000.00} (BR-14).
+   */
+  public synchronized void concluir(Operation agendada) {
+    Operation atual = operacoes.get(agendada.protocolo());
+    if (atual != agendada || atual.status() != OperationStatus.PENDENTE) {
+      return;
+    }
+
+    boolean rejeitar =
+        atual.beneficiarioId().endsWith("-REJ") || somaDasParcelas(atual).compareTo(LIMITE_MARGEM) > 0;
+    Operation concluida =
+        rejeitar
+            ? atual.withStatus(OperationStatus.REJEITADA, MOTIVO_MARGEM)
+            : atual.withStatus(OperationStatus.CONFIRMADA, null);
+    operacoes.put(concluida.protocolo(), concluida);
+  }
+
+  private BigDecimal somaDasParcelas(Operation operacao) {
+    List<Installment> agendaDoBeneficiario = agendaDe(operacao.beneficiarioId());
+    return operacao.parcelas().stream()
+        .map(
+            parcelaId ->
+                agendaDoBeneficiario.stream()
+                    .filter(parcela -> parcela.parcelaId().equals(parcelaId))
+                    .findFirst()
+                    .map(Installment::valor)
+                    .orElse(BigDecimal.ZERO))
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 
   /**
