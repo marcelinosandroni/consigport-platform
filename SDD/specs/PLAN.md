@@ -71,7 +71,7 @@
 
 > Objetivo: core DDD/hexagonal na porta `8080`, com PostgreSQL, Flyway, ACL, i18n,
 > polling resiliente e Swagger.
-> Task em voo: **2.6 — Registro e consulta de autorização**.
+> Task em voo: **2.7 — Consulta de agenda com ACL**.
 
 ### Tasks
 
@@ -91,10 +91,13 @@
 - [x] **2.5 — Evento de auditoria append-only**
       `OperationEvent` com os campos do `ARCHITECTURE.md` §2, sem mutadores públicos;
       `eventType` restrito ao enum; porta de repositório apenas com `append` e consultas.
-- [-] **2.6 — Registro e consulta de autorização**
+- [x] **2.6 — Registro e consulta de autorização**
       `RegisterAuthorization` idempotente: repetir o opt-in devolve o registro existente e
       replica o consentimento na Central pela porta; `FindAuthorization` consulta o
       registro; `Clock` injetado.
+- [-] **2.7 — Consulta de agenda com ACL**
+      `AgendaGateway` e `Installment` no domínio; `CentralAcl` traduz o contrato PT da
+      Central para o domínio EN; `403` sem autorização e `404` repassado.
 
 ### Como usar este arquivo
 
