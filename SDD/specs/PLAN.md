@@ -31,10 +31,10 @@
 
 ---
 
-## Fase atual: 1 — Central mock
+## Fase 1 — Central mock: concluída ✅
 
-> Objetivo: Central determinística na porta `8081`, com contrato PT e Swagger.
-> Task em voo: **1.7 — Caos determinístico e contrato publicado**.
+> Arquivada em [`history/phases/phase-1-finished.md`](./history/phases/phase-1-finished.md).
+> Tag `v0.2.0` publicada com a imagem do mock no GHCR.
 
 ### Tasks
 
@@ -59,11 +59,25 @@
       Assinatura inválida ou timestamp fora de ±300 s → `401 ASSINATURA_INVALIDA`; mesma
       `Idempotency-Key` e payload igual → mesmo protocolo; payload diferente →
       `409 IDEMPOTENCIA_CONFLITO`.
-- [-] **1.7 — Caos determinístico e contrato publicado**
+- [x] **1.7 — Caos determinístico e contrato publicado**
       `-REJ` e soma acima de `5000.00` → `REJEITADA` com
       `MARGEM_CONSIGNADA_INSUFICIENTE`; `-TIMEOUT` atrasa os dois primeiros GETs; headers
       `X-Mock-Delay-Ms` e `X-Mock-Force-Error`; contrato exportado idêntico a
       `contracts/central-api.yaml`.
+
+---
+
+## Fase atual: 2 — Backend core
+
+> Objetivo: core DDD/hexagonal na porta `8080`, com PostgreSQL, Flyway, ACL, i18n,
+> polling resiliente e Swagger.
+> Task em voo: **2.1 — Esqueleto hexagonal e regras ArchUnit**.
+
+### Tasks
+
+- [-] **2.1 — Esqueleto hexagonal e regras ArchUnit**
+      `domain` sem Spring, JPA, Jackson ou HTTP; `application` só importa `domain`;
+      `config` é o único composition root; regra verificada por `HexagonalArchitectureTest`.
 
 ### Como usar este arquivo
 

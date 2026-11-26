@@ -1410,3 +1410,64 @@
 - `central-convenios-mock/src/main/resources/openapi/central-api.yaml`
 - `central-convenios-mock/src/test/java/br/com/consigport/central/api/ChaosTests.java`
 - `central-convenios-mock/src/test/java/br/com/consigport/central/ContractTest.java`
+
+---
+
+### Fase 1 — Central mock: arquivamento e promoção da `v0.2.0`
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `chore/017-phase-1-archive`
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** fechar a Fase 1 (7 tasks), promover a release `v0.2.0` e abrir a Fase 2.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Gates locais antes da promoção:**
+   ```text
+   node scripts/check-specs.mjs               → OK
+   node SDD/SKILLS/check-docs/check-docs.mjs  → OK
+   node scripts/check-architecture.mjs        → OK
+   node scripts/check-ai-log.mjs              → OK
+   node scripts/check-theme-tokens.mjs        → OK
+   ./mvnw -B verify
+   → ConsigPort Platform ................................ SUCCESS
+   → ConsigPort Backend ................................. SUCCESS
+   → Central de Convênios Mock .......................... SUCCESS
+   → BUILD SUCCESS
+   Tests run: 39, Failures: 0, Errors: 0, Skipped: 0 (central-convenios-mock)
+   ```
+2. **Promoção e release:**
+   ```text
+   PR #29  develop → staging   → CI verde → merge
+   PR #30  staging → main      → CI verde → merge
+   PR #31  chore(main): release 0.2.0 → merge
+   → tag v0.2.0 e release publicada
+   → Release (45817926979) — Publish backend/frontend/central-convenios-mock to GHCR: success
+   ```
+3. **Imagens e staging:**
+   ```text
+   backend              sha256:b036e79c7e9cae9396154b74bfe263c5b8b7fd9cc2471d1449f920b2d049c75a
+   central-convenios-mock sha256:8097fae4e6b83cf52e058c5c99b063fad368baf697016e227ed551c58fe43417
+   frontend             sha256:788b083540757b20b8b788782e8853af31e490fa151ba27c93b728c6b6d4196d
+   CD Staging (45818653277): {"status":"UP"} em backend e mock; frontend responde 200
+   ```
+
+#### Conteúdo Entregue:
+- `SDD/specs/history/phases/phase-1-finished.md` — as 7 tasks, os PRs, os critérios de
+  saída, a evidência da release e as dívidas conhecidas.
+- `SDD/specs/PLAN.md` — Fase 1 concluída e Fase 2 aberta com a task 2.1 em voo.
+- `SDD/specs/ROADMAP.md` — Fase 1 fechada com a tag `v0.2.0` e a Fase 2 como fase atual.
+- `docs/ai-harness/AI_USAGE_LOG.md` — sessão #26.
+
+#### Nota Operacional:
+- O `release-please` cria a tag pela API do GitHub, o que **não** dispara o evento `push`
+  da tag. As imagens foram publicadas por `workflow_dispatch` em `release.yml` com a tag
+  `v0.2.0`, caminho já documentado em [`../../docs/process/RELEASE.md`](../../docs/process/RELEASE.md) §6.
+
+#### Arquivos Tocados:
+- `SDD/specs/history/phases/phase-1-finished.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`
