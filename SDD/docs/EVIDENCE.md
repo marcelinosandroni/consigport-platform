@@ -1938,3 +1938,94 @@
 - `backend/src/test/java/br/com/consigport/application/authorization/RegisterAuthorizationTest.java`
 - `backend/src/test/java/br/com/consigport/application/authorization/FindAuthorizationTest.java`
 - `backend/src/test/java/br/com/consigport/application/authorization/InMemoryCentralAuthorizationPort.java`
+
+---
+
+### Task 2.7 — Consulta de agenda com ACL
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/027-backend-agenda-acl`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** traduzir o contrato PT da Central para o domínio EN, sem deixar o DTO
+  externo escapar do adaptador.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Testes da task:**
+   ```text
+   ./mvnw -B -pl backend test -Dtest='HexagonalArchitectureTest,CentralAclTest,QueryAgendaTest'
+   → HexagonalArchitectureTest: Tests run: 10, Failures: 0, Errors: 0, Skipped: 0
+   → QueryAgendaTest: Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+   → CentralAclTest: Tests run: 2, Failures: 0, Errors: 0, Skipped: 0
+   → CentralAclTest$StatusMapping: Tests run: 7, Failures: 0, Errors: 0, Skipped: 0
+   → CentralAclTest$ErrorMapping: Tests run: 3, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **Reator completo:**
+   ```text
+   ./mvnw -B verify
+   → ConsigPort Backend: Tests run: 165, Failures: 0, Errors: 0, Skipped: 0
+   → Central de Convênios Mock: Tests run: 39, Failures: 0, Errors: 0, Skipped: 0
+   → Reactor Summary for ConsigPort Platform 0.1.0-SNAPSHOT:
+   → ConsigPort Platform ................................ SUCCESS [  0.002 s]
+   → ConsigPort Backend ................................. SUCCESS [ 27.696 s]
+   → Central de Convênios Mock .......................... SUCCESS
+   → BUILD SUCCESS
+   ```
+3. **Prova de vida do mapeamento (`ABERTA` lido como `CLOSED`):**
+   ```text
+   → mapeamento `ABERTA → CLOSED` aplicado temporariamente em CentralAcl.java
+   → ./mvnw -B -pl backend test -Dtest=CentralAclTest
+   → Tests run: 7, Failures: 2, Errors: 0, Skipped: 0 -- in
+     br.com.consigport.adapters.out.central.acl.CentralAclTest$StatusMapping
+   → Tests run: 2, Failures: 2, Errors: 0, Skipped: 0 -- in
+     br.com.consigport.adapters.out.central.acl.CentralAclTest
+   → BUILD FAILURE
+   → mapeamento restaurado; suíte verde de novo
+   ```
+
+#### Conteúdo Entregue:
+- `domain/agenda/Installment` e `domain/agenda/InstallmentStatus` — a parcela e a sua
+  situação (`OPEN`, `CLOSED`).
+- `domain/agenda/BeneficiaryAgenda` — o read model imutável da agenda, com
+  `openInstallments()` para a elegibilidade (BR-03).
+- `domain/agenda/AgendaGateway` — a porta de leitura da agenda na Central.
+- `domain/shared/DomainError` — hierarquia selada de erros com o código estável da API
+  pública (`AUTHORIZATION_REQUIRED`, `BENEFICIARY_NOT_FOUND`).
+- `application/agenda/QueryAgenda` — o caso de uso da consulta.
+- `adapters/out/central/dto/AgendaResponse` — o DTO da Central, com os nomes JSON em
+  português.
+- `adapters/out/central/acl/CentralAcl` — a tradução: `ABERTA ↔ OPEN`,
+  `FECHADA ↔ CLOSED`, e `403`/`404` da Central viram erro de domínio.
+- `HexagonalArchitectureTest` — nova regra: nenhum DTO externo fora do adaptador de
+  saída da Central, provada por um fixture que viola a regra.
+
+#### Descobertas e Decisões:
+- O `403` sem opt-in e o `404` de beneficiário desconhecido chegam da Central; a ACL os
+  traduz para `DomainError`, e o caso de uso apenas os repassa. O `DomainError` foi
+  criado em `domain/shared/`, como na árvore do `ARCHITECTURE.md` §3.
+- O mapeamento da situação é bidirecional: a ACL lê o português da Central e escreve o
+  português da Central, e o teste prova o ciclo completo.
+- `InstallmentStatus` e `BeneficiaryAgenda` não estão na lista de arquivos do
+  `BACKLOG.md`, mas estão na árvore do `ARCHITECTURE.md` §3 (`domain/agenda/`) e foram
+  criados para que o read model e a elegibilidade vivam no domínio.
+- A regra ArchUnit nova garante que nenhum DTO da Central escape do adaptador de saída:
+  o `domain` e o `application` nunca alcançam `adapters`, e o fixture prova que a regra
+  morde.
+
+#### Arquivos Tocados:
+- `backend/src/main/java/br/com/consigport/domain/agenda/Installment.java`
+- `backend/src/main/java/br/com/consigport/domain/agenda/InstallmentStatus.java`
+- `backend/src/main/java/br/com/consigport/domain/agenda/BeneficiaryAgenda.java`
+- `backend/src/main/java/br/com/consigport/domain/agenda/AgendaGateway.java`
+- `backend/src/main/java/br/com/consigport/domain/shared/DomainError.java`
+- `backend/src/main/java/br/com/consigport/application/agenda/QueryAgenda.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/central/dto/AgendaResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/central/acl/CentralAcl.java`
+- `backend/src/test/java/br/com/consigport/adapters/out/central/acl/CentralAclTest.java`
+- `backend/src/test/java/br/com/consigport/application/agenda/QueryAgendaTest.java`
+- `backend/src/test/java/br/com/consigport/application/agenda/InMemoryAgendaGateway.java`
+- `backend/src/test/java/br/com/consigport/architecture/HexagonalArchitectureTest.java`
+- `backend/src/test/java/br/com/consigport/architecture/fixture/application/ApplicationUsingCentralDto.java`
