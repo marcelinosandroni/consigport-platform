@@ -71,7 +71,7 @@
 
 > Objetivo: core DDD/hexagonal na porta `8080`, com PostgreSQL, Flyway, ACL, i18n,
 > polling resiliente e Swagger.
-> Task em voo: **2.3 — Agregado de autorização**.
+> Task em voo: **2.4 — Agregado de portabilidade e máquina de estados**.
 
 ### Tasks
 
@@ -81,10 +81,13 @@
 - [x] **2.2 — Value objects compartilhados**
       `BeneficiaryId`, `AgreementId`, `InstallmentId`, `IdempotencyKey`, `Money` e
       `ReceivingAccount` com validação no construtor e igualdade por valor.
-- [-] **2.3 — Agregado de autorização**
+- [x] **2.3 — Agregado de autorização**
       `Authorization` com identidade, beneficiário, convênio e `createdAt`;
       `AuthorizationRepository` com `findByBeneficiaryAndAgreement` e `save`, sem anotação
       de framework.
+- [-] **2.4 — Agregado de portabilidade e máquina de estados**
+      `PortabilityOperation` com ao menos uma parcela, total igual à soma e snapshot
+      imutável; transições apenas as da tabela de estados do `ARCHITECTURE.md` §7.
 
 ### Como usar este arquivo
 

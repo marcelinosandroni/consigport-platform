@@ -769,3 +769,34 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
 5. **Validação:**
    - `./mvnw -B -pl backend test` → 39 testes verdes no backend.
    - `./mvnw -B verify` → reactor verde (backend 39 testes, mock 39 testes).
+
+---
+
+## Sessão #29 — Task 2.3 (Agregado de Autorização)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/023-backend-authorization-aggregate`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** modelar o opt-in único por beneficiário e convênio (BR-02) e declarar a
+  porta de persistência no domínio.
+
+### Atividades Realizadas:
+1. **Agregado:**
+   - `Authorization`: record imutável com `AuthorizationId` (UUID), `BeneficiaryId`,
+     `AgreementId` e `createdAt`; a fábrica `register` cria a identidade e o instante
+     chega pelo relógio.
+   - `AuthorizationAlreadyExistsException`: erro de domínio para o par já autorizado.
+2. **Porta:**
+   - `AuthorizationRepository` com `findByBeneficiaryAndAgreement` e `save`, sem anotação
+     de framework; a unicidade do par é invariante da porta.
+3. **Testes:**
+   - `AuthorizationTest` (12 casos) e `AuthorizationRepositoryContractTest` (6 casos),
+     com o fake em memória `InMemoryAuthorizationRepository` — sem mocks, conforme
+     `stacks/java.md`.
+4. **Prova de vida:** remoção temporária do guard de convênio nulo quebrou o build
+   (`Tests run: 7, Failures: 1`); o guard foi restaurado e a suíte voltou a ficar verde.
+5. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest='AuthorizationTest,AuthorizationRepositoryContractTest'`
+     → 18 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend 57 testes, mock 39 testes).
