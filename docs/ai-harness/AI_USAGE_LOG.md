@@ -570,3 +570,26 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - `InMemoryCentralStore` ganhou `registrarAutorizacao` e `possuiAutorizacao`.
 5. **Validação:**
    - `./mvnw -B -pl central-convenios-mock -am verify` → 8 testes verdes.
+
+---
+
+## Sessão #21 — Task 1.3 (Opt-in de Autorização)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/103-mock-authorization`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Registrar o consentimento do beneficiário e liberar a agenda.
+
+### Atividades Realizadas:
+1. **Endpoint de opt-in:**
+   - `POST /autorizacoes` devolve `201` com `autorizacaoId` na criação e `200` com o mesmo id na repetição (BR-02).
+   - Identificador determinístico no formato `AUT-yyyyMMdd-NNNN`, com sequência zerada pelo reset.
+2. **Índice de unicidade:**
+   - `InMemoryCentralStore` mantém o índice por par `(beneficiarioId, convenioId)` e o método `autorizar` é sincronizado.
+3. **Validação:**
+   - `AuthorizationRequest` com `@NotBlank` e `@Size(max = 64)`; o handler converte falhas em `400 REQUISICAO_INVALIDA`.
+4. **Integração com a agenda:**
+   - Teste prova que o opt-in libera `GET /beneficiarios/BEN-001/agenda`.
+5. **Validação geral:**
+   - `./mvnw -B -pl central-convenios-mock -am verify` → 13 testes verdes.

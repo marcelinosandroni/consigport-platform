@@ -1129,3 +1129,57 @@
 - `central-convenios-mock/src/main/java/br/com/consigport/central/api/dto/ErroCentralResponse.java`
 - `central-convenios-mock/src/main/java/br/com/consigport/central/store/InMemoryCentralStore.java`
 - `central-convenios-mock/src/test/java/br/com/consigport/central/api/AgendaControllerTests.java`
+
+---
+
+### Task 1.3 — Opt-in de autorização
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/103-mock-authorization`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Registrar o consentimento do beneficiário, único por par
+  `(beneficiarioId, convenioId)` (BR-02), e liberar a agenda (BR-01).
+
+#### Comandos de Verificação e Saídas:
+
+1. **Build e testes do módulo:**
+   ```text
+   ./mvnw -B -pl central-convenios-mock -am verify
+   → Tests run: 13, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **Processo real (porta 18083):**
+   ```text
+   POST /autorizacoes {"beneficiarioId":"BEN-001","convenioId":"AGR-001"}
+   → 201 {"autorizacaoId":"AUT-20261126-0001"}
+
+   POST /autorizacoes (mesmo par)
+   → 200 {"autorizacaoId":"AUT-20261126-0001"}
+
+   POST /autorizacoes {"beneficiarioId":"","convenioId":"AGR-001"}
+   → 400 {"codigo":"REQUISICAO_INVALIDA","mensagem":"O campo beneficiarioId é obrigatório.",...}
+
+   GET /beneficiarios/BEN-001/agenda
+   → 200 com PAR-001, PAR-002 e PAR-003
+   ```
+3. **MockMvc (`AuthorizationControllerTests`):** criação (`201`), repetição (`200` com o
+   mesmo id), campos vazios (`400`) e agenda liberada após o opt-in.
+
+#### Conteúdo Entregue:
+- `AuthorizationController` — `POST /autorizacoes` devolve `201` na criação e `200` na
+  repetição, com o mesmo `autorizacaoId`.
+- `AuthorizationRequest` — validação `@NotBlank` e `@Size(max = 64)` nos dois campos.
+- `AuthorizationResponse` — corpo `{"autorizacaoId": "..."}`.
+- `InMemoryCentralStore.autorizar` — índice único por par, geração determinística
+  `AUT-yyyyMMdd-NNNN` e sequência zerada pelo reset.
+- `ApiExceptionHandler` — validação e corpo ilegível viram `400 REQUISICAO_INVALIDA`.
+
+#### Arquivos Tocados:
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/AuthorizationController.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/ApiExceptionHandler.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/dto/AuthorizationRequest.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/dto/AuthorizationResponse.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/store/InMemoryCentralStore.java`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/api/AuthorizationControllerTests.java`
