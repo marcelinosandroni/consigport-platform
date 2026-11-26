@@ -112,6 +112,10 @@ gh api -X PUT /repos/marcelinosandroni/consigport-platform/branches/develop/prot
   -F restrictions=null
 ```
 
+> **Nota de fase:** a proteção de branches está **desativada por decisão do
+> responsável** enquanto a integração é feita por comando (`gh pr merge`). As regras
+> acima ficam como referência para a ativação futura.
+
 ---
 
 ## 5. Padrão de Commits

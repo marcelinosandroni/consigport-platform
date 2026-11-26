@@ -966,3 +966,447 @@
 - `docs/ai-harness/AI_USAGE_LOG.md`, `docs/ai-harness/HARNESS_OVERVIEW.md`
 - `docs/adr/0006-gitflow-ci-cd-docker-e-performance.md`
 - `SDD/specs/PLAN.md`, `SDD/specs/BACKLOG.md`, `SDD/docs/EVIDENCE.md`
+
+---
+
+### Task 0.12 — Promoção da release `v0.1.0` e arquivamento da Fase 0
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `chore/012-phase-0-archive`
+- **PR:** [#21](https://github.com/marcelinosandroni/consigport-platform/pull/21) (back-merge da `main` + arquivamento)
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Promover a `v0.1.0` até a `main`, publicar as três imagens no GHCR,
+  validar o staging e arquivar a Fase 0 em `specs/history/phases/`.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Tag e release publicadas:**
+   ```text
+   git tag --list "v*"        → v0.1.0
+   gh release view v0.1.0     → v0.1.0 (published 2026-11-25T16:58:02Z)
+   ```
+2. **Imagens no GHCR (tags `v0.1.0`, `0.1.0` e `latest`):**
+   ```text
+   gh api user/packages/container/consigport-platform%2Fbackend/versions \
+     --jq '.[0].metadata.container.tags[]'  → latest 0.1.0 v0.1.0
+   ```
+   Digests: backend `sha256:bc42cbb3…c452a1`, mock `sha256:caadf344…a37cb5`,
+   frontend `sha256:278a1113…2bc2f3`.
+3. **Staging real (run `45661533860`, tag `v0.1.0`):** os quatro containers
+   `healthy`, `/actuator/health` do backend e do mock → `{"status":"UP"}`, teardown
+   verde.
+4. **Gates de especificação, links, arquitetura e diário:**
+   ```text
+   node scripts/check-specs.mjs                        → exit 0
+   node SDD/SKILLS/check-docs/check-docs.mjs .         → exit 0
+   node scripts/check-architecture.mjs                 → exit 0 (22/22)
+   node scripts/check-ai-log.mjs                       → exit 0 (18 sessões)
+   node scripts/check-theme-tokens.mjs                 → exit 0
+   ```
+
+#### Conteúdo Entregue:
+- Fase 0 arquivada em `SDD/specs/history/phases/phase-0-finished.md`.
+- `PLAN.md` limpo, com a Fase 0 concluída e a próxima task (1.1) registrada.
+- `ROADMAP.md` sincronizado com a realidade: `v0.1.0`, Fase 0 fechada, 51 tasks.
+- `CHANGELOG.md` sem as entradas duplicadas geradas pelos merges
+  `develop → staging → main`.
+- `docs/process/GITFLOW.md` registra que a proteção de branches permanece desativada
+  por decisão do responsável, com merges integrados via `gh pr merge`.
+
+#### Arquivos Tocados:
+- `SDD/specs/history/phases/phase-0-finished.md`
+- `SDD/specs/PLAN.md`, `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`
+- `docs/process/GITFLOW.md`
+- `CHANGELOG.md`
+
+---
+
+### Task 1.1 — Store em memória, fixtures e administração
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/101-mock-store`
+- **PR:** [#22](https://github.com/marcelinosandroni/consigport-platform/pull/22)
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Estado determinístico reiniciável com `ConcurrentHashMap`, fixtures do
+  `ARCHITECTURE.md` §4 e os endpoints administrativos de reset e inspeção.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Build e testes do módulo:**
+   ```text
+   ./mvnw -B -pl central-convenios-mock -am verify
+   → Tests run: 5, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **`POST /_admin/reset` e `GET /_admin/state` no processo real (porta 18081):**
+   ```text
+   POST /_admin/reset → HTTP 204
+   GET /_admin/state  → 200 com as quatro fixtures
+   {"beneficiarios":{"BEN-001":[{"parcelaId":"PAR-001","convenioId":"AGR-001","valor":450.00,"dataDesconto":"2026-12-05","status":"ABERTA"}, …],"BEN-MARGIN":[…],"BEN-REJ":[…],"BEN-TIMEOUT":[…]},"autorizacoes":{},"operacoes":{},"contadores":{"leiturasDeStatus":{}}}
+   ```
+3. **Determinismo (dois resets comparados byte a byte):**
+   ```text
+   curl -s /_admin/state > s1.json
+   curl -s -X POST /_admin/reset
+   curl -s /_admin/state > s2.json
+   diff -q s1.json s2.json → estados idênticos
+   ```
+
+#### Conteúdo Entregue:
+- `store/InMemoryCentralStore.java` — `ConcurrentHashMap` para agenda, autorizações,
+  operações e contadores; `reset()` restaura as fixtures e `snapshot()` devolve o estado
+  com chaves ordenadas.
+- `store/SeedData.java` — as quatro fixtures do `ARCHITECTURE.md` §4 (`BEN-001`,
+  `BEN-REJ`, `BEN-MARGIN`, `BEN-TIMEOUT`), todas `ABERTA` e com valores em `BigDecimal`.
+- `api/AdminController.java` — `POST /_admin/reset` → `204` e `GET /_admin/state` → `200`.
+- `domain/` — `Installment`, `Authorization`, `Operation` e `OperationStatus`, base das
+  tasks 1.2–1.5.
+- `InMemoryCentralStoreTests` — 3 testes de integração, incluindo os dois resets
+  comparados.
+
+#### Arquivos Tocados:
+- `central-convenios-mock/src/main/java/br/com/consigport/central/store/InMemoryCentralStore.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/store/SeedData.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/AdminController.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/domain/Installment.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/domain/Authorization.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/domain/Operation.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/domain/OperationStatus.java`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/store/InMemoryCentralStoreTests.java`
+
+---
+
+### Task 1.2 — Consulta de agenda
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/102-mock-agenda`
+- **PR:** [#23](https://github.com/marcelinosandroni/consigport-platform/pull/23)
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Expor as parcelas futuras de um beneficiário autorizado, com `404` para
+  beneficiário desconhecido e `403` sem opt-in (BR-01).
+
+#### Comandos de Verificação e Saídas:
+
+1. **Build e testes do módulo:**
+   ```text
+   ./mvnw -B -pl central-convenios-mock -am verify
+   → Tests run: 8, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **MockMvc (`AgendaControllerTests`):**
+   ```text
+   BEN-001 com opt-in   → 200, 3 parcelas (PAR-001, PAR-002, PAR-003)
+   BEN-UNKNOWN          → 404 BENEFICIARIO_NAO_ENCONTRADO
+   BEN-REJ sem opt-in   → 403 SEM_AUTORIZACAO
+   ```
+3. **Processo real (porta 18082):**
+   ```text
+   GET /beneficiarios/BEN-001/agenda     → 403 {"codigo":"SEM_AUTORIZACAO","mensagem":"O beneficiário não possui autorização para este convênio.","timestamp":"..."}
+   GET /beneficiarios/BEN-UNKNOWN/agenda → 404 {"codigo":"BENEFICIARIO_NAO_ENCONTRADO","mensagem":"Beneficiário não encontrado.","timestamp":"..."}
+   ```
+
+#### Conteúdo Entregue:
+- `AgendaController` — `GET /beneficiarios/{beneficiarioId}/agenda` devolve o array de
+  `Parcela` exatamente como o contrato define; por isso não há envelope `AgendaResponse`.
+  Apenas parcelas `ABERTA` são devolvidas (BR-03).
+- `InstallmentResponse` — DTO da `Parcela` com `BigDecimal` e `LocalDate`.
+- `CentralException` + `ApiExceptionHandler` — erros no formato `ErroCentral`
+  (`codigo`, `mensagem`, `timestamp`), reutilizados pelas próximas tasks.
+- `InMemoryCentralStore` ganhou `registrarAutorizacao` e `possuiAutorizacao`, base do
+  opt-in da task 1.3.
+- `AgendaControllerTests` — 3 testes MockMvc cobrindo `200`, `403` e `404`.
+
+#### Arquivos Tocados:
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/AgendaController.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/ApiExceptionHandler.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/CentralException.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/dto/InstallmentResponse.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/dto/ErroCentralResponse.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/store/InMemoryCentralStore.java`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/api/AgendaControllerTests.java`
+
+---
+
+### Task 1.3 — Opt-in de autorização
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/103-mock-authorization`
+- **PR:** [#24](https://github.com/marcelinosandroni/consigport-platform/pull/24)
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Registrar o consentimento do beneficiário, único por par
+  `(beneficiarioId, convenioId)` (BR-02), e liberar a agenda (BR-01).
+
+#### Comandos de Verificação e Saídas:
+
+1. **Build e testes do módulo:**
+   ```text
+   ./mvnw -B -pl central-convenios-mock -am verify
+   → Tests run: 13, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **Processo real (porta 18083):**
+   ```text
+   POST /autorizacoes {"beneficiarioId":"BEN-001","convenioId":"AGR-001"}
+   → 201 {"autorizacaoId":"AUT-20261126-0001"}
+
+   POST /autorizacoes (mesmo par)
+   → 200 {"autorizacaoId":"AUT-20261126-0001"}
+
+   POST /autorizacoes {"beneficiarioId":"","convenioId":"AGR-001"}
+   → 400 {"codigo":"REQUISICAO_INVALIDA","mensagem":"O campo beneficiarioId é obrigatório.",...}
+
+   GET /beneficiarios/BEN-001/agenda
+   → 200 com PAR-001, PAR-002 e PAR-003
+   ```
+3. **MockMvc (`AuthorizationControllerTests`):** criação (`201`), repetição (`200` com o
+   mesmo id), campos vazios (`400`) e agenda liberada após o opt-in.
+
+#### Conteúdo Entregue:
+- `AuthorizationController` — `POST /autorizacoes` devolve `201` na criação e `200` na
+  repetição, com o mesmo `autorizacaoId`.
+- `AuthorizationRequest` — validação `@NotBlank` e `@Size(max = 64)` nos dois campos.
+- `AuthorizationResponse` — corpo `{"autorizacaoId": "..."}`.
+- `InMemoryCentralStore.autorizar` — índice único por par, geração determinística
+  `AUT-yyyyMMdd-NNNN` e sequência zerada pelo reset.
+- `ApiExceptionHandler` — validação e corpo ilegível viram `400 REQUISICAO_INVALIDA`.
+
+#### Arquivos Tocados:
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/AuthorizationController.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/ApiExceptionHandler.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/dto/AuthorizationRequest.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/dto/AuthorizationResponse.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/store/InMemoryCentralStore.java`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/api/AuthorizationControllerTests.java`
+
+---
+
+### Task 1.4 — Submissão de portabilidade
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/104-mock-portability`
+- **PR:** [#25](https://github.com/marcelinosandroni/consigport-platform/pull/25)
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Aceitar a operação de portabilidade com protocolo único, estado inicial
+  `PENDENTE` e `422` para parcela inexistente ou não elegível (BR-04).
+
+#### Comandos de Verificação e Saídas:
+
+1. **Build e testes do módulo:**
+   ```text
+   ./mvnw -B -pl central-convenios-mock -am verify
+   → Tests run: 17, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **Processo real (porta 18084):**
+   ```text
+   POST /operacoes-portabilidade (1ª) → 202 {"protocolo":"PRT-20261126-0001"}
+   POST /operacoes-portabilidade (2ª) → 202 {"protocolo":"PRT-20261126-0002"}
+   POST /operacoes-portabilidade (PAR-999)
+     → 422 {"codigo":"PARCELA_INVALIDA","mensagem":"A parcela PAR-999 não existe.",...}
+   GET /_admin/state → operação com status PENDENTE
+   ```
+3. **MockMvc (`PortabilityControllerTests`):** `202` com protocolo no padrão, estado
+   `PENDENTE` no snapshot, protocolos únicos (`-0001`, `-0002`), `422` e `400`.
+
+#### Conteúdo Entregue:
+- `PortabilityController` — `POST /operacoes-portabilidade` valida as parcelas do
+  beneficiário e devolve `202` com o protocolo.
+- `PortabilityRequest` — DTO com `beneficiarioId`, `parcelas`, `credorCessionario`,
+  `contaRecebimento` (aninhado) e `assinatura`, com Bean Validation.
+- `PortabilityAcceptedResponse` — corpo `{"protocolo": "..."}`.
+- `InMemoryCentralStore.criarOperacao` — protocolo determinístico
+  `PRT-yyyyMMdd-NNNN`, operação `PENDENTE` e sequência zerada pelo reset.
+- `operacao(protocolo)` — leitura usada pela consulta de status da task 1.5.
+
+#### Arquivos Tocados:
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/PortabilityController.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/dto/PortabilityRequest.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/dto/PortabilityAcceptedResponse.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/store/InMemoryCentralStore.java`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/api/PortabilityControllerTests.java`
+
+---
+
+### Task 1.5 — Consulta de status com `Retry-After`
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/105-mock-status`
+- **PR:** [#26](https://github.com/marcelinosandroni/consigport-platform/pull/26)
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Simular a confirmação assíncrona: `204` com `Retry-After` enquanto
+  `PENDENTE`, `200` com o status terminal depois do delay e `404` para protocolo
+  desconhecido.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Build e testes do módulo:**
+   ```text
+   ./mvnw -B -pl central-convenios-mock -am verify
+   → Tests run: 22, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **Processo real com `MOCK_CONFIRMATION_DELAY_MS=200` (porta 18085):**
+   ```text
+   POST /operacoes-portabilidade → 202 {"protocolo":"PRT-20261126-0001"}
+   GET  /operacoes-portabilidade/PRT-20261126-0001 (imediato)
+     → 204, Retry-After: 2
+   GET  /operacoes-portabilidade/PRT-20261126-0001 (após 600 ms)
+     → 200 {"status":"CONFIRMADA","motivoRejeicao":null}
+   GET  /operacoes-portabilidade/PRT-20260101-9999
+     → 404 {"codigo":"OPERACAO_NAO_ENCONTRADA",...}
+   ```
+3. **MockMvc (`PortabilityStatusTests`):** `204` + `Retry-After`, `CONFIRMADA`,
+   `REJEITADA` por sufixo `-REJ`, `REJEITADA` por soma acima de `5000.00` e `404`.
+
+#### Conteúdo Entregue:
+- `PortabilityController.consultarStatus` — `GET /operacoes-portabilidade/{protocolo}`
+  com `204` + `Retry-After: 2` enquanto pendente e `200` no estado terminal.
+- `TransitionScheduler` — executor agendado de thread única que aplica a transição após
+  `mock.confirmation-delay-ms` (env `MOCK_CONFIRMATION_DELAY_MS`, padrão 2000 ms).
+- `InMemoryCentralStore.concluir` — `CONFIRMADA` no caminho feliz; `REJEITADA` com
+  `MARGEM_CONSIGNADA_INSUFICIENTE` para sufixo `-REJ` ou soma acima de `5000.00`
+  (BR-14). A comparação por identidade impede que uma tarefa antiga altere uma operação
+  nova criada após o reset.
+- `StatusResponse` — corpo `StatusOperacao` do contrato.
+
+#### Arquivos Tocados:
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/PortabilityController.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/dto/StatusResponse.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/store/TransitionScheduler.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/store/InMemoryCentralStore.java`
+- `central-convenios-mock/src/main/resources/application.yml`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/api/PortabilityStatusTests.java`
+
+---
+
+### Task 1.6 — HMAC e idempotência
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/106-mock-hmac`
+- **PR:** [#27](https://github.com/marcelinosandroni/consigport-platform/pull/27)
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** garantir integridade das mensagens com HMAC-SHA256 (BR-06) e impedir
+  operações duplicadas com `Idempotency-Key` (BR-07).
+
+#### Comandos de Verificação e Saídas:
+
+1. **Build e testes do módulo:**
+   ```text
+   ./mvnw -B -pl central-convenios-mock -am verify
+   → Tests run: 33, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **Vetor compartilhado (`contracts/hmac-vector.json`):**
+   ```text
+   HmacValidatorTests → reproduz canônico e assinatura de todos os vetores
+   ```
+3. **Processo real (porta 18086):**
+   ```text
+   POST assinado (X-Signature + X-Timestamp + Idempotency-Key)
+     → 202 {"protocolo":"PRT-20261126-0001"}
+   POST mesma key + mesmo payload        → 202 {"protocolo":"PRT-20261126-0001"}
+   POST mesma key + payload diferente    → 409 IDEMPOTENCIA_CONFLITO
+   POST assinatura divergente            → 401 ASSINATURA_INVALIDA
+   POST timestamp expirado (-400 s)      → 401 ASSINATURA_INVALIDA
+   GET  /beneficiarios/BEN-001/agenda    → 401 ASSINATURA_INVALIDA (sem assinatura)
+   ```
+
+#### Conteúdo Entregue:
+- `CanonicalRequest` — JSON com chaves ordenadas, sem espaços e sem o campo `assinatura`;
+  canônico `METHOD\nPATH_WITH_QUERY\nTIMESTAMP\nSHA256_HEX(body)`.
+- `HmacValidator` — HMAC-SHA256 hexadecimal minúsculo, segredo e tolerância de ±300 s
+  vindos do vetor compartilhado.
+- `HmacFilter` — protege `/autorizacoes`, `/beneficiarios/**` e
+  `/operacoes-portabilidade/**`, devolve `401 ASSINATURA_INVALIDA` e mantém o corpo
+  legível para os controllers.
+- `IdempotencyRegistry` — guarda hash do payload e protocolo por `Idempotency-Key`; o
+  reset limpa o registry.
+- `PortabilityController` — key obrigatória (`400 REQUISICAO_INVALIDA`), mesmo payload
+  devolve o mesmo protocolo e payload divergente devolve `409 IDEMPOTENCIA_CONFLITO`.
+- `application.yml`, `.env.example` e `compose.staging.yaml` — `MOCK_HMAC_SECRET` e
+  `MOCK_HMAC_TOLERANCE_SECONDS`.
+
+#### Arquivos Tocados:
+- `central-convenios-mock/src/main/java/br/com/consigport/central/security/CanonicalRequest.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/security/HmacValidator.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/security/HmacFilter.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/security/CachedBodyHttpServletRequest.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/store/IdempotencyRegistry.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/store/InMemoryCentralStore.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/PortabilityController.java`
+- `central-convenios-mock/src/main/resources/application.yml`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/security/HmacValidatorTests.java`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/security/HmacFilterTests.java`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/api/IdempotencyTests.java`
+- `.env.example`, `compose.staging.yaml`
+
+---
+
+### Task 1.7 — Caos determinístico e contrato publicado
+
+- **Data de Conclusão:** 2026-11-26
+- **Branch:** `feat/107-mock-chaos`
+- **PR:** [#28](https://github.com/marcelinosandroni/consigport-platform/pull/28)
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** entregar os cenários de rejeição e falha que o E2E consome e publicar o
+  contrato da Central idêntico a `contracts/central-api.yaml`.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Build e testes do módulo:**
+   ```text
+   ./mvnw -B -pl central-convenios-mock -am verify
+   → Tests run: 39, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   ```
+2. **Processo real (porta 18087, `MOCK_TIMEOUT_DELAY_MS=800`):**
+   ```text
+   BEN-REJ  → {"status":"REJEITADA","motivoRejeicao":"MARGEM_CONSIGNADA_INSUFICIENTE"}
+   BEN-MARGIN (6000.00) → {"status":"REJEITADA","motivoRejeicao":"MARGEM_CONSIGNADA_INSUFICIENTE"}
+   BEN-TIMEOUT 1ª leitura → HTTP 200 em 0.806 s
+   BEN-TIMEOUT 2ª leitura → HTTP 200 em 0.805 s
+   BEN-TIMEOUT 3ª leitura → HTTP 200 em 0.004 s
+   X-Mock-Delay-Ms: 500 → HTTP 200 em 0.505 s
+   X-Mock-Force-Error: 503 (status) → 503 ERRO_FORCADO
+   X-Mock-Force-Error: 500 (agenda) → 500 ERRO_FORCADO
+   contadores antes do reset → {"leiturasDeStatus": {"PRT-20261126-0003": 4}}
+   POST /_admin/reset → 204
+   contadores após o reset → {"leiturasDeStatus": {}}
+   ```
+3. **Contrato exportado:**
+   ```text
+   diff contracts/central-api.yaml \
+     central-convenios-mock/src/main/resources/openapi/central-api.yaml
+   → sem diferença
+   ```
+4. **MockMvc (`ChaosTests`, `ContractTest`):** headers de atraso e erro, duas primeiras
+   leituras do `-TIMEOUT`, reset dos contadores e contrato byte a byte.
+
+#### Conteúdo Entregue:
+- `ChaosPolicy` — atraso explícito por header, erro forçado `500/502/503` e contador
+  determinístico por operação para beneficiários `-TIMEOUT`.
+- `AgendaController` e `PortabilityController` — aplicam `X-Mock-Delay-Ms` e
+  `X-Mock-Force-Error` somente à requisição que os carrega.
+- `InMemoryCentralStore` — snapshot dos contadores e reset do caos junto com o estado.
+- `central-convenios-mock/src/main/resources/openapi/central-api.yaml` — cópia publicada
+  do contrato, garantida por `ContractTest`.
+- `application.yml` — `mock.timeout-delay-ms` (`MOCK_TIMEOUT_DELAY_MS`, padrão 6000 ms).
+
+#### Arquivos Tocados:
+- `central-convenios-mock/src/main/java/br/com/consigport/central/chaos/ChaosPolicy.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/AgendaController.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/api/PortabilityController.java`
+- `central-convenios-mock/src/main/java/br/com/consigport/central/store/InMemoryCentralStore.java`
+- `central-convenios-mock/src/main/resources/openapi/central-api.yaml`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/api/ChaosTests.java`
+- `central-convenios-mock/src/test/java/br/com/consigport/central/ContractTest.java`

@@ -496,3 +496,193 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - O `workflow_dispatch` de `release.yml` passou a aceitar a tag a republicar, reconstruindo as três imagens a partir do commit etiquetado.
    - `docs/process/RELEASE.md` ajustado ao comportamento real do workflow.
 4. **Entrega:** branch `fix/011-release-closure` com commits e PR para `develop`.
+
+---
+
+## Sessão #18 — Fechamento da Task 0.12 e Arquivamento da Fase 0
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `chore/012-phase-0-archive`
+- **Ambiente:** harness remoto em **EC2 (AWS)**; o desenvolvedor ficou sem o notebook e operou apenas pelo celular.
+- **Objetivo:** Fechar a task 0.12 com o arquivamento da Fase 0, sincronizar os documentos de estado e corrigir as inconsistências levantadas na análise do SDD.
+
+### Atividades Realizadas:
+1. **Harness remoto:**
+   - Provisionamento do ambiente de desenvolvimento em uma instância **EC2 (AWS)** com OpenCode no provider **ZEN** e o modelo **DeepSeek V4.1 Flash Free**, porque o desenvolvedor ficou sem o notebook e passou a operar apenas pelo celular.
+   - Instalação de Node.js 24, Java 21 (Corretto), Python 3.13, Docker + Compose e GitHub CLI para permitir o ciclo completo (build, testes, PR e merge) a partir do celular.
+2. **Arquivamento da Fase 0:**
+   - Criado `SDD/specs/history/phases/phase-0-finished.md` com as 12 tasks, os critérios de saída, a evidência da `v0.1.0` e as dívidas conhecidas.
+3. **Sincronização do plano e do roadmap:**
+   - `SDD/specs/PLAN.md` marca a Fase 0 como concluída e registra a próxima task (1.1, `[ ]`).
+   - `SDD/specs/ROADMAP.md` passa a refletir `v0.1.0`, Fase 0 fechada, 12 tasks na fase e 51 no total.
+4. **Correção do CHANGELOG:**
+   - Removidas as entradas duplicadas produzidas pelos merges `develop → staging → main`; cada feature permanece uma única vez.
+5. **Governança:**
+   - `docs/process/GITFLOW.md` registra que a proteção de branches está desativada por decisão do responsável e que os merges são integrados via `gh pr merge`.
+6. **Validação:**
+   - `node scripts/check-specs.mjs`, `node SDD/SKILLS/check-docs/check-docs.mjs .`, `node scripts/check-architecture.mjs`, `node scripts/check-ai-log.mjs` e `node scripts/check-theme-tokens.mjs` → exit 0.
+
+---
+
+## Sessão #19 — Task 1.1 (Store em Memória, Fixtures e Administração)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/101-mock-store`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Entregar a primeira task da Fase 1: estado determinístico reiniciável, fixtures do `ARCHITECTURE.md` §4 e os endpoints administrativos.
+
+### Atividades Realizadas:
+1. **Store em memória:**
+   - `InMemoryCentralStore` com `ConcurrentHashMap` para agenda, autorizações, operações e contadores de status.
+   - `reset()` restaura as fixtures e zera tudo; `snapshot()` devolve o estado com chaves ordenadas para JSON determinístico.
+2. **Fixtures:**
+   - `SeedData` reproduz `BEN-001` (3 parcelas), `BEN-REJ` (`PAR-101`), `BEN-MARGIN` (`PAR-301`, 6.000,00) e `BEN-TIMEOUT` (`PAR-201`), todas `ABERTA` e com `BigDecimal`.
+3. **Administração:**
+   - `AdminController` expõe `POST /_admin/reset` → `204` e `GET /_admin/state` → `200`, conforme `contracts/central-api.yaml`.
+4. **Domínio base:**
+   - `Installment`, `Authorization`, `Operation` e `OperationStatus`, reutilizados pelas tasks 1.2–1.5.
+5. **Validação:**
+   - `./mvnw -B -pl central-convenios-mock -am verify` → 5 testes verdes.
+   - Dois resets consecutivos produzem estados byte a byte idênticos.
+
+---
+
+## Sessão #20 — Task 1.2 (Consulta de Agenda)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/102-mock-agenda`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Expor a agenda de parcelas futuras com o gate de autorização do contrato.
+
+### Atividades Realizadas:
+1. **Endpoint de agenda:**
+   - `GET /beneficiarios/{beneficiarioId}/agenda` devolve um array de `Parcela` em PT, fiel ao `contracts/central-api.yaml` (sem envelope).
+   - Apenas parcelas `ABERTA` são retornadas; a ordem das fixtures é preservada.
+2. **Gate de autorização:**
+   - Beneficiário desconhecido → `404 BENEFICIARIO_NAO_ENCONTRADO`.
+   - Beneficiário sem opt-in → `403 SEM_AUTORIZACAO` (BR-01).
+3. **Erros padronizados:**
+   - `CentralException` + `ApiExceptionHandler` produzem o corpo `ErroCentral` (`codigo`, `mensagem`, `timestamp`).
+4. **Base para o opt-in:**
+   - `InMemoryCentralStore` ganhou `registrarAutorizacao` e `possuiAutorizacao`.
+5. **Validação:**
+   - `./mvnw -B -pl central-convenios-mock -am verify` → 8 testes verdes.
+
+---
+
+## Sessão #21 — Task 1.3 (Opt-in de Autorização)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/103-mock-authorization`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Registrar o consentimento do beneficiário e liberar a agenda.
+
+### Atividades Realizadas:
+1. **Endpoint de opt-in:**
+   - `POST /autorizacoes` devolve `201` com `autorizacaoId` na criação e `200` com o mesmo id na repetição (BR-02).
+   - Identificador determinístico no formato `AUT-yyyyMMdd-NNNN`, com sequência zerada pelo reset.
+2. **Índice de unicidade:**
+   - `InMemoryCentralStore` mantém o índice por par `(beneficiarioId, convenioId)` e o método `autorizar` é sincronizado.
+3. **Validação:**
+   - `AuthorizationRequest` com `@NotBlank` e `@Size(max = 64)`; o handler converte falhas em `400 REQUISICAO_INVALIDA`.
+4. **Integração com a agenda:**
+   - Teste prova que o opt-in libera `GET /beneficiarios/BEN-001/agenda`.
+5. **Validação geral:**
+   - `./mvnw -B -pl central-convenios-mock -am verify` → 13 testes verdes.
+
+---
+
+## Sessão #22 — Task 1.4 (Submissão de Portabilidade)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/104-mock-portability`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Aceitar operações de portabilidade com protocolo único e estado inicial `PENDENTE`.
+
+### Atividades Realizadas:
+1. **Endpoint de submissão:**
+   - `POST /operacoes-portabilidade` devolve `202` com `protocolo` no padrão `PRT-yyyyMMdd-NNNN`.
+   - A operação nasce `PENDENTE` no `ConcurrentHashMap` e fica disponível para a consulta de status.
+2. **Validação de parcelas (BR-04):**
+   - Parcela inexistente ou fora de `ABERTA` → `422 PARCELA_INVALIDA`, com mensagem específica.
+3. **DTOs e validação:**
+   - `PortabilityRequest` com `@NotBlank`, `@NotEmpty`, `@Size` e `@Valid` na conta de recebimento.
+4. **Base para o polling:**
+   - `InMemoryCentralStore.operacao(protocolo)` preparado para a task 1.5.
+5. **Validação geral:**
+   - `./mvnw -B -pl central-convenios-mock -am verify` → 17 testes verdes.
+
+---
+
+## Sessão #23 — Task 1.5 (Consulta de Status com Retry-After)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/105-mock-status`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** Simular a confirmação assíncrona da Central com `Retry-After` e status terminal.
+
+### Atividades Realizadas:
+1. **Consulta de status:**
+   - `GET /operacoes-portabilidade/{protocolo}` devolve `204` com `Retry-After: 2` enquanto a operação está `PENDENTE`.
+   - Depois do delay, devolve `200` com `CONFIRMADA` ou `REJEITADA` e o motivo; protocolo desconhecido → `404 OPERACAO_NAO_ENCONTRADA`.
+2. **Transição assíncrona:**
+   - `TransitionScheduler` agenda a transição em `mock.confirmation-delay-ms` (`MOCK_CONFIRMATION_DELAY_MS`, padrão 2000 ms) em uma thread daemon.
+3. **Regras de rejeição (BR-14):**
+   - Sufixo `-REJ` ou soma das parcelas acima de `5000.00` → `REJEITADA` com `MARGEM_CONSIGNADA_INSUFICIENTE`.
+   - A transição compara a instância da operação, então um reset invalida tarefas antigas.
+4. **Validação:**
+   - `./mvnw -B -pl central-convenios-mock -am verify` → 22 testes verdes.
+
+---
+
+## Sessão #24 — Task 1.6 (HMAC e Idempotência)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/106-mock-hmac`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** validar integridade das requisições com HMAC-SHA256 e evitar operações duplicadas.
+
+### Atividades Realizadas:
+1. **Assinatura canônica:**
+   - `CanonicalRequest` ordena as chaves do JSON, remove `assinatura` e monta `METHOD\nPATH_WITH_QUERY\nTIMESTAMP\nSHA256_HEX(body)`.
+   - `HmacValidator` reproduz o vetor de `contracts/hmac-vector.json` e aplica tolerância de ±300 s.
+2. **Filtro de proteção:**
+   - `HmacFilter` exige `X-Signature` e `X-Timestamp` em `/autorizacoes`, `/beneficiarios/**` e `/operacoes-portabilidade/**`.
+   - Assinatura ausente, divergente ou expirada → `401 ASSINATURA_INVALIDA`.
+3. **Idempotência (BR-07):**
+   - `IdempotencyRegistry` guarda o hash do payload e o protocolo por `Idempotency-Key`.
+   - Mesma key + mesmo payload → mesmo protocolo; payload diferente → `409 IDEMPOTENCIA_CONFLITO`; key ausente → `400 REQUISICAO_INVALIDA`.
+   - O reset limpa o registry junto com o estado.
+4. **Configuração:**
+   - `MOCK_HMAC_SECRET` e `MOCK_HMAC_TOLERANCE_SECONDS` em `application.yml`, `.env.example` e `compose.staging.yaml`.
+5. **Validação:**
+   - `./mvnw -B -pl central-convenios-mock -am verify` → 33 testes verdes.
+
+---
+
+## Sessão #25 — Task 1.7 (Caos Determinístico e Contrato Publicado)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/107-mock-chaos`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** simular rejeições e falhas determinísticas e publicar o contrato idêntico ao compartilhado.
+
+### Atividades Realizadas:
+1. **Caos determinístico:**
+   - `ChaosPolicy` atrasa a resposta por `X-Mock-Delay-Ms` e força `500/502/503` por `X-Mock-Force-Error`, sempre somente na requisição que carrega o header.
+   - Beneficiário `-TIMEOUT` dorme `MOCK_TIMEOUT_DELAY_MS` nas duas primeiras leituras de status; a terceira responde normal.
+   - Rejeições por sufixo `-REJ` e soma acima de `5000.00` já vinham da task 1.5 e foram revalidadas.
+2. **Contadores no estado:**
+   - O snapshot `/_admin/state` expõe `contadores.leiturasDeStatus` e o reset zera o caos junto com as fixtures.
+3. **Contrato publicado:**
+   - `resources/openapi/central-api.yaml` é cópia byte a byte de `contracts/central-api.yaml`, garantida por `ContractTest`.
+4. **Validação:**
+   - `./mvnw -B -pl central-convenios-mock -am verify` → 39 testes verdes.
