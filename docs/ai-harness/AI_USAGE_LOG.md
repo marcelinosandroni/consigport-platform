@@ -1006,3 +1006,45 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - `./mvnw -B -pl backend test -Dtest=PortabilityOperationResourceTest` → 8 testes
      verdes.
    - `./mvnw -B verify` → reactor verde (backend 203 testes, mock 39 testes).
+
+## Sessão #36 — Task 2.10 (Assinatura HMAC e Envio à Central)
+
+- **Data:** 2026-11-27
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/030-backend-central-hmac-submission`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** assinar a operação na forma canônica da Central, enviá-la e absorver o
+  protocolo; uma falha depois das tentativas deixa a operação retomável, nunca duplicada.
+
+### Atividades Realizadas:
+1. **Domínio:**
+   - `CentralPortabilityPort` (porta de envio), `CentralSubmissionException` (status e
+     código da Central) e `ConcurrentOperationUpdateException` (bloqueio otimista).
+2. **Adaptador de saída:**
+   - `HmacSigner`, dono da forma canônica (`canonicalJson`, `canonicalBody` sem
+     `assinatura`, `canonicalString`, `sign`), reproduzindo o vetor compartilhado.
+   - `CentralHttpClient`, que implementa `AgendaGateway` e `CentralPortabilityPort`,
+     assina, envia e repete 3 vezes com backoff exponencial, repetindo só 408/429/5xx.
+   - `CentralProperties` (URL, segredo, tentativas, backoff e timeouts) e
+     `PortabilityAcl` com os DTOs do contrato PT da Central.
+3. **Aplicação:**
+   - `StartOperation` grava a criação em uma transação, submete fora dela e grava
+     `PENDING`/`OPERATION_SUBMITTED` ou `INTEGRATION_ERROR`/`INTEGRATION_FAILED` em
+     outra; o replay de uma operação `CREATED` completa a submissão.
+4. **Persistência e wiring:**
+   - `JpaPortabilityOperationRepository` traduz o bloqueio otimista; `CompositionRoot`
+     monta o cliente e o caso de uso; `application.yml` ganha a seção `central`.
+5. **Testes:** 5 do assinante (o vetor de `contracts/hmac-vector.json`), 10 do cliente
+   HTTP com `MockRestServiceServer`, 16 do caso de uso e 11 de integração HTTP sobre
+   PostgreSQL 16.
+6. **Prova de vida:** a ordenação das chaves do corpo canônico virando `false` quebrou o
+   build (`Tests run: 5, Failures: 2`); a forma canônica foi restaurada e a suíte voltou
+   a ficar verde.
+7. **End-to-end com o backend real contra o mock real:** `202` com `PENDING` e protocolo
+   `PRT-20261127-0002`, replay byte a byte igual, payload divergente `409`, dois eventos
+   na trilha e a Central confirmando a operação; uma recusa da Central deixou a
+   operação em `INTEGRATION_ERROR`, com `retry_count` 1 e `next_poll_at` em 60 s.
+8. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest='HmacSignerTest,CentralHttpClientTest,StartOperationTest'` → 31 testes verdes.
+   - `./mvnw -B -pl backend test -Dtest='PortabilityOperationResourceTest'` → 11 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend 228 testes, mock 39 testes).

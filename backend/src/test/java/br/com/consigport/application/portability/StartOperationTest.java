@@ -9,8 +9,12 @@ import br.com.consigport.domain.agenda.InstallmentStatus;
 import br.com.consigport.domain.audit.EventType;
 import br.com.consigport.domain.audit.InMemoryOperationEventRepository;
 import br.com.consigport.domain.audit.OperationEvent;
+import br.com.consigport.domain.portability.CentralSubmissionException;
+import br.com.consigport.domain.portability.ConcurrentOperationUpdateException;
 import br.com.consigport.domain.portability.IdempotencyKeyAlreadyUsedException;
+import br.com.consigport.domain.portability.InMemoryCentralPortabilityPort;
 import br.com.consigport.domain.portability.InMemoryPortabilityOperationRepository;
+import br.com.consigport.domain.portability.InstallmentSnapshot;
 import br.com.consigport.domain.portability.Money;
 import br.com.consigport.domain.portability.OperationPolicy;
 import br.com.consigport.domain.portability.OperationRequest;
@@ -22,9 +26,9 @@ import br.com.consigport.domain.shared.BeneficiaryId;
 import br.com.consigport.domain.shared.DomainError;
 import br.com.consigport.domain.shared.IdempotencyKey;
 import br.com.consigport.domain.shared.InstallmentId;
-import br.com.consigport.domain.shared.TransactionRunner;
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -41,11 +45,14 @@ import org.junit.jupiter.api.Test;
  * operation that already exists, the same key with another payload is a conflict, and
  * the loser of a race answers with the operation of the winner. The eligibility of the
  * installments comes from the agenda (BR-03) and the amounts are frozen in the snapshot
- * (BR-05).
+ * (BR-05). The operation is sent to the Central and waits for the confirmation (BR-08):
+ * a refusal of the Central leaves it resumable, in {@code INTEGRATION_ERROR} (BR-11).
  */
 class StartOperationTest {
 
-  private static final Instant NOW = Instant.parse("2026-11-26T10:15:30Z");
+  private static final Instant NOW = Instant.parse("2026-11-27T10:15:30Z");
+
+  private static final Duration BACKOFF = Duration.ofSeconds(60);
 
   private static final BeneficiaryId BENEFICIARY = new BeneficiaryId("BEN-001");
   private static final AgreementId AGREEMENT = new AgreementId("AGR-001");
@@ -53,19 +60,15 @@ class StartOperationTest {
 
   private InMemoryPortabilityOperationRepository operations;
   private InMemoryOperationEventRepository events;
+  private InMemoryCentralPortabilityPort central;
   private StartOperation useCase;
 
   @BeforeEach
   void setUp() {
     operations = new InMemoryPortabilityOperationRepository();
     events = new InMemoryOperationEventRepository();
-    useCase = new StartOperation(
-        operations,
-        beneficiaryId -> agenda(),
-        events,
-        new OperationPolicy(),
-        work -> work.run(),
-        Clock.fixed(NOW, ZoneOffset.UTC));
+    central = new InMemoryCentralPortabilityPort();
+    useCase = useCase(operations, central);
   }
 
   @Test
@@ -74,8 +77,6 @@ class StartOperationTest {
 
     PortabilityOperation operation = result.operation();
     assertThat(result.replay()).isFalse();
-    assertThat(operation.status()).isEqualTo(OperationStatus.CREATED);
-    assertThat(operation.protocol()).isNull();
     assertThat(operation.createdAt()).isEqualTo(NOW);
     assertThat(operation.totalAmount()).isEqualTo(new Money(new BigDecimal("750.00")));
     assertThat(operation.installments())
@@ -84,14 +85,36 @@ class StartOperationTest {
   }
 
   @Test
+  void sendsTheOperationToTheCentralAndWaitsForTheConfirmation() {
+    StartOperation.StartOperationResult result = useCase.execute(request(), KEY);
+
+    PortabilityOperation operation = result.operation();
+    assertThat(operation.status()).isEqualTo(OperationStatus.PENDING);
+    assertThat(operation.protocol()).isEqualTo(InMemoryCentralPortabilityPort.PROTOCOL);
+    assertThat(central.submissions()).isEqualTo(1);
+    assertThat(central.lastSubmission().id()).isEqualTo(operation.id());
+  }
+
+  @Test
   void appendsTheCreationEvent() {
     StartOperation.StartOperationResult result = useCase.execute(request(), KEY);
 
     List<OperationEvent> trail = events.findByOperationId(result.operation().id());
-    assertThat(trail).hasSize(1);
+    assertThat(trail).hasSize(2);
     assertThat(trail.get(0).eventType()).isEqualTo(EventType.OPERATION_CREATED);
     assertThat(trail.get(0).previousStatus()).isNull();
     assertThat(trail.get(0).newStatus()).isEqualTo(OperationStatus.CREATED);
+  }
+
+  @Test
+  void appendsTheSubmissionEvent() {
+    StartOperation.StartOperationResult result = useCase.execute(request(), KEY);
+
+    List<OperationEvent> trail = events.findByOperationId(result.operation().id());
+    assertThat(trail.get(1).eventType()).isEqualTo(EventType.OPERATION_SUBMITTED);
+    assertThat(trail.get(1).previousStatus()).isEqualTo(OperationStatus.CREATED);
+    assertThat(trail.get(1).newStatus()).isEqualTo(OperationStatus.PENDING);
+    assertThat(trail.get(1).details()).contains(InMemoryCentralPortabilityPort.PROTOCOL);
   }
 
   @Test
@@ -103,7 +126,8 @@ class StartOperationTest {
     assertThat(second.replay()).isTrue();
     assertThat(second.operation()).isEqualTo(first.operation());
     assertThat(operations.size()).isEqualTo(1);
-    assertThat(events.findByOperationId(first.operation().id())).hasSize(1);
+    assertThat(central.submissions()).isEqualTo(1);
+    assertThat(events.findByOperationId(first.operation().id())).hasSize(2);
   }
 
   @Test
@@ -165,28 +189,92 @@ class StartOperationTest {
   }
 
   @Test
+  void leavesTheOperationResumableWhenTheCentralFails() {
+    central.failWith(new CentralSubmissionException(503, "CENTRAL_INDISPONIVEL", "unavailable"));
+
+    StartOperation.StartOperationResult result = useCase.execute(request(), KEY);
+
+    PortabilityOperation operation = result.operation();
+    assertThat(operation.status()).isEqualTo(OperationStatus.INTEGRATION_ERROR);
+    assertThat(operation.protocol()).isNull();
+    assertThat(operation.retryCount()).isEqualTo(1);
+    assertThat(operation.nextPollAt()).isEqualTo(NOW.plus(BACKOFF));
+  }
+
+  @Test
+  void appendsTheIntegrationFailureEvent() {
+    central.failWith(new CentralSubmissionException(503, "CENTRAL_INDISPONIVEL", "unavailable"));
+
+    StartOperation.StartOperationResult result = useCase.execute(request(), KEY);
+
+    List<OperationEvent> trail = events.findByOperationId(result.operation().id());
+    assertThat(trail).hasSize(2);
+    assertThat(trail.get(1).eventType()).isEqualTo(EventType.INTEGRATION_FAILED);
+    assertThat(trail.get(1).previousStatus()).isEqualTo(OperationStatus.CREATED);
+    assertThat(trail.get(1).newStatus()).isEqualTo(OperationStatus.INTEGRATION_ERROR);
+    assertThat(trail.get(1).details()).contains("CENTRAL_INDISPONIVEL");
+  }
+
+  @Test
+  void doesNotSendAgainAnOperationThatFailed() {
+    central.failWith(new CentralSubmissionException(503, "CENTRAL_INDISPONIVEL", "unavailable"));
+    useCase.execute(request(), KEY);
+
+    StartOperation.StartOperationResult second = useCase.execute(request(), KEY);
+
+    assertThat(second.replay()).isTrue();
+    assertThat(second.operation().status()).isEqualTo(OperationStatus.INTEGRATION_ERROR);
+    assertThat(central.submissions()).isEqualTo(1);
+  }
+
+  @Test
+  void completesTheSubmissionOfAnOperationThatWasNeverSent() {
+    PortabilityOperation orphan =
+        PortabilityOperation.create(
+            new PortabilityOperation.OperationId(UUID.randomUUID()),
+            KEY,
+            BENEFICIARY,
+            AGREEMENT,
+            List.of(
+                new InstallmentSnapshot(
+                    new InstallmentId("PAR-001"),
+                    AGREEMENT,
+                    new Money(new BigDecimal("450.00")),
+                    LocalDate.parse("2026-12-05")),
+                new InstallmentSnapshot(
+                    new InstallmentId("PAR-002"),
+                    AGREEMENT,
+                    new Money(new BigDecimal("300.00")),
+                    LocalDate.parse("2027-01-05"))),
+            "ConsigPort",
+            new ReceivingAccount("001", "1234", "56789-0"),
+            NOW);
+    operations.save(orphan);
+
+    StartOperation.StartOperationResult result = useCase.execute(request(), KEY);
+
+    assertThat(result.replay()).isTrue();
+    assertThat(result.operation().status()).isEqualTo(OperationStatus.PENDING);
+    assertThat(result.operation().protocol()).isEqualTo(InMemoryCentralPortabilityPort.PROTOCOL);
+    assertThat(central.submissions()).isEqualTo(1);
+  }
+
+  @Test
   void answersTheWinnerWhenTheSaveLosesTheRace() {
     RacingPortabilityOperationRepository racing = new RacingPortabilityOperationRepository();
-    StartOperation racingUseCase =
-        new StartOperation(
-            racing,
-            beneficiaryId -> agenda(),
-            events,
-            new OperationPolicy(),
-            work -> work.run(),
-            Clock.fixed(NOW, ZoneOffset.UTC));
+    StartOperation racingUseCase = useCase(racing, central);
     PortabilityOperation winner = PortabilityOperation.create(
         new PortabilityOperation.OperationId(UUID.randomUUID()),
         KEY,
         BENEFICIARY,
         AGREEMENT,
         List.of(
-            new br.com.consigport.domain.portability.InstallmentSnapshot(
+            new InstallmentSnapshot(
                 new InstallmentId("PAR-001"),
                 AGREEMENT,
                 new Money(new BigDecimal("450.00")),
                 LocalDate.parse("2026-12-05")),
-            new br.com.consigport.domain.portability.InstallmentSnapshot(
+            new InstallmentSnapshot(
                 new InstallmentId("PAR-002"),
                 AGREEMENT,
                 new Money(new BigDecimal("300.00")),
@@ -199,20 +287,13 @@ class StartOperationTest {
     StartOperation.StartOperationResult result = racingUseCase.execute(request(), KEY);
 
     assertThat(result.replay()).isTrue();
-    assertThat(result.operation()).isEqualTo(winner);
+    assertThat(result.operation().id()).isEqualTo(winner.id());
   }
 
   @Test
   void refusesTheKeyWhenTheWinnerStoredAnotherPayload() {
     RacingPortabilityOperationRepository racing = new RacingPortabilityOperationRepository();
-    StartOperation racingUseCase =
-        new StartOperation(
-            racing,
-            beneficiaryId -> agenda(),
-            events,
-            new OperationPolicy(),
-            work -> work.run(),
-            Clock.fixed(NOW, ZoneOffset.UTC));
+    StartOperation racingUseCase = useCase(racing, central);
     PortabilityOperation winner =
         PortabilityOperation.create(
             new PortabilityOperation.OperationId(UUID.randomUUID()),
@@ -220,7 +301,7 @@ class StartOperationTest {
             BENEFICIARY,
             AGREEMENT,
             List.of(
-                new br.com.consigport.domain.portability.InstallmentSnapshot(
+                new InstallmentSnapshot(
                     new InstallmentId("PAR-404"),
                     AGREEMENT,
                     new Money(new BigDecimal("450.00")),
@@ -232,6 +313,32 @@ class StartOperationTest {
 
     assertThatThrownBy(() -> racingUseCase.execute(request(), KEY))
         .isInstanceOf(DomainError.IdempotencyConflict.class);
+  }
+
+  @Test
+  void answersTheStoredOperationWhenAnotherTransactionWinsTheRace() {
+    ConflictingPortabilityOperationRepository conflicting =
+        new ConflictingPortabilityOperationRepository();
+    StartOperation conflictingUseCase = useCase(conflicting, central);
+
+    StartOperation.StartOperationResult result = conflictingUseCase.execute(request(), KEY);
+
+    assertThat(result.operation().status()).isEqualTo(OperationStatus.PENDING);
+    assertThat(result.operation().protocol()).isEqualTo(InMemoryCentralPortabilityPort.PROTOCOL);
+  }
+
+  private StartOperation useCase(
+      br.com.consigport.domain.portability.PortabilityOperationRepository repository,
+      br.com.consigport.domain.portability.CentralPortabilityPort centralPort) {
+    return new StartOperation(
+        repository,
+        beneficiaryId -> agenda(),
+        centralPort,
+        events,
+        new OperationPolicy(),
+        work -> work.run(),
+        Clock.fixed(NOW, ZoneOffset.UTC),
+        BACKOFF);
   }
 
   private static OperationRequest request() {
@@ -268,6 +375,44 @@ class StartOperationTest {
   }
 
   /**
+   * Repository that loses the optimistic lock: the creation succeeds and the transition
+   * is refused, because another transaction moved the operation forward in the meantime.
+   */
+  private static final class ConflictingPortabilityOperationRepository
+      implements br.com.consigport.domain.portability.PortabilityOperationRepository {
+
+    private final InMemoryPortabilityOperationRepository delegate =
+        new InMemoryPortabilityOperationRepository();
+    private int saves;
+
+    @Override
+    public void save(PortabilityOperation operation) {
+      if (saves == 0) {
+        saves++;
+        delegate.save(operation);
+        return;
+      }
+      delegate.save(operation);
+      throw new ConcurrentOperationUpdateException(operation.id());
+    }
+
+    @Override
+    public Optional<PortabilityOperation> findById(PortabilityOperation.OperationId id) {
+      return delegate.findById(id);
+    }
+
+    @Override
+    public Optional<PortabilityOperation> findByIdempotencyKey(IdempotencyKey idempotencyKey) {
+      return delegate.findByIdempotencyKey(idempotencyKey);
+    }
+
+    @Override
+    public Optional<PortabilityOperation> findByProtocol(String protocol) {
+      return delegate.findByProtocol(protocol);
+    }
+  }
+
+  /**
    * Repository that loses the race: the first lookup sees nothing, another request
    * commits the key in the meantime and the save is refused by the unique constraint.
    */
@@ -284,7 +429,9 @@ class StartOperationTest {
 
     @Override
     public void save(PortabilityOperation operation) {
-      if (delegate.findByIdempotencyKey(operation.idempotencyKey()).isPresent()) {
+      Optional<PortabilityOperation> taken =
+          delegate.findByIdempotencyKey(operation.idempotencyKey());
+      if (taken.isPresent() && !taken.get().id().equals(operation.id())) {
         throw new IdempotencyKeyAlreadyUsedException(operation.idempotencyKey());
       }
       delegate.save(operation);

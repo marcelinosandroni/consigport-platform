@@ -2298,3 +2298,215 @@
 - `backend/src/test/java/br/com/consigport/adapters/in/web/PortabilityOperationResourceTest.java`
 - `backend/src/test/java/br/com/consigport/domain/portability/InMemoryPortabilityOperationRepository.java`
 - `backend/src/test/java/br/com/consigport/architecture/HexagonalArchitectureTest.java`
+
+### Task 2.10 — Assinatura HMAC e envio à Central
+
+- **Data de Conclusão:** 2026-11-27
+- **Branch:** `feat/030-backend-central-hmac-submission`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** assinar a operação na forma canônica da Central, enviá-la e absorver o
+  protocolo; uma falha depois das tentativas deixa a operação retomável, nunca duplicada.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Assinante, cliente HTTP e caso de uso (unitário):**
+   ```text
+   ./mvnw -B -pl backend test -Dtest='HmacSignerTest,CentralHttpClientTest,StartOperationTest'
+   → Tests run: 16, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.486 s -- in
+     br.com.consigport.application.portability.StartOperationTest
+   → Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.174 s -- in
+     br.com.consigport.adapters.out.central.CentralHttpClientTest
+   → Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.041 s -- in
+     br.com.consigport.adapters.out.central.HmacSignerTest
+   → Tests run: 31, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   → EXIT=0
+   ```
+2. **Recurso HTTP sobre PostgreSQL 16 (Testcontainers):**
+   ```text
+   ./mvnw -B -pl backend test -Dtest='PortabilityOperationResourceTest'
+   → Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 39.34 s -- in
+     br.com.consigport.adapters.in.web.PortabilityOperationResourceTest
+   → Tests run: 11, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   → EXIT=0
+   ```
+3. **Reator completo (backend + mock da Central):**
+   ```text
+   ./mvnw -B verify
+   → Tests run: 228, Failures: 0, Errors: 0, Skipped: 0
+   → Tests run: 39, Failures: 0, Errors: 0, Skipped: 0
+   → Reactor Summary for ConsigPort Platform 0.1.0-SNAPSHOT:
+   → ConsigPort Platform ................................ SUCCESS [  0.003 s]
+   → ConsigPort Backend ................................. SUCCESS [01:05 min]
+   → Central de Convênios Mock .......................... SUCCESS [ 24.806 s]
+   → BUILD SUCCESS
+   → EXIT=0
+   ```
+4. **Vetor HMAC conferido por script independente (Python, fora do código Java):**
+   ```text
+   python3 (contracts/hmac-vector.json, recomputando SHA-256 e HMAC-SHA256)
+   → post-portability: canonical=OK signature=OK
+   → get-status: canonical=OK signature=OK
+   → post-authorization: canonical=OK signature=OK
+   ```
+5. **Prova de vida da forma canônica (ordenação das chaves virando `false`):**
+   ```text
+   → HmacSigner com ORDER_MAP_ENTRIES_BY_KEYS quebrado temporariamente
+   → ./mvnw -q -B -pl backend test -Dtest='HmacSignerTest'
+   → Tests run: 5, Failures: 2, Errors: 0, Skipped: 0, Time elapsed: 3.161 s
+     <<< FAILURE! -- in br.com.consigport.adapters.out.central.HmacSignerTest
+   → HmacSignerTest.sortsTheKeysOfTheNestedObjects:57
+     expected: "{"contaRecebimento":{"agencia":"1234","banco":"001","conta":"56789-0"}}"
+      but was: "{"contaRecebimento":{"conta":"56789-0","banco":"001","agencia":"1234"}}"
+   → HmacSignerTest.signsTheSameBodyWhateverTheOrderOfItsKeys:66
+     expected: "c8c9e93a0b1ae6aca8098c1816a5034fcd3f757001ff28f17e94ca34493b757a"
+      but was: "f3a2035f987b4963d165687296e5b0c9553df6dc0f5f43f7bb8c2f6c5b5cb2e2"
+   → EXIT=1
+   → forma canônica restaurada
+   → ./mvnw -q -B -pl backend test -Dtest='HmacSignerTest'
+   → EXIT=0
+   ```
+6. **End-to-end com o backend real contra o mock real da Central** (PostgreSQL 16 do
+   compose, backend em `:8080`, mock em `:8081`, configuração padrão com read timeout de
+   3 s):
+   ```text
+   === 2. aquecimento do mock: autorização, agenda e submissão ===
+   POST /autorizacoes          -> 201 0.413004 | {"autorizacaoId":"AUT-20261127-0001"}
+   GET  /beneficiarios/BEN-001/agenda -> 200 0.044438 | [{"parcelaId":"PAR-001",...}]
+   POST /operacoes-portabilidade (aquecimento) -> 202 0.075875 | {"protocolo":"PRT-20261127-0001"}
+
+   === 5. criação da operação: o backend assina e a Central aceita ===
+   --- primeira chamada (1304 ms): HTTP/1.1 202  | Idempotent-Replay: false
+   {"operationId":"89fb650a-c03a-4f7e-922f-a57a4687310c","protocol":"PRT-20261127-0002","status":"PENDING","totalAmount":750.00,"createdAt":"2026-11-27T02:12:18.138888Z"}
+   --- replay da mesma chave (39 ms): HTTP/1.1 202  | Idempotent-Replay: true
+   {"operationId":"89fb650a-c03a-4f7e-922f-a57a4687310c","protocol":"PRT-20261127-0002","status":"PENDING","totalAmount":750.00,"createdAt":"2026-11-27T02:12:18.138888Z"}
+   --- corpos byte a byte iguais: True
+   --- mesma chave, payload diferente (25 ms): HTTP/1.1 409
+   {"code":"IDEMPOTENCY_CONFLICT","message":"A chave de idempotência já foi usada com outro conteúdo.","locale":"pt-BR",...}
+
+   === 6. o que o backend gravou (PostgreSQL) ===
+    id                                  | status  |     protocol      | total_amount |          created_at
+   --------------------------------------+---------+-------------------+--------------+-------------------------------
+    89fb650a-c03a-4f7e-922f-a57a4687310c | PENDING | PRT-20261127-0002 |       750.00 | 2026-11-27 02:12:18.445488+00
+
+    id |     event_type      | previous_status | new_status |          created_at
+   ----+---------------------+-----------------+------------+-------------------------------
+    17 | OPERATION_CREATED   |                 | CREATED    | 2026-11-27 02:12:18.445488+00
+    18 | OPERATION_SUBMITTED | CREATED         | PENDING    | 2026-11-27 02:12:19.871956+00
+
+   === 7. o que a Central recebeu (estado do mock) ===
+   "PRT-20261127-0002": {"protocolo": "PRT-20261127-0002", "beneficiarioId": "BEN-001",
+                         "parcelas": ["PAR-001", "PAR-002"], "status": "CONFIRMADA",
+                         "motivoRejeicao": null}
+
+   === 8. status da operação na Central (PENDENTE -> confirmada pelo mock) ===
+   protocolo: PRT-20261127-0002
+   consulta 1: HTTP/1.1 200 ... {"status":"CONFIRMADA","motivoRejeicao":null}
+
+   === 9. falha da Central: a operação fica retomável (INTEGRATION_ERROR) ===
+   mock com a mesma chave e outro payload -> {"protocolo":"PRT-20261127-0003"} | 202
+   --- backend com a Central recusando (106 ms): HTTP/1.1 202
+   {"operationId":"91f72b1a-24d9-4e05-b8df-a81d62a5c985","protocol":null,"status":"INTEGRATION_ERROR","totalAmount":750.00,"createdAt":"2026-11-27T02:15:33.443060Z"}
+    19 | OPERATION_CREATED   |                 | CREATED           | Operation created
+    20 | INTEGRATION_FAILED  | CREATED         | INTEGRATION_ERROR | Central did not accept the operation: IDEMPOTENCIA_CONFLITO (status 409)
+
+    id                  |      status       |     protocol      | retry_count |         next_poll_at
+   --------------------------------------+-------------------+-------------------+-------------+-------------------------------
+    89fb650a-c03a-4f7e-922f-a57a4687310c | PENDING           | PRT-20261127-0002 |           0 |
+    91f72b1a-24d9-4e05-b8df-a81d62a5c985 | INTEGRATION_ERROR |                   |           1 | 2026-11-27 02:16:33.490704+00
+
+   === 10. encerramento dos processos e dos containers ===
+   containers restantes: 0
+   processos restantes: 0
+   === fim ===
+   ```
+7. **Gates locais:**
+   ```text
+   node scripts/check-specs.mjs               → OK (exit 0)
+   node SDD/SKILLS/check-docs/check-docs.mjs  → OK (46 documentos, exit 0)
+   node scripts/check-architecture.mjs        → OK (22 testes de validação, exit 0)
+   node scripts/check-ai-log.mjs              → OK (35 sessões, exit 0)
+   node scripts/check-theme-tokens.mjs        → OK (exit 0)
+   ```
+
+#### Conteúdo Entregue:
+- `domain/portability/CentralPortabilityPort` — a porta de envio da operação, no domínio.
+- `domain/portability/CentralSubmissionException` — a falha da Central com o status e o
+  código estáveis dela; nunca é fatal para a operação.
+- `domain/portability/ConcurrentOperationUpdateException` — o sinal do armazenamento
+  quando outra transação mudou a operação (bloqueio otimista).
+- `adapters/out/central/HmacSigner` — o dono da forma canônica: `canonicalJson`,
+  `canonicalBody` (sem `assinatura`), `canonicalString` e `sign`.
+- `adapters/out/central/CentralProperties` — URL, segredo, tentativas, backoff e timeouts.
+- `adapters/out/central/CentralHttpClient` — implementa `AgendaGateway` e
+  `CentralPortabilityPort`: assina, envia, repete 3 vezes com backoff exponencial e só
+  repete 408/429/5xx.
+- `adapters/out/central/acl/PortabilityAcl` — traduz a operação para o contrato PT da
+  Central e a resposta de erro para `CentralSubmissionException`.
+- `adapters/out/central/dto/` — `CentralPortabilityRequest` (com `@JsonInclude(NON_NULL)`,
+  para que `assinatura: null` não entre no corpo assinado), `CentralPortabilityResponse`
+  e `CentralErrorResponse`.
+- `application/portability/StartOperation` — criação em uma transação, submissão fora
+  dela e gravação de `PENDING`/`OPERATION_SUBMITTED` ou
+  `INTEGRATION_ERROR`/`INTEGRATION_FAILED` em outra transação.
+- `adapters/out/persistence/JpaPortabilityOperationRepository` — traduz o bloqueio
+  otimista para `ConcurrentOperationUpdateException`.
+- `config/CompositionRoot` — beans de `CentralProperties`, `HmacSigner`, `RestClient`,
+  ACLs, `CentralHttpClient` e `StartOperation`.
+- `application.yml` — `central.base-url`, `central.hmac.secret`, `central.retry.*`,
+  `central.timeout.*` e `central.integration.backoff`.
+- Testes: 5 do assinante (o vetor compartilhado), 10 do cliente HTTP (com
+  `MockRestServiceServer`) e 16 do caso de uso, mais 11 de integração HTTP.
+
+#### Descobertas e Decisões:
+- A forma canônica é do adaptador, não do domínio: `HmacSigner` é o único dono do
+  `METHOD\nPATH_WITH_QUERY\nTIMESTAMP\nSHA256_HEX(body)`, e o corpo assinado é o JSON
+  com as chaves ordenadas — inclusive as dos objetos aninhados — sem espaços e sem o
+  campo `assinatura`, que é apenas o espelho da assinatura no corpo.
+- O mock da Central valida a assinatura do cabeçalho contra o corpo que recebeu,
+  removendo `assinatura` antes de canonicalizar: por isso o DTO do pedido usa
+  `@JsonInclude(NON_NULL)`, senão o `null` da assinatura entraria no corpo assinado e a
+  Central recusaria a requisição.
+- A falha de transporte que acontece na leitura da resposta não é um
+  `ResourceAccessException`: o `RestClient` a embrulha em `RestClientException` e ela
+  escapava do cliente como erro 500, com a operação já gravada. O cliente agora traduz
+  qualquer falha de transporte para `CentralSubmissionException`, e a operação fica
+  `INTEGRATION_ERROR`, retomável e com o evento `INTEGRATION_FAILED` — foi o que o
+  end-to-end expôs na primeira execução.
+- A criação da operação e a submissão não podem estar na mesma transação: a submissão
+  é uma chamada a outro sistema. O replay de uma operação ainda `CREATED` completa a
+  submissão com a mesma `Idempotency-Key`, para a resposta ser estável; uma operação em
+  `INTEGRATION_ERROR` não é reenviada pela API, porque o backoff de 60 s pertence ao
+  worker, que a retoma depois.
+- A corrida da atualização da operação foi resolvida pelo bloqueio otimista do
+  `@Version`: o perdedor relê a operação armazenada e responde com ela, porque o
+  chamador pediu a operação da chave, não uma versão dela.
+- O primeiro pedido de cada caminho novo de uma JVM fria custa de 1,5 s a 4,5 s nesta
+  máquina EC2 (carregamento de classes), acima do read timeout de 3 s. O end-to-end
+  aquece o mock (autorização, agenda e submissão) e o cliente HTTP do backend antes de
+  medir, para evidenciar o comportamento da integração e não o aquecimento da máquina.
+
+#### Arquivos Tocados:
+- `backend/src/main/java/br/com/consigport/domain/portability/CentralPortabilityPort.java`
+- `backend/src/main/java/br/com/consigport/domain/portability/CentralSubmissionException.java`
+- `backend/src/main/java/br/com/consigport/domain/portability/ConcurrentOperationUpdateException.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/central/HmacSigner.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/central/CentralProperties.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/central/CentralHttpClient.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/central/acl/PortabilityAcl.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/central/dto/CentralPortabilityRequest.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/central/dto/CentralPortabilityResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/central/dto/CentralErrorResponse.java`
+- `backend/src/main/java/br/com/consigport/application/portability/StartOperation.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/persistence/JpaPortabilityOperationRepository.java`
+- `backend/src/main/java/br/com/consigport/config/CompositionRoot.java`
+- `backend/src/main/resources/application.yml`
+- `backend/src/test/java/br/com/consigport/adapters/out/central/HmacSignerTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/out/central/CentralHttpClientTest.java`
+- `backend/src/test/java/br/com/consigport/application/portability/StartOperationTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/in/web/PortabilityOperationResourceTest.java`
+- `backend/src/test/java/br/com/consigport/domain/portability/InMemoryCentralPortabilityPort.java`
+- `backend/src/test/java/br/com/consigport/domain/portability/InMemoryPortabilityOperationRepository.java`

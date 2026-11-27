@@ -30,6 +30,22 @@ server:
   port: ${SERVER_PORT:8080}
   shutdown: graceful
 
+# Integration with the Central de Convênios: the URL, the shared secret of the HMAC
+# and the resilience of the client (ARCHITECTURE.md §11 and §13).
+central:
+  base-url: ${CENTRAL_BASE_URL:http://localhost:8081}
+  hmac:
+    secret: ${HMAC_SECRET:consigport-hmac-test-secret-2026}
+  retry:
+    max-attempts: ${CENTRAL_RETRY_MAX_ATTEMPTS:3}
+    delay: ${CENTRAL_RETRY_DELAY:500ms}
+  timeout:
+    connect: ${CENTRAL_TIMEOUT_CONNECT:2s}
+    read: ${CENTRAL_TIMEOUT_READ:3s}
+  integration:
+    # How long the operation waits before the next attempt, when the Central fails.
+    backoff: ${CENTRAL_INTEGRATION_BACKOFF:60s}
+
 management:
   endpoints:
     web:

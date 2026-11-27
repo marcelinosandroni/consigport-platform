@@ -71,7 +71,7 @@
 
 > Objetivo: core DDD/hexagonal na porta `8080`, com PostgreSQL, Flyway, ACL, i18n,
 > polling resiliente e Swagger.
-> Task em voo: **2.10 — Assinatura HMAC e envio à Central**.
+> Task em voo: **2.11 — Polling resiliente**.
 
 ### Tasks
 
@@ -105,10 +105,14 @@
       `POST /portability-operations` exige `Idempotency-Key`; o replay devolve `202` com
       `Idempotent-Replay: true`; payload divergente → `409 IDEMPOTENCY_CONFLICT`; parcela
       inelegível → `422`.
-- [-] **2.10 — Assinatura HMAC e envio à Central**
+- [x] **2.10 — Assinatura HMAC e envio à Central**
       `HmacSigner` reproduz o vetor de `contracts/hmac-vector.json`; `CentralHttpClient`
       submete a operação assinada; `CREATED` → `PENDING` com `protocol`; falha após
       retries → `INTEGRATION_ERROR`.
+- [-] **2.11 — Polling resiliente**
+      `PollOperation` acompanha a Central até o estado terminal; intervalo de 2 s e lote
+      de 20; honora o `Retry-After`; `204` gera `POLL_ATTEMPT`; o reenvio usa a mesma
+      `Idempotency-Key`.
 
 ### Como usar este arquivo
 

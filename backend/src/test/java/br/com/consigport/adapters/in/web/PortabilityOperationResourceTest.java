@@ -6,7 +6,10 @@ import br.com.consigport.domain.agenda.AgendaGateway;
 import br.com.consigport.domain.agenda.BeneficiaryAgenda;
 import br.com.consigport.domain.agenda.Installment;
 import br.com.consigport.domain.agenda.InstallmentStatus;
+import br.com.consigport.domain.portability.CentralPortabilityPort;
+import br.com.consigport.domain.portability.CentralSubmissionException;
 import br.com.consigport.domain.portability.Money;
+import br.com.consigport.domain.portability.PortabilityOperation;
 import br.com.consigport.domain.shared.AgreementId;
 import br.com.consigport.domain.shared.BeneficiaryId;
 import br.com.consigport.domain.shared.InstallmentId;
@@ -41,13 +44,17 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *
  * <p>The test runs against PostgreSQL 16 with the migration applied by Flyway: the
  * unique constraint of the idempotency key is what turns two concurrent requests into
- * one operation, so the race is only real against the database.
+ * one operation, so the race is only real against the database. The Central is served by
+ * a stub: the client that talks to it has its own test, with the signature checked
+ * against the shared vector.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Import(PortabilityOperationResourceTest.AgendaStub.class)
+@Import(PortabilityOperationResourceTest.CentralStub.class)
 class PortabilityOperationResourceTest extends PostgreSqlTestSupport {
 
   private static final String PATH = "/api/v1/portability-operations";
+
+  private static final String PROTOCOL = "PRT-20261123-0001";
 
   private static final String BODY =
       """
@@ -62,12 +69,14 @@ class PortabilityOperationResourceTest extends PostgreSqlTestSupport {
 
   @Autowired private TestRestTemplate rest;
   @Autowired private JdbcTemplate jdbc;
+  @Autowired private CentralStub central;
 
   @BeforeEach
   void clean() {
     // TRUNCATE does not fire the row trigger of the trail, so the append-only
     // guarantee survives the isolation of the tests.
     jdbc.execute("TRUNCATE TABLE operation_events, portability_operations, authorizations");
+    central.accept();
   }
 
   @Test
@@ -77,14 +86,40 @@ class PortabilityOperationResourceTest extends PostgreSqlTestSupport {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
     assertThat(response.getHeaders().getFirst("Idempotent-Replay")).isEqualTo("false");
     assertThat(response.getBody())
-        .contains("\"status\":\"CREATED\"")
-        .contains("\"protocol\":null")
+        .contains("\"status\":\"PENDING\"")
+        .contains("\"protocol\":\"" + PROTOCOL + "\"")
         .contains("\"totalAmount\":750.00")
-        .contains("\"operationId\":");    assertThat(
+        .contains("\"operationId\":");
+    assertThat(
             jdbc.queryForObject("select count(*) from portability_operations", Integer.class))
         .isEqualTo(1);
     assertThat(jdbc.queryForObject("select count(*) from operation_events", Integer.class))
-        .isEqualTo(1);
+        .isEqualTo(2);
+  }
+
+  @Test
+  void writesTheProtocolAndTheStatusOfTheOperation() {
+    post(UUID.randomUUID().toString(), BODY);
+
+    assertThat(
+            jdbc.queryForObject(
+                "select protocol from portability_operations limit 1", String.class))
+        .isEqualTo(PROTOCOL);
+    assertThat(
+            jdbc.queryForObject(
+                "select status from portability_operations limit 1", String.class))
+        .isEqualTo("PENDING");
+  }
+
+  @Test
+  void writesTheEventOfTheSubmission() {
+    post(UUID.randomUUID().toString(), BODY);
+
+    assertThat(
+            jdbc.queryForObject(
+                "select event_type from operation_events order by id desc limit 1",
+                String.class))
+        .isEqualTo("OPERATION_SUBMITTED");
   }
 
   @Test
@@ -116,7 +151,7 @@ class PortabilityOperationResourceTest extends PostgreSqlTestSupport {
             jdbc.queryForObject("select count(*) from portability_operations", Integer.class))
         .isEqualTo(1);
     assertThat(jdbc.queryForObject("select count(*) from operation_events", Integer.class))
-        .isEqualTo(1);
+        .isEqualTo(2);
   }
 
   @Test
@@ -159,6 +194,27 @@ class PortabilityOperationResourceTest extends PostgreSqlTestSupport {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
     assertThat(response.getBody()).contains("\"code\":\"INSTALLMENT_NOT_ELIGIBLE\"");
+  }
+
+  @Test
+  void leavesTheOperationResumableWhenTheCentralFails() {
+    central.refuse();
+
+    ResponseEntity<String> response = post(UUID.randomUUID().toString(), BODY);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+    assertThat(response.getBody())
+        .contains("\"status\":\"INTEGRATION_ERROR\"")
+        .contains("\"protocol\":null");
+    assertThat(
+            jdbc.queryForObject(
+                "select status from portability_operations limit 1", String.class))
+        .isEqualTo("INTEGRATION_ERROR");
+    assertThat(
+            jdbc.queryForObject(
+                "select event_type from operation_events order by id desc limit 1",
+                String.class))
+        .isEqualTo("INTEGRATION_FAILED");
   }
 
   @Test
@@ -219,8 +275,12 @@ class PortabilityOperationResourceTest extends PostgreSqlTestSupport {
       assertThat(
               jdbc.queryForObject("select count(*) from portability_operations", Integer.class))
           .isEqualTo(1);
-      assertThat(jdbc.queryForObject("select count(*) from operation_events", Integer.class))
-          .isEqualTo(1);
+      // Both requests may have sent the operation to the Central: the Central answers
+      // the same protocol for the same key, and every submission leaves its event.
+      List<String> trail =
+          jdbc.queryForList("select event_type from operation_events order by id", String.class);
+      assertThat(trail.get(0)).isEqualTo("OPERATION_CREATED");
+      assertThat(trail.subList(1, trail.size())).containsOnly("OPERATION_SUBMITTED");
     } finally {
       pool.shutdownNow();
     }
@@ -237,13 +297,40 @@ class PortabilityOperationResourceTest extends PostgreSqlTestSupport {
   }
 
   /**
-   * Agenda of the beneficiary, served in the place of the Central.
+   * The Central, served in the place of the real one.
    *
-   * <p>The HTTP client of the Central arrives with task 2.10; until then the stub
-   * answers the agenda that the operation start reads.
+   * <p>The agenda and the submission of the operation are answered by the stub: the
+   * client that talks to the Central has its own test, with the signature checked
+   * against the shared vector.
    */
   @TestConfiguration(proxyBeanMethods = false)
-  static class AgendaStub {
+  static class CentralStub {
+
+    private final AgendaGateway agenda =
+        beneficiaryId ->
+            new BeneficiaryAgenda(
+                beneficiaryId,
+                List.of(
+                    new Installment(
+                        new InstallmentId("PAR-001"),
+                        new AgreementId("AGR-001"),
+                        new Money(new BigDecimal("450.00")),
+                        LocalDate.parse("2026-12-05"),
+                        InstallmentStatus.OPEN),
+                    new Installment(
+                        new InstallmentId("PAR-002"),
+                        new AgreementId("AGR-001"),
+                        new Money(new BigDecimal("300.00")),
+                        LocalDate.parse("2027-01-05"),
+                        InstallmentStatus.OPEN),
+                    new Installment(
+                        new InstallmentId("PAR-003"),
+                        new AgreementId("AGR-001"),
+                        new Money(new BigDecimal("100.00")),
+                        LocalDate.parse("2027-02-05"),
+                        InstallmentStatus.CLOSED)));
+
+    private boolean refusing;
 
     /**
      * The agenda of the beneficiary.
@@ -253,28 +340,35 @@ class PortabilityOperationResourceTest extends PostgreSqlTestSupport {
     @Bean
     @Primary
     AgendaGateway stubAgendaGateway() {
-      return beneficiaryId ->
-          new BeneficiaryAgenda(
-              beneficiaryId,
-              List.of(
-                  new Installment(
-                      new InstallmentId("PAR-001"),
-                      new AgreementId("AGR-001"),
-                      new Money(new BigDecimal("450.00")),
-                      LocalDate.parse("2026-12-05"),
-                      InstallmentStatus.OPEN),
-                  new Installment(
-                      new InstallmentId("PAR-002"),
-                      new AgreementId("AGR-001"),
-                      new Money(new BigDecimal("300.00")),
-                      LocalDate.parse("2027-01-05"),
-                      InstallmentStatus.OPEN),
-                  new Installment(
-                      new InstallmentId("PAR-003"),
-                      new AgreementId("AGR-001"),
-                      new Money(new BigDecimal("100.00")),
-                      LocalDate.parse("2027-02-05"),
-                      InstallmentStatus.CLOSED)));
+      return agenda;
+    }
+
+    /**
+     * The submission of the operation to the Central.
+     *
+     * @return the port of the submission
+     */
+    @Bean
+    @Primary
+    CentralPortabilityPort stubCentralPortabilityPort() {
+      return this::submit;
+    }
+
+    private String submit(PortabilityOperation operation) {
+      if (refusing) {
+        throw new CentralSubmissionException(503, "CENTRAL_INDISPONIVEL", "unavailable");
+      }
+      return PROTOCOL;
+    }
+
+    /** Makes the stub refuse the submission, like an unavailable Central. */
+    void refuse() {
+      this.refusing = true;
+    }
+
+    /** Makes the stub accept the submission again. */
+    void accept() {
+      this.refusing = false;
     }
   }
 }
