@@ -19,9 +19,20 @@ class RejectionReasonTest {
   }
 
   @Test
+  void exposesTheCodeOfTheReasonTheDomainDoesNotMap() {
+    assertThat(new RejectionReason.Unmapped().code()).isEqualTo("UNMAPPED_REJECTION");
+  }
+
+  @Test
   void resolvesAReasonFromItsCode() {
     assertThat(RejectionReason.fromCode("MARGIN_INSUFFICIENT"))
         .isInstanceOf(RejectionReason.MarginInsufficient.class);
+  }
+
+  @Test
+  void resolvesTheUnmappedReasonFromItsCode() {
+    assertThat(RejectionReason.fromCode("UNMAPPED_REJECTION"))
+        .isInstanceOf(RejectionReason.Unmapped.class);
   }
 
   @Test

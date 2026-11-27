@@ -160,6 +160,60 @@ class PollOperationTest {
   }
 
   @Test
+  void leavesTheOperationResumableWhenTheCentralDoesNotKnowTheProtocol() {
+    operations.save(pending());
+    status.answerWith(
+        new CentralStatus.NotFound(
+            PROTOCOL, "{\"codigo\":\"OPERACAO_NAO_ENCONTRADA\",\"mensagem\":\"Operação não encontrada.\"}"));
+
+    useCase.pollBatch();
+
+    assertThat(stored().status()).isEqualTo(OperationStatus.INTEGRATION_ERROR);
+    assertThat(stored().retryCount()).isEqualTo(1);
+    assertThat(stored().nextPollAt()).isEqualTo(NOW.plusSeconds(2));
+    List<OperationEvent> trail = events.findByOperationId(pending().id());
+    assertThat(trail.get(0).eventType()).isEqualTo(EventType.INTEGRATION_FAILED);
+    assertThat(trail.get(0).details()).contains(PROTOCOL);
+    assertThat(trail.get(0).rawPayload()).contains("OPERACAO_NAO_ENCONTRADA");
+  }
+
+  @Test
+  void keepsTheOperationInIntegrationErrorWhenTheFailureHappensAgain() {
+    operations.save(pending().registerIntegrationFailure(NOW.minusSeconds(1)));
+    status.fail();
+
+    useCase.pollBatch();
+
+    // The self-transition declared in ARCHITECTURE.md §7: the status does not change, the
+    // count of the failures grows and the backoff is renewed.
+    assertThat(stored().status()).isEqualTo(OperationStatus.INTEGRATION_ERROR);
+    assertThat(stored().retryCount()).isEqualTo(2);
+    assertThat(stored().nextPollAt()).isEqualTo(NOW.plusSeconds(4));
+    List<OperationEvent> trail = events.findByOperationId(pending().id());
+    assertThat(trail.get(0).eventType()).isEqualTo(EventType.INTEGRATION_FAILED);
+    assertThat(trail.get(0).previousStatus()).isEqualTo(OperationStatus.INTEGRATION_ERROR);
+    assertThat(trail.get(0).newStatus()).isEqualTo(OperationStatus.INTEGRATION_ERROR);
+  }
+
+  @Test
+  void closesTheOperationWhenTheCentralRejectsWithAReasonTheDomainDoesNotMap() {
+    operations.save(pending());
+    status.answerWith(
+        new CentralStatus.Rejected(
+            new RejectionReason.Unmapped(),
+            "{\"status\":\"REJEITADA\",\"motivoRejeicao\":\"LIMITE_DE_PARCELAS\"}"));
+
+    useCase.pollBatch();
+
+    assertThat(stored().status()).isEqualTo(OperationStatus.REJECTED);
+    assertThat(stored().rejectionReason()).isEqualTo(new RejectionReason.Unmapped());
+    List<OperationEvent> trail = events.findByOperationId(pending().id());
+    assertThat(trail.get(0).eventType()).isEqualTo(EventType.OPERATION_REJECTED);
+    assertThat(trail.get(0).details()).contains("UNMAPPED_REJECTION");
+    assertThat(trail.get(0).rawPayload()).contains("LIMITE_DE_PARCELAS");
+  }
+
+  @Test
   void doublesTheWaitBetweenTwoFailuresAndCapsItAtTheCeiling() {
     operations.save(pending());
     status.fail();

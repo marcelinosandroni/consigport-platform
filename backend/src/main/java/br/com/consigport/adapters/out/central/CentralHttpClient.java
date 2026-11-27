@@ -196,11 +196,15 @@ public final class CentralHttpClient
   /**
    * Reads the situation of the operation in the Central.
    *
-   * <p>The answer of the Central has three shapes: {@code 204} with {@code Retry-After}
-   * while the operation is still processed, {@code 200 CONFIRMADA} when it ends well and
-   * {@code 200 REJEITADA} when it ends with a reason. The {@code 404} of the contract
-   * ({@code OPERACAO_NAO_ENCONTRADA}) is a failure of the integration: the operation
-   * stays resumable and the worker tries again with the backoff.
+   * <p>The answer of the Central has four shapes: {@code 204} with {@code Retry-After}
+   * while the operation is still processed, {@code 200 CONFIRMADA} when it ends well,
+   * {@code 200 REJEITADA} when it ends with a reason and {@code 404} when it does not
+   * know the protocol.
+   *
+   * <p>The {@code 404} of the contract ({@code OPERACAO_NAO_ENCONTRADA}) is not an
+   * unavailability of the Central: the Central answered, so it is available and the
+   * circuit records the call as successful. The protocol may exist again, so the answer
+   * is returned to the application, which keeps the operation resumable.
    *
    * @param protocol the protocol of the operation
    * @return the situation of the operation
@@ -232,8 +236,9 @@ public final class CentralHttpClient
       } catch (RestClientResponseException exception) {
         int status = exception.getStatusCode().value();
         if (status == 404) {
-          failure = "the Central does not know the protocol " + protocol;
-          break;
+          // The Central answered: it is available. It simply does not know the protocol.
+          circuit.recordSuccess();
+          return new CentralStatus.NotFound(protocol, exception.getResponseBodyAsString());
         }
         if (!isRetryable(status)) {
           failure = "the Central refused the status of the operation with " + status;

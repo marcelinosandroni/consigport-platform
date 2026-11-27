@@ -155,6 +155,7 @@ Nenhum DTO externo atravessa a ACL. Nenhum tipo de domínio é serializado para 
 | `CONFIRMADA` | `CONFIRMED` |
 | `REJEITADA` | `REJECTED` |
 | `MARGEM_CONSIGNADA_INSUFICIENTE` | `MARGIN_INSUFFICIENT` |
+| qualquer outro motivo de rejeição | `UNMAPPED_REJECTION` |
 | `autorizacaoId` | `authorizationId` |
 
 ---
@@ -368,9 +369,15 @@ Migrations em `backend/src/main/resources/db/migration/V1__create_schema.sql`.
 | `INTEGRATION_ERROR` | reenvio `202` | `PENDING` | `OPERATION_SUBMITTED` | mesma `Idempotency-Key` |
 | `INTEGRATION_ERROR` | poll `204` | `PENDING` | `POLL_ATTEMPT` | retoma polling |
 | `INTEGRATION_ERROR` | poll terminal | `CONFIRMED`/`REJECTED` | evento correspondente | — |
+| `INTEGRATION_ERROR` | falha no poll ou no reenvio | `INTEGRATION_ERROR` | `INTEGRATION_FAILED` | `retry_count` + backoff |
 | `CONFIRMED` | conta atualizada | `COMPLETED` | `ACCOUNT_UPDATED`, `OPERATION_COMPLETED` | `account_updated_at` |
 
 `COMPLETED` e `REJECTED` são terminais. Nenhuma transição fora da tabela é aceita.
+
+A auto-transição `INTEGRATION_ERROR` → `INTEGRATION_ERROR` é declarada: o status não
+muda, o `retry_count` cresce e o backoff é renovado (fluxo do worker, §11). A trilha
+imutável registra a auto-transição com `previous_status` e `new_status` iguais a
+`INTEGRATION_ERROR`, como toda outra transição.
 
 ---
 
@@ -599,7 +606,10 @@ Fluxo do worker:
 3. Se há `protocol`, consulta o status.
 4. `204` → `POLL_ATTEMPT`, próximo poll.
 5. Terminal → atualiza status e, em `CONFIRMED`, a conta na mesma transação.
-6. Falha → `INTEGRATION_FAILED`, incrementa `retry_count`, agenda backoff.
+6. `404` → a Central não conhece o protocolo: `INTEGRATION_FAILED` com o corpo bruto
+   da Central na trilha. A Central respondeu, então não conta como indisponibilidade no
+   circuito; a operação continua retomável.
+7. Falha → `INTEGRATION_FAILED`, incrementa `retry_count`, agenda backoff.
 
 ---
 

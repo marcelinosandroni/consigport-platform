@@ -5,11 +5,11 @@ import java.time.Duration;
 /**
  * Situation of a portability operation in the Central, as the domain understands it.
  *
- * <p>The Central answers the status of an operation with three shapes: {@code 204} while
- * the processing continues, {@code 200 CONFIRMADA} when it ends well and {@code 200
- * REJEITADA} when it ends with a reason. The anti-corruption layer translates the
- * Portuguese contract into this sealed hierarchy, so the application never reads a
- * status of the Central.
+ * <p>The Central answers the status of an operation with four shapes: {@code 204} while
+ * the processing continues, {@code 200 CONFIRMADA} when it ends well, {@code 200
+ * REJEITADA} when it ends with a reason and {@code 404} when it does not know the
+ * protocol. The anti-corruption layer translates the Portuguese contract into this
+ * sealed hierarchy, so the application never reads a status of the Central.
  *
  * <p>Every answer carries the raw body of the Central, when there is one, so the trail of
  * the audit proves what the Central answered (ADR {@code 0003}). The body is opaque text:
@@ -63,6 +63,31 @@ public sealed interface CentralStatus {
     public Rejected {
       if (reason == null) {
         throw new IllegalArgumentException("reason must not be null");
+      }
+    }
+  }
+
+  /**
+   * The Central does not know the protocol of the operation.
+   *
+   * <p>The Central answered normally, so it is available: it simply does not know the
+   * protocol. The operation stays resumable and the worker tries again with the backoff,
+   * because the protocol may exist again (the Central may have lost it and recovered it).
+   *
+   * @param protocol the protocol the Central does not know
+   * @param rawPayload the raw body of the answer of the Central
+   */
+  record NotFound(String protocol, String rawPayload) implements CentralStatus {
+
+    /**
+     * Validates the answer.
+     *
+     * @param protocol the protocol the Central does not know
+     * @param rawPayload the raw body of the answer of the Central
+     */
+    public NotFound {
+      if (protocol == null || protocol.isBlank()) {
+        throw new IllegalArgumentException("protocol must not be blank");
       }
     }
   }

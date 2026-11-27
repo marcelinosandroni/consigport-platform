@@ -28,7 +28,15 @@ falhas de integração.
 4. Sem protocolo (falha antes do `202`), o worker reenvia com a mesma `Idempotency-Key`
    em vez de criar outra operação.
 5. Falha persistente → `INTEGRATION_ERROR` com backoff exponencial até 60 s. O estado é
-   retomável, nunca terminal.
+   retomável, nunca terminal. A falha que acontece com a operação já em
+   `INTEGRATION_ERROR` é a auto-transição declarada na §7: o status não muda, o
+   `retry_count` cresce e o backoff é renovado.
+6. O `404` da Central (`OPERACAO_NAO_ENCONTRADA`) é uma resposta tipada, não uma
+   indisponibilidade: a Central respondeu, então não conta como falha no circuito e a
+   operação continua retomável, com o corpo bruto da Central na trilha.
+7. Uma rejeição com um motivo que o contrato da Central não declara fecha a operação
+   como `REJECTED`, com o código `UNMAPPED_REJECTION`: a decisão da Central é terminal
+   e o motivo original fica no `rawPayload` do evento.
 
 ### Resiliência
 
@@ -81,6 +89,12 @@ falhas de integração.
 ## Como é verificado
 
 - Testes com relógio controlado cobrindo `204`, confirmação, rejeição, falha e retomada.
+- Teste da auto-transição `INTEGRATION_ERROR` → `INTEGRATION_ERROR` na matriz da máquina
+  de estados e no worker.
+- Teste do `404` da Central: resposta tipada, fora do circuito e com o corpo bruto na
+  trilha.
+- Teste da rejeição com motivo não declarado no contrato: operação fechada como
+  `REJECTED` com o código `UNMAPPED_REJECTION`.
 - Teste de rollback entre a confirmação e a atualização de conta.
 - Teste que tenta `UPDATE` e `DELETE` em `operation_events` e espera exceção.
 - Teste de ordem cronológica da timeline.

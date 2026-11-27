@@ -71,7 +71,7 @@
 
 > Objetivo: core DDD/hexagonal na porta `8080`, com PostgreSQL, Flyway, ACL, i18n,
 > polling resiliente e Swagger.
-> Task em voo: **2.12 — Confirmação e atualização de conta**.
+> Task em voo: **2.13 — Confirmação e atualização de conta**.
 
 ### Tasks
 
@@ -113,9 +113,26 @@
       `PollOperation` acompanha a Central até o estado terminal; intervalo de 2 s e lote
       de 20; honora o `Retry-After`; `204` gera `POLL_ATTEMPT`; o reenvio usa a mesma
       `Idempotency-Key`.
-- [-] **2.12 — Confirmação e atualização de conta**
+- [x] **2.12 — Auto-transição de integração e respostas tipadas da Central**
+      Auto-transição `INTEGRATION_ERROR` → `INTEGRATION_ERROR` declarada na §7, com
+      caminho único de falha; `404` da Central vira resposta tipada, fora do circuito e
+      com o corpo bruto na trilha; rejeição com motivo fora do contrato fecha a
+      operação como `REJECTED` com o código `UNMAPPED_REJECTION`.
+- [-] **2.13 — Confirmação e atualização de conta**
       `CONFIRMADA` → `CONFIRMED` → `COMPLETED` com `account_updated_at`; `REJEITADA` →
       `REJECTED` com o motivo; os dois eventos gravados na mesma transação.
+- [ ] **2.14 — Consulta de operações e trilha**
+      Leitura paginada com filtro por status; eventos em ordem cronológica;
+      `404 OPERATION_NOT_FOUND`.
+- [ ] **2.15 — Recursos REST e tratamento de erros**
+      Rotas do `ARCHITECTURE.md` §8 e erro com `code`, `message`, `locale`,
+      `timestamp`, `path` e `details`.
+- [ ] **2.16 — i18n, Swagger e snapshot OpenAPI**
+      `Accept-Language` com fallback `pt-BR`; `code` nunca traduzido; contrato gerado
+      equivalente a `contracts/consigport-api.yaml`.
+- [ ] **2.17 — Fechamento do backend**
+      Cobertura ≥ 80% no domínio e na aplicação; fluxos `CREATED` → `COMPLETED` e
+      `REJECTED` comprovados com o banco real.
 
 ### Como usar este arquivo
 

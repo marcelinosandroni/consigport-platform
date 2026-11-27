@@ -81,7 +81,7 @@ class PortabilityOperationTest {
         Arguments.of(
             OperationStatus.INTEGRATION_ERROR, Trigger.REJECT, true, OperationStatus.REJECTED),
         Arguments.of(
-            OperationStatus.INTEGRATION_ERROR, Trigger.INTEGRATION_FAILURE, false, null),
+            OperationStatus.INTEGRATION_ERROR, Trigger.INTEGRATION_FAILURE, true, OperationStatus.INTEGRATION_ERROR),
         Arguments.of(OperationStatus.INTEGRATION_ERROR, Trigger.COMPLETE, false, null),
         Arguments.of(OperationStatus.CONFIRMED, Trigger.SUBMIT, false, null),
         Arguments.of(OperationStatus.CONFIRMED, Trigger.POLL_ATTEMPT, false, null),
@@ -167,7 +167,7 @@ class PortabilityOperationTest {
     PortabilityOperation failed =
         newOperation().submit(PROTOCOL).registerIntegrationFailure(LATER);
 
-    PortabilityOperation renewed = failed.renewIntegrationBackoff(LATER.plusSeconds(60));
+    PortabilityOperation renewed = failed.registerIntegrationFailure(LATER.plusSeconds(60));
 
     assertThat(renewed.status()).isEqualTo(OperationStatus.INTEGRATION_ERROR);
     assertThat(renewed.retryCount()).isEqualTo(2);
@@ -176,10 +176,11 @@ class PortabilityOperationTest {
   }
 
   @Test
-  void refusesToRenewTheBackoffOfAnOperationThatDidNotFail() {
-    PortabilityOperation pending = newOperation().submit(PROTOCOL);
+  void refusesToRegisterTheFailureOfATerminalOperation() {
+    PortabilityOperation rejected =
+        newOperation().submit(PROTOCOL).reject(new RejectionReason.MarginInsufficient());
 
-    assertThatThrownBy(() -> pending.renewIntegrationBackoff(LATER))
+    assertThatThrownBy(() -> rejected.registerIntegrationFailure(LATER))
         .isInstanceOf(PortabilityOperation.InvalidTransitionException.class);
   }
 

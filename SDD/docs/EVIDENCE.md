@@ -2751,3 +2751,229 @@
 - `backend/src/test/java/br/com/consigport/support/MutableClock.java`
 - `backend/src/test/java/br/com/consigport/support/PostgreSqlTestSupport.java`
 - `backend/src/test/java/br/com/consigport/application/portability/StartOperationTest.java`
+
+### Task 2.12 — Auto-transição de integração e respostas tipadas da Central
+
+- **Data de Conclusão:** 2026-11-27
+- **Branch:** `feat/032-backend-typed-central-answers`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** alinhar a máquina de estados, a trilha e o fluxo do worker, e distinguir as
+  respostas da Central que antes caíam no mesmo balde de falha: o `404` da Central e a
+  rejeição com um motivo que o contrato não declara.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Máquina de estados, razão selada, worker, cliente HTTP e ACL (unitário):**
+   ```text
+   ./mvnw -B -pl backend test -Dtest='PortabilityOperationTest,RejectionReasonTest,PollOperationTest,CentralHttpClientTest,PortabilityAclTest'
+   → Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.022 s -- in
+     br.com.consigport.domain.portability.PortabilityOperationTest$OperationIdTest
+   → Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.166 s -- in
+     br.com.consigport.domain.portability.PortabilityOperationTest$Creation
+   → Tests run: 45, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.713 s -- in
+     br.com.consigport.domain.portability.PortabilityOperationTest
+   → Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.021 s -- in
+     br.com.consigport.domain.portability.RejectionReasonTest
+   → Tests run: 16, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.218 s -- in
+     br.com.consigport.application.portability.PollOperationTest
+   → Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.478 s -- in
+     br.com.consigport.adapters.out.central.acl.PortabilityAclTest
+   → Tests run: 19, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.752 s -- in
+     br.com.consigport.adapters.out.central.CentralHttpClientTest
+   → Tests run: 104, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   → EXIT=0
+   ```
+2. **Reator completo (backend + mock da Central):**
+   ```text
+   ./mvnw -B verify
+   → Tests run: 289, Failures: 0, Errors: 0, Skipped: 0   (backend)
+   → Tests run: 39, Failures: 0, Errors: 0, Skipped: 0    (central-convenios-mock)
+   → ConsigPort Platform ................................ SUCCESS [  0.007 s]
+   → ConsigPort Backend ................................. SUCCESS [ 54.543 s]
+   → Central de Convênios Mock .......................... SUCCESS [ 23.195 s]
+   → BUILD SUCCESS
+   → EXIT=0
+   ```
+3. **Prova de vida da auto-transição (a máquina de estados sem a linha da §7):**
+   ```text
+   → matriz de transições sem a linha INTEGRATION_ERROR → INTEGRATION_ERROR
+   → ./mvnw -q -B -pl backend test -Dtest='PortabilityOperationTest'
+   → [ERROR] Tests run: 45, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.851 s <<< FAILURE! -- in br.com.consigport.domain.portability.PortabilityOperationTest
+   → [ERROR] br.com.consigport.domain.portability.PortabilityOperationTest.followsOnlyTheTransitionsOfTheStateMachine(OperationStatus, Trigger, boolean, OperationStatus)[17] -- Time elapsed: 0.027 s <<< FAILURE!
+   → [ERROR]   PortabilityOperationTest.followsOnlyTheTransitionsOfTheStateMachine:117
+   → [ERROR] Expecting code to raise a throwable.
+   → EXIT=1
+   → linha da §7 restaurada
+   → ./mvnw -q -B -pl backend test -Dtest='PortabilityOperationTest'
+   → EXIT=0
+   ```
+4. **End-to-end com o backend real contra o mock real da Central** (PostgreSQL 16 do
+   compose, backend em `:8080`, mock em `:8081`; o mock confirma em 8 s). O reset
+   administrativo (`POST /_admin/reset → 204`) faz a Central **esquecer** as operações
+   sem sair do ar: é assim que o `404` do contrato é provado sem indisponibilidade:
+   ```text
+   === 5. sete operacoes aceitas pela Central (protocolos que ela vai esquecer) ===
+   POST /api/v1/portability-operations -> {"operationId":"23bac40b-595b-444b-94c1-8fc954579581","protocol":"PRT-20261127-0002","status":"PENDING","totalAmount":450.00,"createdAt":"2026-11-27T10:03:57.884945Z"} | 202 0.591029
+   POST /api/v1/portability-operations -> {"operationId":"ad3e20ce-3957-44df-987a-2af4161f683c","protocol":"PRT-20261127-0003","status":"PENDING","totalAmount":450.00,"createdAt":"2026-11-27T10:03:58.492699Z"} | 202 0.056787
+   POST /api/v1/portability-operations -> {"operationId":"e670216d-a005-47f4-aa0a-0ee73e728d34","protocol":"PRT-20261127-0004","status":"PENDING","totalAmount":450.00,"createdAt":"2026-11-27T10:03:58.605586Z"} | 202 0.061435
+   POST /api/v1/portability-operations -> {"operationId":"0ee95f69-c7c4-42b6-92c2-d0322a5b2306","protocol":"PRT-20261127-0005","status":"PENDING","totalAmount":450.00,"createdAt":"2026-11-27T10:03:58.736799Z"} | 202 0.052582
+   POST /api/v1/portability-operations -> {"operationId":"6542a498-43de-4e78-bce5-12b181e3c823","protocol":"PRT-20261127-0006","status":"PENDING","totalAmount":450.00,"createdAt":"2026-11-27T10:03:58.861720Z"} | 202 0.068968
+   POST /api/v1/portability-operations -> {"operationId":"1fd9d022-231e-4a78-9a52-1373e836dc03","protocol":"PRT-20261127-0007","status":"PENDING","totalAmount":450.00,"createdAt":"2026-11-27T10:03:58.985701Z"} | 202 0.040046
+   POST /api/v1/portability-operations -> {"operationId":"444292be-e918-4110-b6f2-a7a4a9554645","protocol":"PRT-20261127-0008","status":"PENDING","totalAmount":450.00,"createdAt":"2026-11-27T10:03:59.098880Z"} | 202 0.048561
+
+   === 6. o reset administrativo: a Central esquece as operacoes, mas continua no ar ===
+   POST /_admin/reset -> 204
+
+   === 7. o worker recebe 404: a resposta tipada mantem a operacao retomavel ===
+   as 7 operacoes registraram o 404 da Central apos 2 ciclos de 2 s
+                     id                  |      status       |     protocol      | rejection_reason | retry_count |         next_poll_at
+   --------------------------------------+-------------------+-------------------+------------------+-------------+-------------------------------
+    23bac40b-595b-444b-94c1-8fc954579581 | INTEGRATION_ERROR | PRT-20261127-0002 |                  |           1 | 2026-11-27 10:04:04.751961+00
+    ad3e20ce-3957-44df-987a-2af4161f683c | INTEGRATION_ERROR | PRT-20261127-0003 |                  |           2 | 2026-11-27 10:04:06.770605+00
+
+   --- os eventos: o 404 virou INTEGRATION_FAILED com o corpo bruto da Central ---
+    id  |     event_type     |  previous_status  |    new_status     |                                                                           raw_payload
+   -----+--------------------+-------------------+-------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    156 | INTEGRATION_FAILED | PENDING           | INTEGRATION_ERROR | "{\"codigo\":\"OPERACAO_NAO_ENCONTRADA\",\"mensagem\":\"Operação não encontrada para o protocolo informado.\",\"timestamp\":\"2026-11-27T10:04:00.505272785Z\"}"
+    157 | INTEGRATION_FAILED | PENDING           | INTEGRATION_ERROR | "{\"codigo\":\"OPERACAO_NAO_ENCONTRADA\",\"mensagem\":\"Operação não encontrada para o protocolo informado.\",\"timestamp\":\"2026-11-27T10:04:00.562912808Z\"}"
+    158 | INTEGRATION_FAILED | PENDING           | INTEGRATION_ERROR | "{\"codigo\":\"OPERACAO_NAO_ENCONTRADA\",\"mensagem\":\"Operação não encontrada para o protocolo informado.\",\"timestamp\":\"2026-11-27T10:04:00.617225668Z\"}"
+    159 | INTEGRATION_FAILED | PENDING           | INTEGRATION_ERROR | "{\"codigo\":\"OPERACAO_NAO_ENCONTRADA\",\"mensagem\":\"Operação não encontrada para o protocolo informado.\",\"timestamp\":\"2026-11-27T10:04:00.645248785Z\"}"
+    160 | INTEGRATION_FAILED | PENDING           | INTEGRATION_ERROR | "{\"codigo\":\"OPERACAO_NAO_ENCONTRADA\",\"mensagem\":\"Operação não encontrada para o protocolo informado.\",\"timestamp\":\"2026-11-27T10:04:00.684236838Z\"}"
+    161 | INTEGRATION_FAILED | PENDING           | INTEGRATION_ERROR | "{\"codigo\":\"OPERACAO_NAO_ENCONTRADA\",\"mensagem\":\"Operação não encontrada para o protocolo informado.\",\"timestamp\":\"2026-11-27T10:04:00.710929061Z\"}"
+    162 | INTEGRATION_FAILED | PENDING           | INTEGRATION_ERROR | "{\"codigo\":\"OPERACAO_NAO_ENCONTRADA\",\"mensagem\":\"Operação não encontrada para o protocolo informado.\",\"timestamp\":\"2026-11-27T10:04:02.750061046Z\"}"
+
+   === 8. a segunda falha e a auto-transicao (previous_status = new_status = INTEGRATION_ERROR) ===
+   as 7 operacoes registraram a segunda falha apos 1 ciclos de 2 s
+    162 | INTEGRATION_FAILED  | INTEGRATION_ERROR | INTEGRATION_ERROR | 2026-11-27 10:04:02.751961+00 | the Central does not know the protocol PRT-20261127-0002
+    163 | INTEGRATION_FAILED  | INTEGRATION_ERROR | INTEGRATION_ERROR | 2026-11-27 10:04:02.770605+00 | the Central does not know the protocol PRT-20261127-0003
+    164 | INTEGRATION_FAILED  | INTEGRATION_ERROR | INTEGRATION_ERROR | 2026-11-27 10:04:02.787956+00 | the Central does not know the protocol PRT-20261127-0004
+    165 | INTEGRATION_FAILED  | INTEGRATION_ERROR | INTEGRATION_ERROR | 2026-11-27 10:04:02.814885+00 | the Central does not know the protocol PRT-20261127-0005
+    166 | INTEGRATION_FAILED  | INTEGRATION_ERROR | INTEGRATION_ERROR | 2026-11-27 10:04:02.838666+00 | the Central does not know the protocol PRT-20261127-0006
+    167 | INTEGRATION_FAILED  | INTEGRATION_ERROR | INTEGRATION_ERROR | 2026-11-27 10:04:02.855522+00 | the Central does not know the protocol PRT-20261127-0007
+    168 | INTEGRATION_FAILED  | INTEGRATION_ERROR | INTEGRATION_ERROR | 2026-11-27 10:04:02.88488+00  | the Central does not know the protocol PRT-20261127-0008
+
+   --- o intervalo entre as falhas: o backoff dobrou (2 s, 4 s, 8 s) ---
+   INTEGRATION_FAILED|INTEGRATION_ERROR|INTEGRATION_ERROR|2026-11-27 10:04:02.770605+00|00:00:02.244012
+   INTEGRATION_FAILED|INTEGRATION_ERROR|INTEGRATION_ERROR|2026-11-27 10:04:04.937696+00|00:00:02.185735
+   INTEGRATION_FAILED|INTEGRATION_ERROR|INTEGRATION_ERROR|2026-11-27 10:04:06.978625+00|00:00:04.208020
+   INTEGRATION_FAILED|INTEGRATION_ERROR|INTEGRATION_ERROR|2026-11-27 10:04:06.999302+00|00:00:04.211346
+
+   === 9. o circuito nao foi poluido pelo 404: uma nova operacao e aceita e confirmada ===
+   POST /autorizacoes BEN-001 -> {"autorizacaoId":"AUT-20261127-0001"} | 201
+   POST /api/v1/portability-operations -> {"operationId":"99202f4b-e46f-4168-b560-605d1686bc1d","protocol":"PRT-20261127-0001","status":"PENDING","totalAmount":450.00,"createdAt":"2026-11-27T10:12:05.287875Z"} | 202 0.060706
+   a nova operacao foi confirmada pela Central (o circuito continuou fechado) apos 5 ciclos de 2 s
+    99202f4b-e46f-4168-b560-605d1686bc1d | CONFIRMED         | PRT-20261127-0001 |                  |           0 | 2026-11-27 10:12:15.316945+00
+
+   === 10. prova de vida: rejeicao com motivo fora do contrato vira REJECTED terminal ===
+   --- patch temporario no mock: MARGEM_CONSIGNADA_INSUFICIENTE vira LIMITE_DE_PARCELAS ---
+   34:  private static final String MOTIVO_MARGEM = "LIMITE_DE_PARCELAS";
+   POST /autorizacoes BEN-REJ -> {"autorizacaoId":"AUT-20261127-0001"} | 201
+   POST /api/v1/portability-operations -> {"operationId":"be0f7632-2b77-4ae9-a024-ef66bb43aa98","protocol":"PRT-20261127-0001","status":"PENDING","totalAmount":250.00,"createdAt":"2026-11-27T10:12:40.204855Z"} | 202 1.066940
+   a operacao foi encerrada como REJECTED apos 5 ciclos de 2 s
+                     id                  |  status  |  rejection_reason
+   --------------------------------------+----------+--------------------
+    be0f7632-2b77-4ae9-a024-ef66bb43aa98 | REJECTED | UNMAPPED_REJECTION
+
+   --- o evento da rejeicao: o motivo original da Central no corpo bruto ---
+    id  |     event_type     | previous_status | new_status |          created_at           |                        details                         |                              raw_payload
+   -----+--------------------+-----------------+------------+-------------------------------+--------------------------------------------------------+------------------------------------------------------------------------
+    254 | OPERATION_REJECTED | PENDING         | REJECTED   | 2026-11-27 10:12:50.138168+00 | The Central rejected the operation: UNMAPPED_REJECTION | "{\"status\":\"REJEITADA\",\"motivoRejeicao\":\"LIMITE_DE_PARCELAS\"}"
+
+   --- o codigo publico e UNMAPPED_REJECTION ---
+   UNMAPPED_REJECTION
+
+   === 11. o patch do mock e revertido e o jar recompilado ===
+   34:  private static final String MOTIVO_MARGEM = "MARGEM_CONSIGNADA_INSUFICIENTE";
+
+   === 12. encerramento dos processos e dos containers ===
+   containers restantes: 0
+   processos restantes: 0
+   === fim ===
+   ```
+5. **Gates locais:**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → OK (65 documentos, todo link relativo resolve, exit 0)
+   node scripts/check-specs.mjs                → OK (exatamente 1 task em voo, tasks catalogadas, exit 0)
+   node scripts/check-architecture.mjs         → OK (22 testes de validação dos desenhos, exit 0)
+   node scripts/check-theme-tokens.mjs         → OK (exit 0)
+   node scripts/check-ai-log.mjs               → OK (38 sessões, estrutura válida, exit 0)
+   ```
+
+#### Conteúdo Entregue:
+- `domain/portability/PortabilityOperation.registerIntegrationFailure` — a falha da
+  integração vem de `CREATED`, de `PENDING` **e de `INTEGRATION_ERROR`**: a auto-transição
+  `INTEGRATION_ERROR` → `INTEGRATION_ERROR` da §7, com o evento `INTEGRATION_FAILED`.
+  `renewIntegrationBackoff` deixou de existir: o caminho de falha é único no domínio e no
+  worker.
+- `domain/portability/CentralStatus.NotFound` — a Central não conhece o protocolo: uma
+  resposta tipada, com o corpo bruto, em vez de uma falha genérica de disponibilidade.
+- `domain/portability/RejectionReason.Unmapped` — o motivo que o contrato da Central não
+  declara, com o código público estável `UNMAPPED_REJECTION`.
+- `adapters/out/central/acl/PortabilityAcl.toRejectionReason` — traduz o motivo
+  desconhecido para `Unmapped`; a rejeição sem motivo continua violando o contrato.
+- `adapters/out/central/CentralHttpClient.statusOf` — o `404` vira `NotFound` e conta como
+  **chamada bem-sucedida** no circuito: a Central respondeu, ela está disponível.
+- `application/portability/PollOperation` — trata o `NotFound` como falha retomável, grava
+  o corpo bruto da Central no evento e usa `registerIntegrationFailure` em todos os
+  caminhos de falha.
+- `SDD/ARCHITECTURE.md` §7 — a linha da auto-transição; §3 — a tradução do motivo
+  desconhecido; §11 — o passo do `404` no fluxo do worker.
+- `docs/adr/0003-assincronismo-polling-e-trilha-imutavel.md` — o protocolo de polling
+  com a auto-transição, o `404` e a rejeição não mapeada.
+- Testes: 45 do agregado, 16 do worker, 19 do cliente HTTP, 8 da ACL e 6 da razão selada.
+
+#### Descobertas e Decisões:
+- A tabela de estados da §7 **já usava** auto-transição (`PENDING` → `PENDING` no poll
+  `204`), o que prova que a linha ausente para `INTEGRATION_ERROR` era omissão da tabela,
+  e não decisão de design. Com a linha declarada, a tabela, o fluxo do worker (§11, passo
+  6), a trilha imutável e o teste parametrizado passam a dizer a mesma coisa.
+- A trilha imutável registrava `(INTEGRATION_ERROR → INTEGRATION_ERROR)` com o método
+  `renewIntegrationBackoff`, que dizia ser uma "renovação", não uma transição: o banco
+  contradizia a máquina de estados. Agora `previous_status` e `new_status` iguais são uma
+  transição declarada.
+- O `404` da Central é uma **resposta**, não uma indisponibilidade: ele nascia como
+  `CentralUnavailable` e contava como falha no circuito, o que podia bloquear operações
+  saudáveis de outras operações. Agora é `CentralStatus.NotFound`, conta como sucesso no
+  circuito e a operação continua retomável, com o corpo bruto (`OPERACAO_NAO_ENCONTRADA`)
+  na trilha.
+- Uma rejeição com motivo fora do contrato é **decisão de negócio** da Central: tratá-la
+  como falha de integração mantinha a operação em polling eterno e, se a Central mudasse a
+  resposta depois, a operação terminaria `CONFIRMED` e apagaria a rejeição. Agora ela fecha
+  como `REJECTED` com o código `UNMAPPED_REJECTION`, e o motivo original da Central fica
+  no `rawPayload` do evento. O contrato público não mudou: `rejectionReason` é texto
+  livre em `contracts/consigport-api.yaml`.
+- O end-to-end encontrou um defeito **pré-existente**, fora do escopo desta task: a
+  sequência de protocolos da Central mock reinicia a cada `POST /_admin/reset` e a cada
+  reinício do processo, e o esquema da §6 garante `protocol` único — quando a Central
+  reemite um protocolo já guardado, a violação da restrição chega como
+  `DataIntegrityViolationException` e a API responde `500` em vez de um erro mapeado. A
+  dívida foi registrada no `BACKLOG.md` com a evidência.
+- O `ARCHITECTURE.md` §11 e o ADR-0003 dizem "Falhas até `INTEGRATION_ERROR`: 5", mas a
+  implementação entra em `INTEGRATION_ERROR` assim que o cliente HTTP esgota as 3
+  tentativas. A divergência também foi registrada no `BACKLOG.md`: implementar o limiar de
+  5 ou corrigir a regra.
+- O `404` continua sem teto de tentativas: a operação que a Central não conhece é
+  consultada a cada 60 s, para sempre. Registrado como dívida no `BACKLOG.md`.
+
+#### Arquivos Tocados:
+- `backend/src/main/java/br/com/consigport/domain/portability/PortabilityOperation.java`
+- `backend/src/main/java/br/com/consigport/domain/portability/RejectionReason.java`
+- `backend/src/main/java/br/com/consigport/domain/portability/CentralStatus.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/central/acl/PortabilityAcl.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/central/CentralHttpClient.java`
+- `backend/src/main/java/br/com/consigport/application/portability/PollOperation.java`
+- `backend/src/test/java/br/com/consigport/domain/portability/PortabilityOperationTest.java`
+- `backend/src/test/java/br/com/consigport/domain/portability/RejectionReasonTest.java`
+- `backend/src/test/java/br/com/consigport/application/portability/PollOperationTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/out/central/CentralHttpClientTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/out/central/acl/PortabilityAclTest.java`
+- `SDD/ARCHITECTURE.md`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/adr/0003-assincronismo-polling-e-trilha-imutavel.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`

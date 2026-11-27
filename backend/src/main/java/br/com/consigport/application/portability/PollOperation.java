@@ -29,7 +29,8 @@ import java.util.List;
  * {@code 204} records a {@code POLL_ATTEMPT} and schedules the next poll with the
  * {@code Retry-After} of the Central, a terminal answer records the new status, and a
  * failure of the Central records an {@code INTEGRATION_FAILED} and schedules the retry
- * with the backoff.
+ * with the backoff. A {@code 404} of the Central is a failure too: the operation stays
+ * resumable, because the Central may know the protocol again.
  *
  * <p>Every transition is written with its event in one transaction (BR-12): the trail of
  * the audit proves what happened with the operation.
@@ -133,6 +134,15 @@ public final class PollOperation {
               rejectedEvent(
                   rejectedOperation, previousStatus, answeredAt, rejected.reason(), rejected.rawPayload()));
         }
+        case CentralStatus.NotFound notFound -> {
+          // The Central does not know the protocol: the operation stays resumable and the
+          // next attempt happens with the backoff.
+          fail(
+              operation,
+              answeredAt,
+              "the Central does not know the protocol " + notFound.protocol(),
+              notFound.rawPayload());
+        }
       }
     } catch (DomainError.CentralUnavailable failure) {
       fail(operation, clock.instant(), failure.getMessage());
@@ -162,24 +172,35 @@ public final class PollOperation {
   /**
    * Records the failure of the Central and schedules the next attempt.
    *
-   * <p>The operation that was already in {@code INTEGRATION_ERROR} keeps the status: the
-   * state machine of {@code ARCHITECTURE.md} §7 has no transition from {@code
-   * INTEGRATION_ERROR} to {@code INTEGRATION_ERROR}. What grows is the backoff and the
-   * count of the failures.
+   * <p>The operation goes to {@code INTEGRATION_ERROR} and stays there while the Central
+   * keeps failing: the state machine of {@code ARCHITECTURE.md} §7 declares the
+   * self-transition {@code INTEGRATION_ERROR} to {@code INTEGRATION_ERROR}, with the
+   * {@code INTEGRATION_FAILED} event. What grows is the backoff and the count of the
+   * failures.
    *
    * @param operation the operation whose integration failed
    * @param now the instant of the failure
    * @param reason what the Central answered
    */
   private void fail(PortabilityOperation operation, Instant now, String reason) {
+    fail(operation, now, reason, null);
+  }
+
+  /**
+   * Records the failure of the Central, keeping the raw answer of the Central.
+   *
+   * @param operation the operation whose integration failed
+   * @param now the instant of the failure
+   * @param reason what the Central answered
+   * @param rawPayload the raw body of the answer of the Central, {@code null} when there
+   *     was none
+   */
+  private void fail(PortabilityOperation operation, Instant now, String reason, String rawPayload) {
     OperationStatus previousStatus = operation.status();
     int failures = operation.retryCount() + 1;
     Instant nextPoll = now.plus(backoff.delayFor(failures));
-    PortabilityOperation failed =
-        previousStatus == OperationStatus.INTEGRATION_ERROR
-            ? operation.renewIntegrationBackoff(nextPoll)
-            : operation.registerIntegrationFailure(nextPoll);
-    record(failed, integrationFailedEvent(failed, previousStatus, now, reason));
+    PortabilityOperation failed = operation.registerIntegrationFailure(nextPoll);
+    record(failed, integrationFailedEvent(failed, previousStatus, now, reason, rawPayload));
   }
 
   /**
@@ -269,14 +290,15 @@ public final class PollOperation {
       PortabilityOperation operation,
       OperationStatus previousStatus,
       Instant now,
-      String reason) {
+      String reason,
+      String rawPayload) {
     return OperationEvent.record(
         operation.id(),
         previousStatus,
-        OperationStatus.INTEGRATION_ERROR,
+        operation.status(),
         EventType.INTEGRATION_FAILED,
         reason,
-        null,
+        rawPayload,
         now);
   }
 

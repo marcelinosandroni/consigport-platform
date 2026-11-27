@@ -132,7 +132,7 @@
 
 ---
 
-## Fase 2 — Backend core (16 tasks)
+## Fase 2 — Backend core (17 tasks)
 
 ### 2.1 — Esqueleto hexagonal e regras ArchUnit
 - **Objetivo:** criar as camadas e impedir dependências proibidas desde o primeiro commit.
@@ -200,35 +200,46 @@
 - **Aceite:** intervalo 2 s e lote 20; honra `Retry-After`; retry 3× com backoff e circuit breaker; `204` gera `POLL_ATTEMPT`; reenvio usa a mesma `Idempotency-Key`.
 - **Verificação:** testes com relógio controlado cobrindo `204`, sucesso, falha e retomada.
 
-### 2.12 — Confirmação e atualização de conta
+### 2.12 — Auto-transição de integração e respostas tipadas da Central
+- **Objetivo:** alinhar a máquina de estados, a trilha e o fluxo do worker, e distinguir as respostas da Central que hoje caem no mesmo balde de falha.
+- **Arquivos:** `domain/portability/PortabilityOperation.java`, `domain/portability/RejectionReason.java`, `domain/portability/CentralStatus.java`, `adapters/out/central/acl/PortabilityAcl.java`, `adapters/out/central/CentralHttpClient.java`, `application/portability/PollOperation.java`.
+- **Aceite:** auto-transição `INTEGRATION_ERROR` → `INTEGRATION_ERROR` declarada na §7, com caminho único de falha no domínio e no worker; `404` da Central vira resposta tipada, fora do circuito, e mantém a operação retomável com o corpo bruto na trilha; rejeição com motivo fora do contrato fecha a operação como `REJECTED` com o código `UNMAPPED_REJECTION`; contrato público inalterado.
+- **Verificação:** teste parametrizado da máquina de estados com a auto-transição; teste do cliente com `404` e motivo desconhecido; teste do worker com o relógio controlado; E2E com a Central real.
+
+### 2.13 — Confirmação e atualização de conta
 - **Objetivo:** fechar o ciclo em uma única transação.
 - **Arquivos:** `application/portability/CompleteOperation.java`, `PortabilityOperation.java`, testes de integração.
 - **Aceite:** `CONFIRMADA` → `CONFIRMED` → `COMPLETED` com `account_updated_at`; `REJEITADA` → `REJECTED` com motivo; dois eventos gravados na mesma transação.
 - **Verificação:** teste que simula falha entre as etapas e confirma rollback completo.
 
-### 2.13 — Consulta de operações e trilha
+### 2.14 — Consulta de operações e trilha
 - **Objetivo:** expor leitura paginada e timeline.
 - **Arquivos:** `application/portability/FindOperation.java`, `ListOperations.java`, `application/audit/ListOperationEvents.java`.
 - **Aceite:** filtro por status, página e tamanho; eventos em ordem cronológica; `404 OPERATION_NOT_FOUND`.
 - **Verificação:** testes de integração com 25 operações e paginação conferida.
 
-### 2.14 — Recursos REST e tratamento de erros
+### 2.15 — Recursos REST e tratamento de erros
 - **Objetivo:** completar a superfície `/api/v1`.
 - **Arquivos:** `adapters/in/web/AuthorizationResource.java`, `AgendaResource.java`, `OperationEventResource.java`, `ApiExceptionHandler.java`.
 - **Aceite:** rotas do `ARCHITECTURE.md` §8; erro com `code`, `message`, `locale`, `timestamp`, `path`, `details`; códigos EN estáveis.
 - **Verificação:** `@WebMvcTest` por recurso e teste do handler para cada código.
 
-### 2.15 — i18n, Swagger e snapshot OpenAPI
+### 2.16 — i18n, Swagger e snapshot OpenAPI
 - **Objetivo:** documentação viva e mensagens localizadas.
 - **Arquivos:** `backend/src/main/resources/i18n/messages_pt_BR.properties`, `messages_en.properties`, `messages_es.properties`, `config/MessageSourceConfig.java`, `config/OpenApiConfig.java`.
 - **Aceite:** `Accept-Language` com fallback `pt-BR`; `code` nunca traduzido; `/v3/api-docs` gera contrato equivalente a `contracts/consigport-api.yaml`.
 - **Verificação:** teste de negociação para os três locales e comparação do contrato no CI.
 
-### 2.16 — Fechamento do backend
+### 2.17 — Fechamento do backend
 - **Objetivo:** provar domínio, persistência e resiliência juntos.
 - **Arquivos:** testes de integração com Testcontainers, `backend/pom.xml` (JaCoCo).
 - **Aceite:** cobertura de linhas ≥ 80% no domínio e aplicação; fluxo completo `CREATED` → `COMPLETED` e `REJECTED`; ArchUnit verde.
 - **Verificação:** `./mvnw -q -pl backend -am verify` com relatório JaCoCo anexado.
+
+### Dívidas da Fase 2 (polling e resiliência)
+- **Teto de tentativas para `404` da Central:** hoje a operação que a Central não conhece continua em polling a cada 60 s, para sempre (`retry_count` cresce sem limite). Definir um orçamento de tentativas e um destino (alerta operacional ou estado que exija intervenção humana) sem tocar no contrato público.
+- **Alinhar "Falhas até `INTEGRATION_ERROR`":** o `ARCHITECTURE.md` §11 e o ADR-0003 dizem `5`, mas a implementação entra em `INTEGRATION_ERROR` assim que o cliente HTTP esgota as 3 tentativas. Decidir se o limiar de 5 é implementado no worker ou se a regra é corrigida.
+- **Protocolo repetido pela Central:** o esquema da §6 garante `protocol` único e o mock reinicia a sequência de protocolos a cada `POST /_admin/reset` ou a cada reinício do processo. Quando a Central reemite um protocolo já guardado, a violação da restrição chega como `DataIntegrityViolationException` e a API responde `500` em vez de um erro mapeado. Traduzir a colisão para um erro de domínio (falha de integração, operação retomável) no adaptador de persistência. Evidência: E2E da task 2.12, primeira rodada (`ERROR: duplicate key value violates unique constraint "uk_portability_operations_protocol"`).
 
 ---
 
