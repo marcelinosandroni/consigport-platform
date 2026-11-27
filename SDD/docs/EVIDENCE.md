@@ -2303,7 +2303,7 @@
 
 - **Data de Conclusão:** 2026-11-27
 - **Branch:** `feat/030-backend-central-hmac-submission`
-- **PR:** a abrir para `develop`
+- **PR:** #42 — https://github.com/marcelinosandroni/consigport-platform/pull/42
 - **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** assinar a operação na forma canônica da Central, enviá-la e absorver o
