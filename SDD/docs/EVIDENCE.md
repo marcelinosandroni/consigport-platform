@@ -3157,7 +3157,7 @@
 
 - **Data de Conclusão:** 2026-11-27
 - **Branch:** `feat/034-backend-operation-queries`
-- **PR:** a abrir para `develop`
+- **PR:** #46 — https://github.com/marcelinosandroni/consigport-platform/pull/46
 - **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** expor a leitura paginada das operações com filtro por status, o detalhe
