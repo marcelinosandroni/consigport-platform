@@ -58,13 +58,16 @@ class PollOperationTest {
     central = new InMemoryCentralPortabilityPort();
     status = new InMemoryCentralStatusPort();
     clock = new MutableClock(NOW);
+    TransitionRecorder recorder =
+        new TransitionRecorder(
+            operations, events, work -> work.run());
     useCase =
         new PollOperation(
             operations,
             central,
             status,
-            events,
-            work -> work.run(),
+            new CompleteOperation(recorder, clock),
+            recorder,
             clock,
             new IntegrationBackoff(Duration.ofSeconds(2), Duration.ofSeconds(60)),
             20);
@@ -80,7 +83,7 @@ class PollOperationTest {
     assertThat(result.polled()).isEqualTo(1);
     assertThat(status.polls()).isEqualTo(1);
     assertThat(status.lastPoll()).isEqualTo(PROTOCOL);
-    assertThat(stored().status()).isEqualTo(OperationStatus.CONFIRMED);
+    assertThat(stored().status()).isEqualTo(OperationStatus.COMPLETED);
   }
 
   @Test
@@ -91,7 +94,7 @@ class PollOperationTest {
     useCase.pollBatch();
 
     List<OperationEvent> trail = events.findByOperationId(pending().id());
-    assertThat(trail).hasSize(1);
+    assertThat(trail).hasSize(3);
     assertThat(trail.get(0).eventType()).isEqualTo(EventType.OPERATION_CONFIRMED);
     assertThat(trail.get(0).previousStatus()).isEqualTo(OperationStatus.PENDING);
     assertThat(trail.get(0).newStatus()).isEqualTo(OperationStatus.CONFIRMED);
@@ -294,7 +297,7 @@ class PollOperationTest {
 
     useCase.pollBatch();
 
-    assertThat(stored().status()).isEqualTo(OperationStatus.CONFIRMED);
+    assertThat(stored().status()).isEqualTo(OperationStatus.COMPLETED);
     assertThat(status.lastPoll()).isEqualTo(PROTOCOL);
   }
 

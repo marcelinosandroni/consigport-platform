@@ -201,6 +201,28 @@ class PortabilityOperationTest {
   }
 
   @Test
+  void keepsTheInstantOfTheAccountUpdateInTheCompletedOperation() {
+    PortabilityOperation completed = newOperation().submit(PROTOCOL).confirm().complete(LATER);
+
+    assertThat(completed.status()).isEqualTo(OperationStatus.COMPLETED);
+    assertThat(completed.accountUpdatedAt()).isEqualTo(LATER);
+  }
+
+  @Test
+  void refusesACompletedOperationWithoutTheInstantOfTheAccountUpdate() {
+    assertThatThrownBy(() -> withAccountUpdate(OperationStatus.COMPLETED, null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("accountUpdatedAt must not be null when completed");
+  }
+
+  @Test
+  void refusesAnAccountUpdateOutsideTheCompletedStatus() {
+    assertThatThrownBy(() -> withAccountUpdate(OperationStatus.PENDING, LATER))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("accountUpdatedAt must be null unless completed");
+  }
+
+  @Test
   void namesTheRefusedTransition() {
     PortabilityOperation completed =
         newOperation().submit(PROTOCOL).confirm().complete(LATER);
@@ -337,8 +359,32 @@ class PortabilityOperationTest {
     }
   }
 
-  private static PortabilityOperation operationIn(OperationStatus status) {
-    PortabilityOperation operation = newOperation();
+  /**
+   * Rebuilds the aggregate with another status and another instant of the account
+   * update, to prove the invariants of the constructor.
+   */
+  private static PortabilityOperation withAccountUpdate(
+      OperationStatus status, Instant accountUpdatedAt) {
+    PortabilityOperation operation = newOperation().submit(PROTOCOL);
+    return new PortabilityOperation(
+        operation.id(),
+        operation.idempotencyKey(),
+        operation.beneficiaryId(),
+        operation.agreementId(),
+        operation.installments(),
+        operation.assigneeCreditor(),
+        operation.receivingAccount(),
+        operation.totalAmount(),
+        status,
+        operation.protocol(),
+        operation.rejectionReason(),
+        operation.retryCount(),
+        operation.nextPollAt(),
+        accountUpdatedAt,
+        operation.createdAt());
+  }
+
+  private static PortabilityOperation operationIn(OperationStatus status) {    PortabilityOperation operation = newOperation();
     return switch (status) {
       case CREATED -> operation;
       case PENDING -> operation.submit(PROTOCOL);

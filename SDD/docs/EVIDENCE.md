@@ -2977,3 +2977,178 @@
 - `SDD/docs/EVIDENCE.md`
 - `docs/adr/0003-assincronismo-polling-e-trilha-imutavel.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+### Task 2.13 — Confirmação e atualização de conta
+
+- **Data de Conclusão:** 2026-11-27
+- **Branch:** `feat/033-backend-complete-operation`
+- **PR:** #45 — https://github.com/marcelinosandroni/consigport-platform/pull/45
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** fechar o ciclo da operação em uma única transação: a confirmação da
+  Central vira `CONFIRMED` e, na mesma transação, a conta recebe a atualização e a
+  operação vira `COMPLETED` com `account_updated_at`; a rejeição fecha a operação como
+  `REJECTED` com o motivo.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Caso de uso, worker, agregados e persistência (unitário e integração):**
+   ```text
+   ./mvnw -B -pl backend test -Dtest='CompleteOperationTest,PollOperationTest,CompletionPersistenceTest,PollingPersistenceTest,PortabilityOperationTest,SchedulingConfigTest'
+   → Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.032 s -- in
+     br.com.consigport.domain.portability.PortabilityOperationTest$OperationIdTest
+   → Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.105 s -- in
+     br.com.consigport.domain.portability.PortabilityOperationTest$Creation
+   → Tests run: 48, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.745 s -- in
+     br.com.consigport.domain.portability.PortabilityOperationTest
+   → Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.079 s -- in
+     br.com.consigport.application.portability.CompleteOperationTest
+   → Tests run: 16, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.161 s -- in
+     br.com.consigport.application.portability.PollOperationTest
+   → Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 20.88 s -- in
+     br.com.consigport.adapters.out.persistence.CompletionPersistenceTest
+   → Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.448 s -- in
+     br.com.consigport.adapters.out.persistence.PollingPersistenceTest
+   → Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.015 s -- in
+     br.com.consigport.config.SchedulingConfigTest
+   → Tests run: 93, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   → EXIT=0
+   ```
+2. **Reator completo (backend + mock da Central):**
+   ```text
+   ./mvnw -B verify
+   → Tests run: 301, Failures: 0, Errors: 0, Skipped: 0   (backend)
+   → Tests run: 39, Failures: 0, Errors: 0, Skipped: 0    (central-convenios-mock)
+   → ConsigPort Platform ................................ SUCCESS [  0.010 s]
+   → ConsigPort Backend ................................. SUCCESS [ 50.046 s]
+   → Central de Convênios Mock .......................... SUCCESS [ 22.345 s]
+   → BUILD SUCCESS
+   → EXIT=0
+   ```
+3. **Prova de vida do rollback (a trilha gravada fora da transação):**
+   ```text
+   → TransitionRecorder grava os eventos fora de transactions.run(...)
+   → ./mvnw -q -B -pl backend test -Dtest='CompletionPersistenceTest'
+   → [ERROR] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 22.58 s <<< FAILURE! -- in br.com.consigport.adapters.out.persistence.CompletionPersistenceTest
+   → [ERROR] br.com.consigport.adapters.out.persistence.CompletionPersistenceTest.rollsBackEverythingWhenTheTrailFailsBetweenTheSteps -- Time elapsed: 1.883 s <<< FAILURE!
+   → [ERROR] expected: PENDING
+   →  but was: COMPLETED
+   → [ERROR]   CompletionPersistenceTest.rollsBackEverythingWhenTheTrailFailsBetweenTheSteps:118
+   → EXIT=1
+   → a trilha voltou para dentro da transação
+   → ./mvnw -q -B -pl backend test -Dtest='CompletionPersistenceTest'
+   → EXIT=0
+   ```
+4. **End-to-end com o backend real contra o mock real da Central** (PostgreSQL 16 do
+   compose, backend em `:8080`, mock em `:8081`; o mock confirma em 8 s):
+   ```text
+   === 4. a operacao confirmada: CONFIRMADA -> CONFIRMED -> COMPLETED ===
+   POST /autorizacoes BEN-001 -> {"autorizacaoId":"AUT-20261127-0001"} | 201
+   POST /api/v1/portability-operations -> {"operationId":"e3f9106f-0dac-4958-9266-db246d0c08b0","protocol":"PRT-20261127-0001","status":"PENDING","totalAmount":450.00,"createdAt":"2026-11-27T11:35:47.316980Z"} | 202 0.554699
+   a operacao foi completada apos 4 ciclos de 2 s
+   --- a operacao: o status final e o instante da atualizacao da conta ---
+                     id                  |  status   |     protocol      | rejection_reason | retry_count |      account_updated_at      |          created_at
+   --------------------------------------+-----------+-------------------+------------------+-------------+------------------------------+------------------------------
+    e3f9106f-0dac-4958-9266-db246d0c08b0 | COMPLETED | PRT-20261127-0001 |                  |           0 | 2026-11-27 11:35:56.39997+00 | 2026-11-27 11:35:47.31698+00
+
+   === 5. a trilha imutavel: o caminho inteiro ===
+    id  |     event_type      | previous_status | new_status |          created_at           |                                details                                 |                      raw_payload
+   -----+--------------------+-----------------+------------+-------------------------------+------------------------------------------------------------------------+-------------------------------------------------------
+    269 | OPERATION_CREATED   |                 | CREATED    | 2026-11-27 11:35:47.31698+00  | Operation created                                                      |
+    270 | OPERATION_SUBMITTED | CREATED         | PENDING    | 2026-11-27 11:35:47.690617+00 | Central accepted the operation with protocol PRT-20261127-0001         |
+    271 | POLL_ATTEMPT        | PENDING         | PENDING    | 2026-11-27 11:35:48.261837+00 | The Central is still processing the operation; the next poll is in 2 s |
+    272 | POLL_ATTEMPT        | PENDING         | PENDING    | 2026-11-27 11:35:50.307053+00 | The Central is still processing the operation; the next poll is in 2 s |
+    273 | POLL_ATTEMPT        | PENDING         | PENDING    | 2026-11-27 11:35:52.336279+00 | The Central is still processing the operation; the next poll is in 2 s |
+    274 | POLL_ATTEMPT        | PENDING         | PENDING    | 2026-11-27 11:35:54.363893+00 | The Central is still processing the operation; the next poll is in 2 s |
+    275 | OPERATION_CONFIRMED | PENDING         | CONFIRMED  | 2026-11-27 11:35:56.39997+00  | The Central confirmed the operation                                    | "{\"status\":\"CONFIRMADA\",\"motivoRejeicao\":null}"
+    276 | ACCOUNT_UPDATED     | CONFIRMED       | COMPLETED  | 2026-11-27 11:35:56.39997+00  | The receiving account of the operation was updated                     |
+    277 | OPERATION_COMPLETED | CONFIRMED       | COMPLETED  | 2026-11-27 11:35:56.39997+00  | The operation was completed                                            |
+   (9 rows)
+
+   === 6. a operacao rejeitada: REJEITADA -> REJECTED com o motivo ===
+   POST /autorizacoes BEN-REJ -> {"autorizacaoId":"AUT-20261127-0002"} | 201
+   POST /api/v1/portability-operations -> {"operationId":"aaa1339d-19bb-4808-b1f6-3980eb2a314e","protocol":"PRT-20261127-0002","status":"PENDING","totalAmount":250.00,"createdAt":"2026-11-27T11:35:57.180884Z"} | 202 0.050598
+   a operacao foi encerrada como REJECTED apos 5 ciclos de 2 s
+   --- as operacoes: a confirmada completed e a rejeitada rejected ---
+                     id                  |  status   |     protocol      |  rejection_reason   | retry_count |      account_updated_at      |          created_at
+   --------------------------------------+-----------+-------------------+---------------------+-------------+------------------------------+-------------------------------
+    e3f9106f-0dac-4958-9266-db246d0c08b0 | COMPLETED | PRT-20261127-0001 |                     |           0 | 2026-11-27 11:35:56.39997+00 | 2026-11-27 11:35:47.31698+00
+    aaa1339d-19bb-4808-b1f6-3980eb2a314e | REJECTED  | PRT-20261127-0002 | MARGIN_INSUFFICIENT |           0 |                              | 2026-11-27 11:35:57.180884+00
+
+   --- a trilha da rejeicao ---
+    id  |     event_type     | previous_status | new_status |                         details                         |                                    raw_payload
+   -----+--------------------+-----------------+------------+---------------------------------------------------------+------------------------------------------------------------------------------------
+    284 | OPERATION_REJECTED | PENDING         | REJECTED   | The Central rejected the operation: MARGIN_INSUFFICIENT | "{\"status\":\"REJEITADA\",\"motivoRejeicao\":\"MARGEM_CONSIGNADA_INSUFICIENTE\"}"
+   (1 row)
+
+   === 7. encerramento dos processos e dos containers ===
+   containers restantes: 0
+   processos restantes: 0
+   === fim ===
+   ```
+5. **Gates locais:**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → OK (65 documentos, todo link relativo resolve, exit 0)
+   node scripts/check-specs.mjs                → OK (exatamente 1 task em voo, tasks catalogadas, exit 0)
+   node scripts/check-architecture.mjs         → OK (22 testes de validação dos desenhos, exit 0)
+   node scripts/check-theme-tokens.mjs         → OK (exit 0)
+   node scripts/check-ai-log.mjs               → OK (39 sessões, estrutura válida, exit 0)
+   ```
+
+#### Conteúdo Entregue:
+- `application/portability/CompleteOperation.java` — o caso de uso que fecha o ciclo: a
+  confirmação vira `CONFIRMED` e, na mesma transação, a conta é atualizada e a operação
+  vira `COMPLETED`; a rejeição fecha a operação como `REJECTED` com o motivo.
+- `application/portability/TransitionRecorder.java` — a fronteira de transação e a
+  política do lock otimista em um lugar só: o estado da operação e os eventos da
+  transição são gravados juntos ou não são gravados.
+- `application/portability/PollOperation.java` — o worker entrega a resposta terminal da
+  Central ao `CompleteOperation`; ele não escreve mais o estado terminal.
+- `domain/portability/PortabilityOperation.java` — invariante nova: `account_updated_at`
+  existe apenas quando a operação está `COMPLETED`.
+- `config/CompositionRoot.java` — o wiring dos dois casos de uso novos.
+- `docs/adr/0003-assincronismo-polling-e-trilha-imutavel.md` — o protocolo de polling
+  com o fechamento do ciclo.
+- Testes: 7 do `CompleteOperation`, 3 de integração da persistência, 7 do polling
+  persistido, 16 do worker, 48 do agregado e 2 do agendamento.
+
+#### Descobertas e Decisões:
+- A operação parava em `CONFIRMED`: o `§7` declara `CONFIRMED` → `COMPLETED` com
+  `ACCOUNT_UPDATED`, `OPERATION_COMPLETED` e `account_updated_at`, mas nada no código
+  executava essa segunda transição. O ciclo agora fecha, e a primeira execução do
+  end-to-end com o jar antigo provou a lacuna: a operação ficou em `CONFIRMED` e a
+  trilha parou em `OPERATION_CONFIRMED`.
+- O estado intermediário `CONFIRMED` **não** é gravado: a confirmação, a atualização da
+  conta e o fechamento são uma transição só, gravada em uma transação só. A trilha
+  prova o caminho (`PENDING` → `CONFIRMED` → `COMPLETED`), o banco guarda o estado
+  final.
+- O `rawPayload` da Central fica só no evento `OPERATION_CONFIRMED`: os eventos
+  `ACCOUNT_UPDATED` e `OPERATION_COMPLETED` são fatos locais, não respostas da Central.
+- A transação e a política do lock otimista saíram do `PollOperation` para o
+  `TransitionRecorder`: os dois casos de uso gravam "estado + trilha" do mesmo jeito, e
+  o conflito de concorrência continua sendo resolvido do mesmo jeito — o estado
+  gravado é a verdade.
+- O rollback é real, não uma afirmação: o teste de integração quebra a trilha no
+  segundo evento, sobre PostgreSQL 16, e prova que a operação continua `PENDING` e que
+  o evento já escrito não existe. A prova de vida (eventos fora da transação) deixou o
+  teste vermelho com `expected: PENDING but was: COMPLETED`.
+
+#### Arquivos Tocados:
+- `backend/src/main/java/br/com/consigport/application/portability/CompleteOperation.java`
+- `backend/src/main/java/br/com/consigport/application/portability/TransitionRecorder.java`
+- `backend/src/main/java/br/com/consigport/application/portability/PollOperation.java`
+- `backend/src/main/java/br/com/consigport/domain/portability/PortabilityOperation.java`
+- `backend/src/main/java/br/com/consigport/config/CompositionRoot.java`
+- `backend/src/test/java/br/com/consigport/application/portability/CompleteOperationTest.java`
+- `backend/src/test/java/br/com/consigport/application/portability/PollOperationTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/out/persistence/CompletionPersistenceTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/out/persistence/PollingPersistenceTest.java`
+- `backend/src/test/java/br/com/consigport/domain/portability/PortabilityOperationTest.java`
+- `backend/src/test/java/br/com/consigport/config/SchedulingConfigTest.java`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/adr/0003-assincronismo-polling-e-trilha-imutavel.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`

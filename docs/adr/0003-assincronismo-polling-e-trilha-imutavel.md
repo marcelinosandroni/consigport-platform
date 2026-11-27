@@ -24,7 +24,10 @@ falhas de integração.
 2. Um worker agendado (`fixedDelay` 2 s, lote 20) busca operações
    `PENDING` ou `INTEGRATION_ERROR` com `next_poll_at <= now()`.
 3. `GET` de status: `204` com `Retry-After` → evento `POLL_ATTEMPT` e novo
-   `next_poll_at`; `200 CONFIRMADA` → `CONFIRMED`; `200 REJEITADA` → `REJECTED`.
+   `next_poll_at`; `200 CONFIRMADA` → `CONFIRMED` e, na mesma transação, a atualização da
+   conta e o fechamento em `COMPLETED` (eventos `OPERATION_CONFIRMED`, `ACCOUNT_UPDATED`
+   e `OPERATION_COMPLETED`, com `account_updated_at`); `200 REJEITADA` → `REJECTED` com o
+   motivo.
 4. Sem protocolo (falha antes do `202`), o worker reenvia com a mesma `Idempotency-Key`
    em vez de criar outra operação.
 5. Falha persistente → `INTEGRATION_ERROR` com backoff exponencial até 60 s. O estado é
@@ -95,6 +98,7 @@ falhas de integração.
   trilha.
 - Teste da rejeição com motivo não declarado no contrato: operação fechada como
   `REJECTED` com o código `UNMAPPED_REJECTION`.
-- Teste de rollback entre a confirmação e a atualização de conta.
+- Teste de rollback entre a confirmação e a atualização de conta: a falha no segundo
+  evento desfaz o estado da operação e o evento já escrito, sobre PostgreSQL 16.
 - Teste que tenta `UPDATE` e `DELETE` em `operation_events` e espera exceção.
 - Teste de ordem cronológica da timeline.

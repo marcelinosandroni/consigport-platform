@@ -2,8 +2,10 @@ package br.com.consigport.adapters.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import br.com.consigport.application.portability.CompleteOperation;
 import br.com.consigport.application.portability.IntegrationBackoff;
 import br.com.consigport.application.portability.PollOperation;
+import br.com.consigport.application.portability.TransitionRecorder;
 import br.com.consigport.domain.audit.EventType;
 import br.com.consigport.domain.audit.OperationEvent;
 import br.com.consigport.domain.audit.OperationEventRepository;
@@ -105,17 +107,18 @@ class PollingPersistenceTest extends PostgreSqlTestSupport {
   }
 
   @Test
-  void writesTheConfirmationAndItsEventInTheDatabase() {
+  void closesTheOperationWhenTheCentralConfirmsIt() {
     operations.save(pending().pollAttempt(NOW.minusSeconds(1)));
     InMemoryCentralStatusPort status = new InMemoryCentralStatusPort();
     status.answerWith(new CentralStatus.Confirmed("{\"status\":\"CONFIRMADA\"}"));
+    TransitionRecorder recorder = new TransitionRecorder(operations, events, transactions);
     PollOperation worker =
         new PollOperation(
             operations,
             new InMemoryCentralPortabilityPort(),
             status,
-            events,
-            transactions,
+            new CompleteOperation(recorder, java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)),
+            recorder,
             java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC),
             new IntegrationBackoff(Duration.ofSeconds(2), Duration.ofSeconds(60)),
             20);
@@ -124,11 +127,14 @@ class PollingPersistenceTest extends PostgreSqlTestSupport {
 
     assertThat(result.polled()).isEqualTo(1);
     PortabilityOperation stored = operations.findByProtocol(PROTOCOL).orElseThrow();
-    assertThat(stored.status()).isEqualTo(OperationStatus.CONFIRMED);
+    assertThat(stored.status()).isEqualTo(OperationStatus.COMPLETED);
+    assertThat(stored.accountUpdatedAt()).isEqualTo(NOW);
     List<OperationEvent> trail = events.findByOperationId(stored.id());
-    assertThat(trail).hasSize(1);
+    assertThat(trail).hasSize(3);
     assertThat(trail.get(0).eventType()).isEqualTo(EventType.OPERATION_CONFIRMED);
     assertThat(trail.get(0).rawPayload()).isEqualTo("{\"status\":\"CONFIRMADA\"}");
+    assertThat(trail.get(1).eventType()).isEqualTo(EventType.ACCOUNT_UPDATED);
+    assertThat(trail.get(2).eventType()).isEqualTo(EventType.OPERATION_COMPLETED);
   }
 
   @Test
@@ -136,13 +142,14 @@ class PollingPersistenceTest extends PostgreSqlTestSupport {
     operations.save(pending().pollAttempt(NOW.minusSeconds(1)));
     InMemoryCentralStatusPort status = new InMemoryCentralStatusPort();
     status.fail();
+    TransitionRecorder recorder = new TransitionRecorder(operations, events, transactions);
     PollOperation worker =
         new PollOperation(
             operations,
             new InMemoryCentralPortabilityPort(),
             status,
-            events,
-            transactions,
+            new CompleteOperation(recorder, java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)),
+            recorder,
             java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC),
             new IntegrationBackoff(Duration.ofSeconds(2), Duration.ofSeconds(60)),
             20);

@@ -2,8 +2,10 @@ package br.com.consigport.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import br.com.consigport.application.portability.CompleteOperation;
 import br.com.consigport.application.portability.IntegrationBackoff;
 import br.com.consigport.application.portability.PollOperation;
+import br.com.consigport.application.portability.TransitionRecorder;
 import br.com.consigport.domain.audit.InMemoryOperationEventRepository;
 import br.com.consigport.domain.portability.CentralStatus;
 import br.com.consigport.domain.portability.InMemoryCentralPortabilityPort;
@@ -59,7 +61,7 @@ class SchedulingConfigTest {
 
     assertThat(status.polls()).isEqualTo(1);
     assertThat(operations.findByProtocol(PROTOCOL).orElseThrow().status())
-        .isEqualTo(OperationStatus.CONFIRMED);
+        .isEqualTo(OperationStatus.COMPLETED);
   }
 
   @Test
@@ -75,13 +77,17 @@ class SchedulingConfigTest {
   }
 
   private PollOperation worker() {
+    InMemoryOperationEventRepository events = new InMemoryOperationEventRepository();
+    TransitionRecorder recorder =
+        new TransitionRecorder(operations, events, work -> work.run());
+    Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
     return new PollOperation(
         operations,
         new InMemoryCentralPortabilityPort(),
         status,
-        new InMemoryOperationEventRepository(),
-        work -> work.run(),
-        Clock.fixed(NOW, ZoneOffset.UTC),
+        new CompleteOperation(recorder, clock),
+        recorder,
+        clock,
         new IntegrationBackoff(Duration.ofSeconds(2), Duration.ofSeconds(60)),
         20);
   }
