@@ -163,6 +163,27 @@ class PortabilityOperationTest {
   }
 
   @Test
+  void renewsTheBackoffWithoutChangingTheStatusOfTheFailedOperation() {
+    PortabilityOperation failed =
+        newOperation().submit(PROTOCOL).registerIntegrationFailure(LATER);
+
+    PortabilityOperation renewed = failed.renewIntegrationBackoff(LATER.plusSeconds(60));
+
+    assertThat(renewed.status()).isEqualTo(OperationStatus.INTEGRATION_ERROR);
+    assertThat(renewed.retryCount()).isEqualTo(2);
+    assertThat(renewed.nextPollAt()).isEqualTo(LATER.plusSeconds(60));
+    assertThat(renewed.protocol()).isEqualTo(PROTOCOL);
+  }
+
+  @Test
+  void refusesToRenewTheBackoffOfAnOperationThatDidNotFail() {
+    PortabilityOperation pending = newOperation().submit(PROTOCOL);
+
+    assertThatThrownBy(() -> pending.renewIntegrationBackoff(LATER))
+        .isInstanceOf(PortabilityOperation.InvalidTransitionException.class);
+  }
+
+  @Test
   void refusesToSubmitWithoutAProtocol() {
     assertThatThrownBy(() -> newOperation().submit(" "))
         .isInstanceOf(IllegalArgumentException.class)

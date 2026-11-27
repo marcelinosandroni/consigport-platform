@@ -160,6 +160,35 @@ public class JpaPortabilityOperationRepository implements PortabilityOperationRe
   }
 
   /**
+   * Finds the operations whose polling is due.
+   *
+   * <p>The worker polls the operations that the Central accepted and the ones whose
+   * integration failed. An operation that was never polled has no scheduled poll, so it
+   * is due at once.
+   *
+   * @param now the instant of the worker
+   * @param limit the maximum number of operations returned
+   * @return the operations due for polling
+   */
+  @Override
+  @Transactional(readOnly = true)
+  public List<PortabilityOperation> findDueForPolling(Instant now, int limit) {
+    return entityManager
+        .createQuery(
+            "select operation from PortabilityOperationJpaEntity operation"
+                + " where operation.status in :statuses"
+                + " and (operation.nextPollAt is null or operation.nextPollAt <= :now)"
+                + " order by operation.createdAt",
+            PortabilityOperationJpaEntity.class)
+        .setParameter("statuses", List.of(OperationStatus.PENDING.name(), OperationStatus.INTEGRATION_ERROR.name()))
+        .setParameter("now", now)
+        .setMaxResults(limit)
+        .getResultStream()
+        .map(JpaPortabilityOperationRepository::toDomain)
+        .toList();
+  }
+
+  /**
    * Rebuilds the aggregate from its row.
    *
    * <p>The schema of {@code ARCHITECTURE.md} §6 has no column for the agreement of the

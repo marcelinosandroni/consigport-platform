@@ -45,6 +45,24 @@ central:
   integration:
     # How long the operation waits before the next attempt, when the Central fails.
     backoff: ${CENTRAL_INTEGRATION_BACKOFF:60s}
+  poll:
+    # The worker that follows the operations until the Central answers.
+    enabled: ${CENTRAL_POLL_ENABLED:true}
+    # The interval between two polls, used when the Central does not send a Retry-After.
+    interval: ${CENTRAL_POLL_INTERVAL:2s}
+    # How often the worker wakes up and how many operations it polls at once.
+    fixed-delay: ${CENTRAL_POLL_FIXED_DELAY:2s}
+    batch-size: ${CENTRAL_POLL_BATCH_SIZE:20}
+    backoff:
+      # The wait doubles with every failure and never passes the ceiling.
+      base: ${CENTRAL_POLL_BACKOFF_BASE:2s}
+      ceiling: ${CENTRAL_POLL_BACKOFF_CEILING:60s}
+  circuit:
+    # The circuit that stops the calls to a Central that is failing.
+    window-size: ${CENTRAL_CIRCUIT_WINDOW_SIZE:10}
+    failure-threshold: ${CENTRAL_CIRCUIT_FAILURE_THRESHOLD:0.5}
+    open-duration: ${CENTRAL_CIRCUIT_OPEN_DURATION:10s}
+    half-open-calls: ${CENTRAL_CIRCUIT_HALF_OPEN_CALLS:3}
 
 management:
   endpoints:

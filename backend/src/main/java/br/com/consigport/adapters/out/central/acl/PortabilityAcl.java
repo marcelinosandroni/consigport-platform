@@ -3,12 +3,16 @@ package br.com.consigport.adapters.out.central.acl;
 import br.com.consigport.adapters.out.central.dto.CentralErrorResponse;
 import br.com.consigport.adapters.out.central.dto.CentralPortabilityRequest;
 import br.com.consigport.adapters.out.central.dto.CentralPortabilityResponse;
+import br.com.consigport.adapters.out.central.dto.CentralStatusResponse;
+import br.com.consigport.domain.portability.CentralStatus;
 import br.com.consigport.domain.portability.CentralSubmissionException;
 import br.com.consigport.domain.portability.PortabilityOperation;
+import br.com.consigport.domain.portability.RejectionReason;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import java.time.Duration;
 
 /**
  * Anti-corruption layer of the submission of a portability operation.
@@ -23,6 +27,18 @@ public final class PortabilityAcl {
 
   /** Code used when the Central answers with a body that is not the contract. */
   private static final String UNEXPECTED_ANSWER_CODE = "ERRO_CENTRAL";
+
+  /** The status of an operation that the Central is still processing. */
+  private static final String CENTRAL_PENDING = "PENDENTE";
+
+  /** The status of an operation that the Central confirmed. */
+  private static final String CENTRAL_CONFIRMED = "CONFIRMADA";
+
+  /** The status of an operation that the Central rejected. */
+  private static final String CENTRAL_REJECTED = "REJEITADA";
+
+  /** The reason the Central gives when the consignee margin is not enough. */
+  private static final String CENTRAL_MARGIN_INSUFFICIENT = "MARGEM_CONSIGNADA_INSUFICIENTE";
 
   private final ObjectMapper mapper;
 
@@ -90,6 +106,57 @@ public final class PortabilityAcl {
       throw new IllegalArgumentException("the Central accepted the operation without a protocol");
     }
     return response.protocolo().trim();
+  }
+
+  /**
+   * Translates the status answered by the Central into the domain.
+   *
+   * <p>The Central writes the situation of the operation in Portuguese; the domain knows
+   * three shapes: still pending, confirmed and rejected. The raw body travels with the
+   * answer, so the trail of the audit proves what the Central said.
+   *
+   * @param rawBody the raw body of the answer of the Central
+   * @param pendingInterval how long to wait before the next poll when the Central answers
+   *     that the operation is still pending without a {@code Retry-After}
+   * @return the situation of the operation in the domain
+   * @throws IllegalArgumentException when the answer is not the contract of the Central
+   */
+  public CentralStatus toCentralStatus(String rawBody, Duration pendingInterval) {
+    if (rawBody == null || rawBody.isBlank()) {
+      throw new IllegalArgumentException("the Central answered the status without a body");
+    }
+    CentralStatusResponse status;
+    try {
+      status = mapper.readValue(rawBody, CentralStatusResponse.class);
+    } catch (JsonProcessingException exception) {
+      throw new IllegalArgumentException("the Central answered a body that is not the contract", exception);
+    }
+    if (status.status() == null || status.status().isBlank()) {
+      throw new IllegalArgumentException("the Central answered the status without a status");
+    }
+    return switch (status.status().trim()) {
+      case CENTRAL_PENDING -> new CentralStatus.Pending(pendingInterval, rawBody);
+      case CENTRAL_CONFIRMED -> new CentralStatus.Confirmed(rawBody);
+      case CENTRAL_REJECTED -> new CentralStatus.Rejected(toRejectionReason(status.motivoRejeicao()), rawBody);
+      default -> throw new IllegalArgumentException("unknown Central status: " + status.status());
+    };
+  }
+
+  /**
+   * Translates the reason of the rejection of the Central into the domain.
+   *
+   * @param motivoRejeicao the reason as the Central writes it
+   * @return the reason in the domain
+   * @throws IllegalArgumentException when the reason is unknown
+   */
+  public RejectionReason toRejectionReason(String motivoRejeicao) {
+    if (motivoRejeicao == null || motivoRejeicao.isBlank()) {
+      throw new IllegalArgumentException("the Central rejected the operation without a reason");
+    }
+    return switch (motivoRejeicao.trim()) {
+      case CENTRAL_MARGIN_INSUFFICIENT -> new RejectionReason.MarginInsufficient();
+      default -> throw new IllegalArgumentException("unknown Central rejection reason: " + motivoRejeicao);
+    };
   }
 
   /**

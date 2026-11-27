@@ -71,7 +71,7 @@
 
 > Objetivo: core DDD/hexagonal na porta `8080`, com PostgreSQL, Flyway, ACL, i18n,
 > polling resiliente e Swagger.
-> Task em voo: **2.11 — Polling resiliente**.
+> Task em voo: **2.12 — Confirmação e atualização de conta**.
 
 ### Tasks
 
@@ -109,10 +109,13 @@
       `HmacSigner` reproduz o vetor de `contracts/hmac-vector.json`; `CentralHttpClient`
       submete a operação assinada; `CREATED` → `PENDING` com `protocol`; falha após
       retries → `INTEGRATION_ERROR`.
-- [-] **2.11 — Polling resiliente**
+- [x] **2.11 — Polling resiliente**
       `PollOperation` acompanha a Central até o estado terminal; intervalo de 2 s e lote
       de 20; honora o `Retry-After`; `204` gera `POLL_ATTEMPT`; o reenvio usa a mesma
       `Idempotency-Key`.
+- [-] **2.12 — Confirmação e atualização de conta**
+      `CONFIRMADA` → `CONFIRMED` → `COMPLETED` com `account_updated_at`; `REJEITADA` →
+      `REJECTED` com o motivo; os dois eventos gravados na mesma transação.
 
 ### Como usar este arquivo
 

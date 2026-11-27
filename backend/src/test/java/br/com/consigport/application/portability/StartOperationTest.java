@@ -410,6 +410,11 @@ class StartOperationTest {
     public Optional<PortabilityOperation> findByProtocol(String protocol) {
       return delegate.findByProtocol(protocol);
     }
+
+    @Override
+    public List<PortabilityOperation> findDueForPolling(Instant now, int limit) {
+      return delegate.findDueForPolling(now, limit);
+    }
   }
 
   /**
@@ -454,6 +459,11 @@ class StartOperationTest {
     @Override
     public Optional<PortabilityOperation> findByProtocol(String protocol) {
       return delegate.findByProtocol(protocol);
+    }
+
+    @Override
+    public List<PortabilityOperation> findDueForPolling(Instant now, int limit) {
+      return delegate.findDueForPolling(now, limit);
     }
   }
 }

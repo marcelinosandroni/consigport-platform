@@ -10,7 +10,9 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import br.com.consigport.adapters.out.central.acl.CentralAcl;
 import br.com.consigport.adapters.out.central.acl.PortabilityAcl;
+import br.com.consigport.adapters.out.resilience.CircuitBreaker;
 import br.com.consigport.domain.agenda.InstallmentStatus;
+import br.com.consigport.domain.portability.CentralStatus;
 import br.com.consigport.domain.portability.CentralSubmissionException;
 import br.com.consigport.domain.portability.InstallmentSnapshot;
 import br.com.consigport.domain.portability.Money;
@@ -67,11 +69,15 @@ class CentralHttpClientTest {
 
   private MockRestServiceServer server;
   private CentralHttpClient client;
+  private CircuitBreaker circuit;
 
   @BeforeEach
   void setUp() {
     RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
     server = MockRestServiceServer.bindTo(builder).build();
+    circuit =
+        new CircuitBreaker(
+            10, 0.5, Duration.ofSeconds(10), 3, Clock.fixed(Instant.ofEpochSecond(TIMESTAMP), ZoneOffset.UTC));
     client =
         new CentralHttpClient(
             builder.build(),
@@ -85,7 +91,9 @@ class CentralHttpClientTest {
                 3,
                 Duration.ZERO,
                 Duration.ofSeconds(2),
-                Duration.ofSeconds(3)));
+                Duration.ofSeconds(3),
+                Duration.ofSeconds(2)),
+            circuit);
   }
 
   @Test
@@ -268,6 +276,159 @@ class CentralHttpClientTest {
     assertThatThrownBy(() -> client.findAgenda(new BeneficiaryId("BEN-001")))
         .isInstanceOf(DomainError.CentralUnavailable.class);
     server.verify();
+  }
+
+  @Test
+  void readsTheStatusThatIsStillPendingAndHonoursTheRetryAfter() {
+    server
+        .expect(requestTo(BASE_URL + "/operacoes-portabilidade/" + PROTOCOL))
+        .andExpect(method(HttpMethod.GET))
+        .andExpect(header("X-Signature", signatureOfTheStatus()))
+        .andRespond(
+            withStatus(HttpStatus.NO_CONTENT).header("Retry-After", "5"));
+
+    CentralStatus answer = client.statusOf(PROTOCOL);
+
+    assertThat(answer).isInstanceOfSatisfying(
+        CentralStatus.Pending.class,
+        pending -> assertThat(pending.retryAfter()).isEqualTo(Duration.ofSeconds(5)));
+    server.verify();
+  }
+
+  @Test
+  void fallsBackToTheConfiguredIntervalWhenTheCentralSendsNoRetryAfter() {
+    server
+        .expect(requestTo(BASE_URL + "/operacoes-portabilidade/" + PROTOCOL))
+        .andRespond(withStatus(HttpStatus.NO_CONTENT));
+
+    CentralStatus answer = client.statusOf(PROTOCOL);
+
+    assertThat(answer).isInstanceOfSatisfying(
+        CentralStatus.Pending.class,
+        pending -> assertThat(pending.retryAfter()).isEqualTo(Duration.ofSeconds(2)));
+    server.verify();
+  }
+
+  @Test
+  void readsTheConfirmationOfTheCentral() {
+    server
+        .expect(requestTo(BASE_URL + "/operacoes-portabilidade/" + PROTOCOL))
+        .andRespond(
+            withStatus(HttpStatus.OK)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"status\":\"CONFIRMADA\",\"motivoRejeicao\":null}"));
+
+    CentralStatus answer = client.statusOf(PROTOCOL);
+
+    assertThat(answer).isInstanceOfSatisfying(
+        CentralStatus.Confirmed.class,
+        confirmed -> assertThat(confirmed.rawPayload()).contains("CONFIRMADA"));
+    server.verify();
+  }
+
+  @Test
+  void readsTheRejectionOfTheCentral() {
+    server
+        .expect(requestTo(BASE_URL + "/operacoes-portabilidade/" + PROTOCOL))
+        .andRespond(
+            withStatus(HttpStatus.OK)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(
+                    "{\"status\":\"REJEITADA\",\"motivoRejeicao\":\"MARGEM_CONSIGNADA_INSUFICIENTE\"}"));
+
+    CentralStatus answer = client.statusOf(PROTOCOL);
+
+    assertThat(answer).isInstanceOfSatisfying(
+        CentralStatus.Rejected.class,
+        rejected ->
+            assertThat(rejected.reason())
+                .isEqualTo(new br.com.consigport.domain.portability.RejectionReason.MarginInsufficient()));
+    server.verify();
+  }
+
+  @Test
+  void refusesTheCallsWhileTheCircuitIsOpen() {
+    CircuitBreaker shortCircuit =
+        new CircuitBreaker(
+            2,
+            0.5,
+            Duration.ofSeconds(10),
+            3,
+            Clock.fixed(Instant.ofEpochSecond(TIMESTAMP), ZoneOffset.UTC));
+    RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
+    server = MockRestServiceServer.bindTo(builder).build();
+    CentralHttpClient protectedClient =
+        new CentralHttpClient(
+            builder.build(),
+            new HmacSigner(SECRET),
+            new PortabilityAcl(),
+            new CentralAcl(),
+            Clock.fixed(Instant.ofEpochSecond(TIMESTAMP), ZoneOffset.UTC),
+            new CentralProperties(
+                BASE_URL,
+                SECRET,
+                3,
+                Duration.ZERO,
+                Duration.ofSeconds(2),
+                Duration.ofSeconds(3),
+                Duration.ofSeconds(2)),
+            shortCircuit);
+    for (int attempt = 0; attempt < 6; attempt++) {
+      server
+          .expect(requestTo(BASE_URL + "/operacoes-portabilidade/" + PROTOCOL))
+          .andRespond(
+              withStatus(HttpStatus.SERVICE_UNAVAILABLE)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .body("{\"codigo\":\"ERRO_CENTRAL\",\"mensagem\":\"Indisponível.\"}"));
+    }
+
+    // The first call fails after its three attempts and the second one opens the circuit.
+    assertThatThrownBy(() -> protectedClient.statusOf(PROTOCOL))
+        .isInstanceOf(DomainError.CentralUnavailable.class);
+    assertThat(shortCircuit.isOpen()).isFalse();
+    assertThatThrownBy(() -> protectedClient.statusOf(PROTOCOL))
+        .isInstanceOf(DomainError.CentralUnavailable.class);
+
+    assertThat(shortCircuit.isOpen()).isTrue();
+    assertThatThrownBy(() -> protectedClient.statusOf(PROTOCOL))
+        .isInstanceOf(DomainError.CentralUnavailable.class);
+    server.verify();
+  }
+
+  @Test
+  void answersCentralUnavailableWhenTheCentralDoesNotKnowTheProtocol() {
+    server
+        .expect(requestTo(BASE_URL + "/operacoes-portabilidade/" + PROTOCOL))
+        .andRespond(
+            withStatus(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(
+                    "{\"codigo\":\"OPERACAO_NAO_ENCONTRADA\",\"mensagem\":\"Operação não encontrada.\"}"));
+
+    assertThatThrownBy(() -> client.statusOf(PROTOCOL))
+        .isInstanceOf(DomainError.CentralUnavailable.class)
+        .hasMessageContaining("does not know the protocol " + PROTOCOL);
+    server.verify();
+  }
+
+  @Test
+  void answersCentralUnavailableWhenTheCentralAnswersOutsideTheContract() {
+    server
+        .expect(requestTo(BASE_URL + "/operacoes-portabilidade/" + PROTOCOL))
+        .andRespond(
+            withStatus(HttpStatus.OK)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("[\"not-the-contract\"]"));
+
+    assertThatThrownBy(() -> client.statusOf(PROTOCOL))
+        .isInstanceOf(DomainError.CentralUnavailable.class)
+        .hasMessageContaining("not the contract");
+    server.verify();
+  }
+
+  private String signatureOfTheStatus() {
+    return new HmacSigner(SECRET)
+        .sign("GET", "/operacoes-portabilidade/" + PROTOCOL, TIMESTAMP, "");
   }
 
   private String signatureOfTheAgenda() {

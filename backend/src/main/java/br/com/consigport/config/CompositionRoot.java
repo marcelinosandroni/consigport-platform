@@ -5,10 +5,14 @@ import br.com.consigport.adapters.out.central.CentralProperties;
 import br.com.consigport.adapters.out.central.HmacSigner;
 import br.com.consigport.adapters.out.central.acl.CentralAcl;
 import br.com.consigport.adapters.out.central.acl.PortabilityAcl;
+import br.com.consigport.adapters.out.resilience.CircuitBreaker;
+import br.com.consigport.application.portability.IntegrationBackoff;
+import br.com.consigport.application.portability.PollOperation;
 import br.com.consigport.application.portability.StartOperation;
 import br.com.consigport.domain.agenda.AgendaGateway;
 import br.com.consigport.domain.audit.OperationEventRepository;
 import br.com.consigport.domain.portability.CentralPortabilityPort;
+import br.com.consigport.domain.portability.CentralStatusPort;
 import br.com.consigport.domain.portability.OperationPolicy;
 import br.com.consigport.domain.portability.PortabilityOperationRepository;
 import br.com.consigport.domain.shared.TransactionRunner;
@@ -49,6 +53,8 @@ public class CompositionRoot {
    * @param retryDelay the delay between two attempts
    * @param connectTimeout the timeout of the connection
    * @param readTimeout the timeout of the reading
+   * @param pollInterval the interval between two polls, used when the Central does not
+   *     answer with a {@code Retry-After}
    * @return the configuration of the integration
    */
   @Bean
@@ -58,9 +64,16 @@ public class CompositionRoot {
       @Value("${central.retry.max-attempts:3}") int maxAttempts,
       @Value("${central.retry.delay:500ms}") Duration retryDelay,
       @Value("${central.timeout.connect:2s}") Duration connectTimeout,
-      @Value("${central.timeout.read:3s}") Duration readTimeout) {
+      @Value("${central.timeout.read:3s}") Duration readTimeout,
+      @Value("${central.poll.interval:2s}") Duration pollInterval) {
     return new CentralProperties(
-        baseUrl, hmacSecret, maxAttempts, retryDelay, connectTimeout, readTimeout);
+        baseUrl,
+        hmacSecret,
+        maxAttempts,
+        retryDelay,
+        connectTimeout,
+        readTimeout,
+        pollInterval);
   }
 
   /**
@@ -109,10 +122,11 @@ public class CompositionRoot {
   }
 
   /**
-   * The client of the Central: it reads the agenda and submits the operation.
+   * The client of the Central: it reads the agenda, submits the operation and reads its
+   * status.
    *
-   * <p>The bean answers the two ports of the domain, {@code AgendaGateway} and
-   * {@code CentralPortabilityPort}.
+   * <p>The bean answers the three ports of the domain, {@code AgendaGateway},
+   * {@code CentralPortabilityPort} and {@code CentralStatusPort}.
    *
    * @param rest the transport towards the Central
    * @param signer the canonical form and the signature of the requests
@@ -120,6 +134,7 @@ public class CompositionRoot {
    * @param centralAcl the translation of the agenda
    * @param clock the clock that dates the signature
    * @param properties the configuration of the integration
+   * @param circuit the circuit that protects the calls to the Central
    * @return the client of the Central
    */
   @Bean
@@ -129,8 +144,10 @@ public class CompositionRoot {
       PortabilityAcl portabilityAcl,
       CentralAcl centralAcl,
       Clock clock,
-      CentralProperties properties) {
-    return new CentralHttpClient(rest, signer, portabilityAcl, centralAcl, clock, properties);
+      CentralProperties properties,
+      CircuitBreaker circuit) {
+    return new CentralHttpClient(
+        rest, signer, portabilityAcl, centralAcl, clock, properties, circuit);
   }
 
   /**
@@ -175,5 +192,32 @@ public class CompositionRoot {
         transactions,
         clock,
         integrationBackoff);
+  }
+
+  /**
+   * The worker that follows the operations until the Central answers.
+   *
+   * @param operations the storage of the operations
+   * @param central the submission of the operation to the Central
+   * @param status the read of the situation of the operation in the Central
+   * @param events the append-only trail of the audit
+   * @param transactions the boundary of the transaction of each transition
+   * @param clock the clock that dates the polls
+   * @param backoff the wait between two attempts after a failure
+   * @param batchSize how many operations a single batch polls
+   * @return the use case
+   */
+  @Bean
+  public PollOperation pollOperation(
+      PortabilityOperationRepository operations,
+      CentralPortabilityPort central,
+      CentralStatusPort status,
+      OperationEventRepository events,
+      TransactionRunner transactions,
+      Clock clock,
+      IntegrationBackoff backoff,
+      @Value("${central.poll.batch-size:20}") int batchSize) {
+    return new PollOperation(
+        operations, central, status, events, transactions, clock, backoff, batchSize);
   }
 }

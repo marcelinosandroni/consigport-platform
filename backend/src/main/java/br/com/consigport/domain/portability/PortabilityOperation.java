@@ -187,6 +187,30 @@ public record PortabilityOperation(
   }
 
   /**
+   * The integration failed again while the operation was already in {@code
+   * INTEGRATION_ERROR}.
+   *
+   * <p>The state machine of {@code ARCHITECTURE.md} §7 has no transition from {@code
+   * INTEGRATION_ERROR} to {@code INTEGRATION_ERROR}: the status does not change, the
+   * operation keeps waiting for the Central. What changes is the schedule of the next
+   * attempt and the count of the failures, which grow with the backoff (the flow of the
+   * worker, {@code ARCHITECTURE.md} §11).
+   *
+   * @param nextPollAt when the next attempt happens
+   * @return the operation in {@code INTEGRATION_ERROR}, with the renewed backoff
+   * @throws InvalidTransitionException when the operation is not in {@code
+   *     INTEGRATION_ERROR}
+   */
+  public PortabilityOperation renewIntegrationBackoff(Instant nextPollAt) {
+    requireSource(OperationStatus.INTEGRATION_ERROR, OperationStatus.INTEGRATION_ERROR);
+    if (nextPollAt == null) {
+      throw new IllegalArgumentException("nextPollAt must not be null");
+    }
+    return transition(
+        OperationStatus.INTEGRATION_ERROR, protocol, rejectionReason, retryCount + 1, nextPollAt, accountUpdatedAt);
+  }
+
+  /**
    * The poll returned {@code 204}: the operation is still pending.
    *
    * @param nextPollAt when the next poll happens

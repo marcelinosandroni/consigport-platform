@@ -1,6 +1,7 @@
 package br.com.consigport.domain.portability;
 
 import br.com.consigport.domain.shared.IdempotencyKey;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -53,5 +54,21 @@ public final class InMemoryPortabilityOperationRepository
    */
   public int size() {
     return operations.size();
+  }
+
+  @Override
+  public List<PortabilityOperation> findDueForPolling(Instant now, int limit) {
+    return operations.stream()
+        .filter(operation -> isDue(operation, now))
+        .limit(limit)
+        .toList();
+  }
+
+  private static boolean isDue(PortabilityOperation operation, Instant now) {
+    if (operation.status() != OperationStatus.PENDING
+        && operation.status() != OperationStatus.INTEGRATION_ERROR) {
+      return false;
+    }
+    return operation.nextPollAt() == null || !operation.nextPollAt().isAfter(now);
   }
 }

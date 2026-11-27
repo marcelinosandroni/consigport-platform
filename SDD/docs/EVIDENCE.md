@@ -2510,3 +2510,244 @@
 - `backend/src/test/java/br/com/consigport/adapters/in/web/PortabilityOperationResourceTest.java`
 - `backend/src/test/java/br/com/consigport/domain/portability/InMemoryCentralPortabilityPort.java`
 - `backend/src/test/java/br/com/consigport/domain/portability/InMemoryPortabilityOperationRepository.java`
+
+### Task 2.11 — Polling resiliente
+
+- **Data de Conclusão:** 2026-11-27
+- **Branch:** `feat/031-backend-resilient-polling`
+- **PR:** #43 — https://github.com/marcelinosandroni/consigport-platform/pull/43
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** acompanhar a Central até o estado terminal, com worker de 2 s e lote de
+  20, honrando o `Retry-After`, repetindo com backoff e circuit breaker, e reenviando a
+  operação que falhou com a mesma `Idempotency-Key`.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Worker, backoff, circuito e cliente HTTP (unitário):**
+   ```text
+   ./mvnw -B -pl backend test -Dtest='PollOperationTest,IntegrationBackoffTest,CircuitBreakerTest,CentralHttpClientTest'
+   → Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.199 s -- in
+     br.com.consigport.application.portability.IntegrationBackoffTest
+   → Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.326 s -- in
+     br.com.consigport.application.portability.PollOperationTest
+   → Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.335 s -- in
+     br.com.consigport.adapters.out.central.CentralHttpClientTest
+   → Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.042 s -- in
+     br.com.consigport.adapters.out.resilience.CircuitBreakerTest
+   → Tests run: 44, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   → EXIT=0
+   ```
+2. **Persistência do polling, worker e agregado (PostgreSQL 16 via Testcontainers):**
+   ```text
+   ./mvnw -B -pl backend test -Dtest='PollingPersistenceTest,SchedulingConfigTest,PortabilityOperationTest'
+   → Tests run: 45, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.703 s -- in
+     br.com.consigport.domain.portability.PortabilityOperationTest
+   → Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 23.02 s -- in
+     br.com.consigport.adapters.out.persistence.PollingPersistenceTest
+   → Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.019 s -- in
+     br.com.consigport.config.SchedulingConfigTest
+   → Tests run: 64, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   → EXIT=0
+   ```
+3. **Reator completo (backend + mock da Central):**
+   ```text
+   ./mvnw -B verify
+   → Tests run: 273, Failures: 0, Errors: 0, Skipped: 0
+   → Tests run: 39, Failures: 0, Errors: 0, Skipped: 0
+   → ConsigPort Backend ................................. SUCCESS [ 53.521 s]
+   → Central de Convênios Mock .......................... SUCCESS [ 23.317 s]
+   → BUILD SUCCESS
+   → EXIT=0
+   ```
+4. **Prova de vida do `Retry-After` (o próximo poll ignorando o cabeçalho da Central):**
+   ```text
+   → PollOperation com answeredAt.plus(Duration.ZERO) no lugar do Retry-After
+   → ./mvnw -q -B -pl backend test -Dtest='PollOperationTest'
+   → Tests run: 13, Failures: 2, Errors: 0, Skipped: 0, Time elapsed: 0.630 s
+     <<< FAILURE! -- in br.com.consigport.application.portability.PollOperationTest
+   → PollOperationTest.recordsTheAttemptAndHonoursTheRetryAfterOfTheCentral:122
+     expected: 2026-11-27T10:15:35Z
+      but was: 2026-11-27T10:15:30Z
+   → PollOperationTest.schedulesTheNextPollFromTheAnswerOfTheCentralAndNotFromTheStartOfTheBatch:111
+     expected: 2026-11-27T10:15:37Z
+      but was: 2026-11-27T10:15:35Z
+   → EXIT=1
+   → Retry-After restaurado
+   → ./mvnw -q -B -pl backend test -Dtest='PollOperationTest'
+   → EXIT=0
+   ```
+5. **End-to-end com o backend real contra o mock real da Central** (PostgreSQL 16 do
+   compose, backend em `:8080`, mock em `:8081`; o mock confirma em 8 s e a sua falha
+   determinística de timeout dura 4 s, acima do read timeout de 3 s do backend):
+   ```text
+   === 5. fase A: a operação entra em PENDING e o worker acompanha a Central ===
+   Idempotency-Key: 3085ffa1-71ca-431a-82f9-bbe6ae5b84de
+   POST /api/v1/portability-operations -> {"operationId":"8c22e86d-c93a-4658-bd99-2ce7792504f6","protocol":"PRT-20261127-0002","status":"PENDING","totalAmount":750.00,"createdAt":"2026-11-27T06:03:54.252213Z"} | 202 1.037958
+   status CONFIRMED apos 5 ciclos de 2 s do worker
+
+   === 6. fase A: o que o backend gravou (o 204 virou POLL_ATTEMPT) ===
+    id |     event_type      | previous_status | new_status |          created_at           |                                details
+   ----+---------------------+-----------------+------------+-------------------------------+------------------------------------------------------------------------
+   59 | OPERATION_CREATED   |                 | CREATED    | 2026-11-27 06:03:54.252213+00 | Operation created
+   60 | OPERATION_SUBMITTED | CREATED         | PENDING    | 2026-11-27 06:03:55.185084+00 | Central accepted the operation with protocol PRT-20261127-0002
+   61 | POLL_ATTEMPT        | PENDING         | PENDING    | 2026-11-27 06:03:55.964406+00 | The Central is still processing the operation; the next poll is in 2 s
+   62 | POLL_ATTEMPT        | PENDING         | PENDING    | 2026-11-27 06:03:58.005691+00 | The Central is still processing the operation; the next poll is in 2 s
+   63 | POLL_ATTEMPT        | PENDING         | PENDING    | 2026-11-27 06:04:00.121605+00 | The Central is still processing the operation; the next poll is in 2 s
+   64 | POLL_ATTEMPT        | PENDING         | PENDING    | 2026-11-27 06:04:02.202531+00 | The Central is still processing the operation; the next poll is in 2 s
+   65 | OPERATION_CONFIRMED | PENDING         | CONFIRMED  | 2026-11-27 06:04:04.25457+00  | The Central confirmed the operation
+
+   === 7. fase A: o intervalo entre as tentativas de poll (Retry-After honrado) ===
+   POLL_ATTEMPT|2026-11-27 06:03:55.964406+00|00:00:00.779322
+   POLL_ATTEMPT|2026-11-27 06:03:58.005691+00|00:00:02.041285
+   POLL_ATTEMPT|2026-11-27 06:04:00.121605+00|00:00:02.115914
+   POLL_ATTEMPT|2026-11-27 06:04:02.202531+00|00:00:02.080926
+   OPERATION_CONFIRMED|2026-11-27 06:04:04.25457+00|00:00:02.052039
+
+   === 9. fase B: o beneficiario -TIMEOUT faz a Central estourar o read timeout ===
+   POST /api/v1/portability-operations (BEN-TIMEOUT) -> {"operationId":"9fa953ce-83b5-4e2b-901a-2874c73f8557","protocol":"PRT-20261127-0003","status":"PENDING","totalAmount":500.00,"createdAt":"2026-11-27T06:04:06.898824Z"} | 202 0.067818
+    67 | OPERATION_SUBMITTED | CREATED         | PENDING    | 2026-11-27 06:04:06.930323+00 | Central accepted the operation with protocol PRT-20261127-0003
+    68 | OPERATION_CONFIRMED | PENDING         | CONFIRMED  | 2026-11-27 06:04:15.808875+00 | The Central confirmed the operation
+
+   --- as leituras de status que a Central countou (o timeout deterministico leu 2 vezes) ---
+       "contadores": {
+           "leiturasDeStatus": {
+               "PRT-20261127-0003": 3
+           }
+       }
+
+   === 10. fase C: o reenvio usa a mesma Idempotency-Key ===
+   mock com a chave K e outro payload -> {"protocolo":"PRT-20261127-0004"} | 202
+   POST /api/v1/portability-operations -> {"operationId":"604bebe1-d997-4b30-80a5-8a86144b438c","protocol":null,"status":"INTEGRATION_ERROR","totalAmount":450.00,"createdAt":"2026-11-27T06:04:18.379816Z"} | 202 0.072037
+   o worker reenviou e a Central recusou de novo (retry_count=2) apos 30 ciclos
+    70 | INTEGRATION_FAILED  | CREATED           | INTEGRATION_ERROR | 2026-11-27 06:04:18.418668+00 | Central did not accept the operation: IDEMPOTENCIA_CONFLITO (status 409)
+    71 | INTEGRATION_FAILED  | INTEGRATION_ERROR | INTEGRATION_ERROR | 2026-11-27 06:05:20.114594+00 | the Central did not accept the operation: IDEMPOTENCIA_CONFLITO
+
+   --- a Central nao criou uma segunda operacao: o reenvio carregou a mesma chave ---
+       "operacoes": { "PRT-20261127-0001": {...}, "PRT-20261127-0002": {...},
+                      "PRT-20261127-0003": {...}, "PRT-20261127-0004": {...} }
+
+   === 11. fase D: a Central cai durante o polling ===
+   POST /api/v1/portability-operations -> {"operationId":"8feaef21-def8-46ed-808f-19560076142a","protocol":"PRT-20261127-0005","status":"PENDING","totalAmount":300.00,"createdAt":"2026-11-27T06:05:22.128636Z"} | 202 0.134268
+   mock derrubado
+   a falha da Central ficou registrada apos 2 ciclos de 2 s
+    74 | INTEGRATION_FAILED  | INTEGRATION_ERROR | INTEGRATION_ERROR | 2026-11-27 06:05:25.782009+00 | the Central did not accept the operation: CENTRAL_INDISPONIVEL
+    75 | INTEGRATION_FAILED  | PENDING           | INTEGRATION_ERROR | 2026-11-27 06:05:27.354524+00 | the Central did not answer the status of the operation
+
+                     id                  |      status       |     protocol      | retry_count |         next_poll_at
+   --------------------------------------+-------------------+-------------------+-------------+-------------------------------
+    604bebe1-d997-4b30-80a5-8a86144b438c | INTEGRATION_ERROR |                   |           3 | 2026-11-27 06:05:33.782009+00
+    8feaef21-def8-46ed-808f-19560076142a | INTEGRATION_ERROR | PRT-20261127-0005 |           1 | 2026-11-27 06:05:29.354524+00
+
+   === 13. encerramento dos processos e dos containers ===
+   containers restantes: 0
+   processes restantes: 0
+   === fim ===
+   ```
+6. **Gates locais:**
+   ```text
+   node scripts/check-specs.mjs               → OK (exit 0)
+   node SDD/SKILLS/check-docs/check-docs.mjs  → OK (46 documentos, exit 0)
+   node scripts/check-architecture.mjs        → OK (22 testes de validação, exit 0)
+   node scripts/check-ai-log.mjs              → OK (37 sessões, exit 0)
+   node scripts/check-theme-tokens.mjs        → OK (exit 0)
+   ```
+
+#### Conteúdo Entregue:
+- `domain/portability/CentralStatus` — o estado da operação na Central, selado em
+  `Pending` (com o `Retry-After`), `Confirmed` e `Rejected`, sempre com o corpo bruto da
+  Central, para a trilha da auditoria provar o que ela respondeu.
+- `domain/portability/CentralStatusPort` — a porta de leitura do status, no domínio.
+- `domain/portability/PortabilityOperation.renewIntegrationBackoff` — a falha de uma
+  operação que já está em `INTEGRATION_ERROR` renova o backoff e a contagem de falhas sem
+  mudar o status, porque a tabela de estados do `ARCHITECTURE.md` §7 não tem a
+  auto-transição de `INTEGRATION_ERROR` para `INTEGRATION_ERROR`.
+- `application/portability/PollOperation` — o worker: lê o lote das operações devidas,
+  pergunta o status, reenvia a operação sem protocolo com a mesma chave e grava a
+  operação e o evento na mesma transação.
+- `application/portability/IntegrationBackoff` — a espera que dobra com cada falha e
+  nunca passa de 60 s.
+- `adapters/out/central/CentralHttpClient.statusOf` — a leitura do status: `204` com
+  `Retry-After`, `200` terminal, `404` e corpo fora do contrato como falha, com 3
+  tentativas e o circuito.
+- `adapters/out/central/acl/PortabilityAcl.toCentralStatus` e o DTO
+  `CentralStatusResponse` — a tradução do contrato PT para o domínio EN.
+- `adapters/out/resilience/CircuitBreaker` — janela de 10 chamadas, abre em 50% de
+  falhas, fica 10 s aberto e fecha depois de 3 chamadas em half-open.
+- `adapters/out/persistence/JpaPortabilityOperationRepository.findDueForPolling` — as
+  operações `PENDING` e `INTEGRATION_ERROR` com `next_poll_at <= now()`, as mais antigas
+  primeiro, limitadas ao lote.
+- `config/ResilienceConfig` e `config/SchedulingConfig` — o circuito, o backoff e o
+  worker (`fixedDelay` de 2 s, lote de 20, desligável com `central.poll.enabled`).
+- `config/CompositionRoot` e `application.yml` — os beans e a seção `central.poll.*` e
+  `central.circuit.*`.
+- Testes: 13 do worker, 6 do backoff, 8 do circuito, 17 do cliente HTTP, 7 de
+  integração do polling sobre PostgreSQL 16, 2 do agendamento e 45 do agregado.
+
+#### Descobertas e Decisões:
+- O `Retry-After` é contado a partir da **resposta** da Central, não do começo do lote:
+  a primeira execução do end-to-end mostrou um poll que durou 8,9 s (as duas tentativas
+  com timeout do mock) gravando o `next_poll_at` com o instante do começo do lote, já no
+  passado — a operação seria consultada de novo sem espera. O worker agora data a
+  transição com o instante da resposta, e o teste
+  `schedulesTheNextPollFromTheAnswerOfTheCentralAndNotFromTheStartOfTheBatch` prova a
+  regra.
+- A tabela de estados do `ARCHITECTURE.md` §7 não lista a transição de
+  `INTEGRATION_ERROR` para `INTEGRATION_ERROR`, mas o fluxo do worker (§11, passo 6)
+  manda registrar `INTEGRATION_FAILED`, incrementar `retry_count` e agendar o backoff
+  quando a falha acontece em uma operação que já estava em `INTEGRATION_ERROR`. O
+  agregado ganhou `renewIntegrationBackoff`, que muda só a agenda e a contagem; o
+  status permanece, e a máquina de estados testada em `PortabilityOperationTest` segue
+  intacta.
+- O `404` do contrato (`OPERACAO_NAO_ENCONTRADA`) é falha da integração, não estado
+  terminal: o contrato da Central não tem motivo de rejeição para ele e o domínio só
+  conhece `MARGEM_INSUFFICIENTE`. A operação fica `INTEGRATION_ERROR`, retomável, com o
+  motivo da recusa na trilha da auditoria.
+- Um motivo de rejeição que o domínio não conhece também vira falha de integração, pelo
+  mesmo motivo: o `RejectionReason` é selado e o contrato não fecha a lista de motivos.
+- O circuito conta uma falha por chamada lógica, não por tentativa: a janela de 10
+  mede as chamadas que a Central realmente recebeu.
+- O worker é uma instância só (`@Scheduled` com um `TaskScheduler` de uma thread), como
+  o trade-off documentado do `ARCHITECTURE.md` §11; o `@Version` otimista do banco
+  resolve a concorrência entre instâncias, e o perdedor do bloqueio descarta a
+  transição, porque o estado armazenado é a verdade.
+- O reenvio da operação que a Central nunca recebeu leva a mesma `Idempotency-Key`: o
+  end-to-end provou isso pelo `409 IDEMPOTENCIA_CONFLITO` que o mock devolveu no
+  reenvio — com outra chave, o mock teria aceitado a operação.
+- O primeiro pedido de cada caminho novo de uma JVM fria custa de 1,5 s a 4,5 s nesta
+  máquina EC2 (carregamento de classes), acima do read timeout de 3 s. O end-to-end
+  aquece o mock (autorização, agenda e submissão) e o cliente HTTP do backend antes de
+  medir, para evidenciar o comportamento da integração e não o aquecimento da máquina.
+
+#### Arquivos Tocados:
+- `backend/src/main/java/br/com/consigport/domain/portability/CentralStatus.java`
+- `backend/src/main/java/br/com/consigport/domain/portability/CentralStatusPort.java`
+- `backend/src/main/java/br/com/consigport/domain/portability/PortabilityOperation.java`
+- `backend/src/main/java/br/com/consigport/domain/portability/PortabilityOperationRepository.java`
+- `backend/src/main/java/br/com/consigport/domain/shared/DomainError.java`
+- `backend/src/main/java/br/com/consigport/application/portability/PollOperation.java`
+- `backend/src/main/java/br/com/consigport/application/portability/IntegrationBackoff.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/central/CentralHttpClient.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/central/CentralProperties.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/central/acl/PortabilityAcl.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/central/dto/CentralStatusResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/resilience/CircuitBreaker.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/persistence/JpaPortabilityOperationRepository.java`
+- `backend/src/main/java/br/com/consigport/config/CompositionRoot.java`
+- `backend/src/main/java/br/com/consigport/config/ResilienceConfig.java`
+- `backend/src/main/java/br/com/consigport/config/SchedulingConfig.java`
+- `backend/src/main/resources/application.yml`
+- `backend/src/test/java/br/com/consigport/application/portability/PollOperationTest.java`
+- `backend/src/test/java/br/com/consigport/application/portability/IntegrationBackoffTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/out/resilience/CircuitBreakerTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/out/central/CentralHttpClientTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/out/persistence/PollingPersistenceTest.java`
+- `backend/src/test/java/br/com/consigport/config/SchedulingConfigTest.java`
+- `backend/src/test/java/br/com/consigport/domain/portability/PortabilityOperationTest.java`
+- `backend/src/test/java/br/com/consigport/domain/portability/InMemoryCentralStatusPort.java`
+- `backend/src/test/java/br/com/consigport/domain/portability/InMemoryPortabilityOperationRepository.java`
+- `backend/src/test/java/br/com/consigport/support/MutableClock.java`
+- `backend/src/test/java/br/com/consigport/support/PostgreSqlTestSupport.java`
+- `backend/src/test/java/br/com/consigport/application/portability/StartOperationTest.java`

@@ -185,6 +185,18 @@ public sealed abstract class DomainError extends RuntimeException
       super("the Central is unavailable");
     }
 
+    /**
+     * Builds the error with the reason of the failure.
+     *
+     * <p>The code of the error does not change: the reason explains the failure in the
+     * trail of the audit, never in the answer of the public API.
+     *
+     * @param message the reason of the failure
+     */
+    public CentralUnavailable(String message) {
+      super(message);
+    }
+
     @Override
     public String code() {
       return "CENTRAL_UNAVAILABLE";
