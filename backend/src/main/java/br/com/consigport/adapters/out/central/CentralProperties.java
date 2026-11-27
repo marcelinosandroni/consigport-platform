@@ -15,6 +15,8 @@ import java.time.Duration;
  * @param retryDelay the delay between two attempts; it doubles on every attempt
  * @param connectTimeout the timeout of the connection
  * @param readTimeout the timeout of the reading
+ * @param pollInterval the interval between two polls, used when the Central does not
+ *     answer with a {@code Retry-After}
  */
 public record CentralProperties(
     String baseUrl,
@@ -22,7 +24,8 @@ public record CentralProperties(
     int maxAttempts,
     Duration retryDelay,
     Duration connectTimeout,
-    Duration readTimeout) {
+    Duration readTimeout,
+    Duration pollInterval) {
 
   /**
    * Validates the configuration.
@@ -47,6 +50,9 @@ public record CentralProperties(
     }
     if (readTimeout == null || readTimeout.isNegative()) {
       throw new IllegalArgumentException("readTimeout must not be negative");
+    }
+    if (pollInterval == null || pollInterval.isNegative() || pollInterval.isZero()) {
+      throw new IllegalArgumentException("pollInterval must be positive");
     }
   }
 }

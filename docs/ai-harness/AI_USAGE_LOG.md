@@ -1048,3 +1048,49 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - `./mvnw -B -pl backend test -Dtest='HmacSignerTest,CentralHttpClientTest,StartOperationTest'` → 31 testes verdes.
    - `./mvnw -B -pl backend test -Dtest='PortabilityOperationResourceTest'` → 11 testes verdes.
    - `./mvnw -B verify` → reactor verde (backend 228 testes, mock 39 testes).
+
+## Sessão #37 — Task 2.11 (Polling Resiliente)
+
+- **Data:** 2026-11-27
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/031-backend-resilient-polling`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** acompanhar a Central até o estado terminal, com worker de 2 s e lote de
+  20, honrando o `Retry-After`, repetindo com backoff e circuit breaker, e reenviando a
+  operação que falhou com a mesma `Idempotency-Key`.
+
+### Atividades Realizadas:
+1. **Domínio:**
+   - `CentralStatus` (selado: `Pending` com o `Retry-After`, `Confirmed` e `Rejected`,
+     sempre com o corpo bruto da Central) e `CentralStatusPort` (a porta de leitura do
+     status).
+   - `PortabilityOperation.renewIntegrationBackoff`: a falha de uma operação que já
+     está em `INTEGRATION_ERROR` renova o backoff e a contagem sem mudar o status,
+     porque a tabela de estados do `ARCHITECTURE.md` §7 não tem a auto-transição.
+2. **Aplicação:**
+   - `PollOperation` (lote das operações devidas, consulta do status, reenvio sem
+     protocolo com a mesma chave, operação e evento gravados na mesma transação) e
+     `IntegrationBackoff` (2 s dobrando até 60 s).
+3. **Adaptadores:**
+   - `CentralHttpClient.statusOf`: `204` com `Retry-After`, `200` terminal, `404` e
+     corpo fora do contrato como falha, com 3 tentativas e o circuito.
+   - `PortabilityAcl.toCentralStatus` e o DTO `CentralStatusResponse` (tradução PT → EN).
+   - `CircuitBreaker` (janela 10, 50% de falhas, 10 s aberto, 3 chamadas em half-open) e
+     a consulta `findDueForPolling` do repositório.
+4. **Wiring:** `ResilienceConfig`, `SchedulingConfig` (`fixedDelay` de 2 s, lote de 20,
+   desligável com `central.poll.enabled`), `CompositionRoot` e `application.yml`.
+5. **Testes:** 13 do worker, 6 do backoff, 8 do circuito, 17 do cliente HTTP, 7 de
+   integração do polling sobre PostgreSQL 16, 2 do agendamento e 45 do agregado.
+6. **Prova de vida:** ignorar o `Retry-After` no worker quebrou o build
+   (`Tests run: 13, Failures: 2`); o `Retry-After` foi restaurado e a suíte voltou a
+   ficar verde.
+7. **End-to-end com o backend real contra o mock real:** `204` virando `POLL_ATTEMPT`
+   com o intervalo de 2 s honrado, a confirmação terminal, o timeout determinístico da
+   Central sobrevivo pelas 3 tentativas (3 leituras contadas no mock), o reenvio com a
+   mesma `Idempotency-Key` (o mock recusou de novo com `409 IDEMPOTENCIA_CONFLITO`) e a
+   queda da Central deixando a operação em `INTEGRATION_ERROR` com o backoff de 2 s, 4 s
+   e 8 s.
+8. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest='PollOperationTest,IntegrationBackoffTest,CircuitBreakerTest,CentralHttpClientTest'` → 44 testes verdes.
+   - `./mvnw -B -pl backend test -Dtest='PollingPersistenceTest,SchedulingConfigTest,PortabilityOperationTest'` → 64 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend 273 testes, mock 39 testes).

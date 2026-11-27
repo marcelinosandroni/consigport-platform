@@ -1,6 +1,8 @@
 package br.com.consigport.domain.portability;
 
 import br.com.consigport.domain.shared.IdempotencyKey;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -46,4 +48,17 @@ public interface PortabilityOperationRepository {
    * @return the operation, or empty when the protocol is unknown
    */
   Optional<PortabilityOperation> findByProtocol(String protocol);
+
+  /**
+   * Finds the operations whose polling is due.
+   *
+   * <p>The worker polls the operations that the Central accepted and the ones whose
+   * integration failed: both are waiting for the Central. An operation that was never
+   * polled has no scheduled poll, so it is due at once (ADR {@code 0003}).
+   *
+   * @param now the instant of the worker
+   * @param limit the maximum number of operations returned
+   * @return the operations due for polling, from the oldest to the newest
+   */
+  List<PortabilityOperation> findDueForPolling(Instant now, int limit);
 }

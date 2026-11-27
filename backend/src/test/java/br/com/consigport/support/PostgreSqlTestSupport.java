@@ -29,6 +29,9 @@ public abstract class PostgreSqlTestSupport {
   /**
    * Points the datasource of the test at the shared container.
    *
+   * <p>The worker of the polling is switched off: it would race with the assertions of
+   * the tests, which drive the use case themselves.
+   *
    * @param registry the properties of the context under construction
    */
   @DynamicPropertySource
@@ -36,6 +39,7 @@ public abstract class PostgreSqlTestSupport {
     registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
     registry.add("spring.datasource.username", POSTGRES::getUsername);
     registry.add("spring.datasource.password", POSTGRES::getPassword);
+    registry.add("central.poll.enabled", () -> "false");
   }
 
   private static PostgreSQLContainer<?> startPostgres() {
