@@ -415,6 +415,18 @@ class StartOperationTest {
     public List<PortabilityOperation> findDueForPolling(Instant now, int limit) {
       return delegate.findDueForPolling(now, limit);
     }
+
+    @Override
+    public br.com.consigport.domain.shared.Page<br.com.consigport.domain.portability.OperationSummary>
+        list(br.com.consigport.domain.portability.OperationFilter filter, int page, int size) {
+      return delegate.list(filter, page, size);
+    }
+
+    @Override
+    public Optional<br.com.consigport.domain.portability.OperationDetail> findDetailById(
+        PortabilityOperation.OperationId id) {
+      return delegate.findDetailById(id);
+    }
   }
 
   /**
@@ -464,6 +476,18 @@ class StartOperationTest {
     @Override
     public List<PortabilityOperation> findDueForPolling(Instant now, int limit) {
       return delegate.findDueForPolling(now, limit);
+    }
+
+    @Override
+    public br.com.consigport.domain.shared.Page<br.com.consigport.domain.portability.OperationSummary>
+        list(br.com.consigport.domain.portability.OperationFilter filter, int page, int size) {
+      return delegate.list(filter, page, size);
+    }
+
+    @Override
+    public Optional<br.com.consigport.domain.portability.OperationDetail> findDetailById(
+        PortabilityOperation.OperationId id) {
+      return delegate.findDetailById(id);
     }
   }
 }

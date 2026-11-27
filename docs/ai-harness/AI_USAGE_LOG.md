@@ -1196,3 +1196,52 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - `./mvnw -B -pl backend test -Dtest='CompleteOperationTest,PollOperationTest,CompletionPersistenceTest,PollingPersistenceTest,PortabilityOperationTest,SchedulingConfigTest'` → 93 testes verdes.
    - `./mvnw -B verify` → reactor verde (backend 301 testes, mock 39 testes).
    - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).
+
+## Sessão #40 — Task 2.14 (Consulta de operações e trilha)
+
+- **Data:** 2026-11-27
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/034-backend-operation-queries`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** expor a leitura paginada das operações com filtro por status, o detalhe
+  de uma operação e a trilha da auditoria em ordem cronológica; a operação que não
+  existe responde `404 OPERATION_NOT_FOUND`.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/AGENTS.md`, `SDD/specs/PLAN.md` (task 2.14 em voo),
+   `SDD/stacks/java.md` e `SDD/stacks/testing.md`; o `ARCHITECTURE.md` §8 e o contrato
+   público já declaravam as rotas e o formato do erro — nenhuma regra precisou ser
+   alterada.
+2. **Aplicação:**
+   - `ListOperations`: a consulta paginada e filtrada pelo estado, com o total do
+     conjunto na página.
+   - `FindOperation`: o detalhe de uma operação; a inexistente vira
+     `DomainError.OperationNotFound` com o código `OPERATION_NOT_FOUND`.
+   - `ListOperationEvents`: a trilha da auditoria em ordem cronológica.
+3. **Domínio:** `Page` (página imutável com o total), `OperationFilter` (todas ou as de
+   um estado) e os modelos de leitura `OperationSummary` e `OperationDetail`.
+4. **Persistência:** a porta ganhou `list` e `findDetailById`; o adaptador JPA faz a
+   contagem e a página, com a ordem estável `createdAt, id`.
+5. **Borda HTTP:** `GET /api/v1/portability-operations` (com `status`, `page` e `size`) e
+   `GET /api/v1/portability-operations/{id}`, com os DTOs do contrato; o handler passou a
+   traduzir `OPERATION_NOT_FOUND` em `404`.
+6. **Testes:** 2 do `FindOperation`, 6 do `ListOperations`, 3 do `ListOperationEvents`, 6
+   do `Page`, 5 de integração da persistência sobre PostgreSQL 16 (25 operações,
+   paginação conferida) e 9 da borda HTTP sobre HTTP real.
+7. **End-to-end com o backend real contra o mock real:** quatro operações (três
+   confirmadas e uma rejeitada); a lista paginada devolveu `totalElements: 4` e
+   `totalPages: 2`, com as duas páginas sem repetir operação; o filtro por estado
+   devolveu 3 `COMPLETED` e 1 `REJECTED`; o detalhe veio completo; a operação
+   inexistente respondeu `404 OPERATION_NOT_FOUND`; página negativa, tamanho 101 e
+   estado inexistente responderam `400 VALIDATION_ERROR`. Nenhum processo ou container
+   sobrou.
+8. **Descoberta:** `OPERATION_NOT_FOUND` estava no contrato e no `ARCHITECTURE.md` §8,
+   mas não estava mapeado no handler — a consulta de uma operação inexistente
+   respondia `500` em vez de `404`.
+9. **Decisão:** a consulta sai por modelos de leitura, e não pelo agregado: `updated_at`
+   pertence à linha do armazenamento e o contrato público exige `updatedAt` no resumo e
+   no detalhe.
+10. **Validação:**
+    - `./mvnw -B -pl backend test -Dtest='FindOperationTest,ListOperationsTest,ListOperationEventsTest,SharedValueObjectsTest,QueryPersistenceTest,OperationQueryResourceTest'` → 49 testes verdes.
+    - `./mvnw -B verify` → reactor verde (backend 332 testes, mock 39 testes).
+    - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).

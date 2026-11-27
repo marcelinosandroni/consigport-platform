@@ -43,6 +43,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
           Map.entry("IDEMPOTENCY_KEY_REQUIRED", HttpStatus.BAD_REQUEST),
           Map.entry("AUTHORIZATION_REQUIRED", HttpStatus.FORBIDDEN),
           Map.entry("BENEFICIARY_NOT_FOUND", HttpStatus.NOT_FOUND),
+          Map.entry("OPERATION_NOT_FOUND", HttpStatus.NOT_FOUND),
           Map.entry("IDEMPOTENCY_CONFLICT", HttpStatus.CONFLICT),
           Map.entry("INSTALLMENT_NOT_ELIGIBLE", HttpStatus.UNPROCESSABLE_ENTITY),
           Map.entry("CENTRAL_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE),
@@ -56,6 +57,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
               "AUTHORIZATION_REQUIRED",
               "É necessário registrar a autorização antes de consultar a agenda."),
           Map.entry("BENEFICIARY_NOT_FOUND", "Beneficiário não encontrado."),
+          Map.entry("OPERATION_NOT_FOUND", "Operação não encontrada."),
           Map.entry(
               "IDEMPOTENCY_CONFLICT", "A chave de idempotência já foi usada com outro conteúdo."),
           Map.entry("INSTALLMENT_NOT_ELIGIBLE", "Uma ou mais parcelas não são elegíveis."),

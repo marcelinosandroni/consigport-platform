@@ -3152,3 +3152,216 @@
 - `SDD/docs/EVIDENCE.md`
 - `docs/adr/0003-assincronismo-polling-e-trilha-imutavel.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+### Task 2.14 — Consulta de operações e trilha
+
+- **Data de Conclusão:** 2026-11-27
+- **Branch:** `feat/034-backend-operation-queries`
+- **PR:** #46 — https://github.com/marcelinosandroni/consigport-platform/pull/46
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** expor a leitura paginada das operações com filtro por status, o detalhe
+  de uma operação e a trilha da auditoria em ordem cronológica; a operação que não
+  existe responde `404 OPERATION_NOT_FOUND`.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Recorte da task (casos de uso, domínio, persistência e borda HTTP):**
+   ```text
+   ./mvnw -B -pl backend test -Dtest='FindOperationTest,ListOperationsTest,ListOperationEventsTest,SharedValueObjectsTest,QueryPersistenceTest,OperationQueryResourceTest'
+   → Tests run: 6, Failures: 0, Errors: 0, Skipped: 0 -- in SharedValueObjectsTest$IdempotencyKeyTest
+   → Tests run: 6, Failures: 0, Errors: 0, Skipped: 0 -- in SharedValueObjectsTest$PageTest
+   → Tests run: 4, Failures: 0, Errors: 0, Skipped: 0 -- in SharedValueObjectsTest$InstallmentIdTest
+   → Tests run: 4, Failures: 0, Errors: 0, Skipped: 0 -- in SharedValueObjectsTest$AgreementIdTest
+   → Tests run: 4, Failures: 0, Errors: 0, Skipped: 0 -- in SharedValueObjectsTest$BeneficiaryIdTest
+   → Tests run: 2, Failures: 0, Errors: 0, Skipped: 0 -- in FindOperationTest
+   → Tests run: 6, Failures: 0, Errors: 0, Skipped: 0 -- in ListOperationsTest
+   → Tests run: 3, Failures: 0, Errors: 0, Skipped: 0 -- in ListOperationEventsTest
+   → Tests run: 5, Failures: 0, Errors: 0, Skipped: 0 -- in QueryPersistenceTest
+   → Tests run: 9, Failures: 0, Errors: 0, Skipped: 0 -- in OperationQueryResourceTest
+   → Tests run: 49, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   → EXIT=0
+   ```
+2. **Reator completo (backend + mock da Central):**
+   ```text
+   ./mvnw -B verify
+   → Tests run: 332, Failures: 0, Errors: 0, Skipped: 0   (backend)
+   → Tests run: 39, Failures: 0, Errors: 0, Skipped: 0    (central-convenios-mock)
+   → ConsigPort Platform ................................ SUCCESS [  0.003 s]
+   → ConsigPort Backend ................................. SUCCESS [ 54.153 s]
+   → Central de Convênios Mock .......................... SUCCESS [ 22.098 s]
+   → BUILD SUCCESS
+   → EXIT=0
+   ```
+3. **End-to-end com o backend real contra o mock real da Central** (PostgreSQL 16 do
+   compose, backend em `:8080`, mock em `:8081`; o mock confirma em 8 s; roteiro
+   `/tmp/opencode/e2e-2.14.sh`, log `/tmp/opencode/e2e-2.14.log`):
+   ```text
+   === 0. ambiente ===
+   data: 2026-11-27T14:09:58Z
+     Container consigport-postgres Healthy
+   === 1. mock da Central em :8081 (confirmacao em 8 s) ===
+   mock saudável em 9s
+   === 2. limpeza das tabelas e backend em :8080 (JVM fria) ===
+   TRUNCATE TABLE
+   backend saudável em 16s
+   === 3. quatro operacoes: tres confirmadas e uma rejeitada ===
+   POST /autorizacoes BEN-001 -> {"autorizacaoId":"AUT-20261127-0001"} | 201
+   POST /autorizacoes BEN-REJ -> {"autorizacaoId":"AUT-20261127-0002"} | 201
+   POST /api/v1/portability-operations -> {"operationId":"2bae1e18-e54f-4e6c-91ba-61ee931bd5b6","protocol":"PRT-20261127-0001","status":"PENDING","totalAmount":450.00,"createdAt":"2026-11-27T14:10:40.000927Z"} | 202 1.115476
+   POST /api/v1/portability-operations -> {"operationId":"b69e8dd8-ed26-467f-933d-ede8d850a722","protocol":"PRT-20261127-0002","status":"PENDING","totalAmount":450.00,"createdAt":"2026-11-27T14:10:40.554459Z"} | 202 0.110633
+   POST /api/v1/portability-operations -> {"operationId":"da049309-294e-459c-98b4-8b93aafcbe32","protocol":"PRT-20261127-0003","status":"PENDING","totalAmount":450.00,"createdAt":"2026-11-27T14:10:40.719190Z"} | 202 0.071502
+   POST /api/v1/portability-operations -> {"operationId":"be11d340-9cda-4783-811d-66b463f76722","protocol":"PRT-20261127-0004","status":"PENDING","totalAmount":250.00,"createdAt":"2026-11-27T14:10:40.847504Z"} | 202 0.048923
+
+   === 4. a lista paginada, logo depois do envio ===
+   --- GET /api/v1/portability-operations?page=0&size=2 ---
+   {"items":[{"operationId":"2bae1e18-e54f-4e6c-91ba-61ee931bd5b6","protocol":"PRT-20261127-0001","beneficiaryId":"BEN-001","status":"PENDING","totalAmount":450.00,"createdAt":"2026-11-27T14:10:40.000927Z","updatedAt":"2026-11-27T14:10:40.354209Z"},{"operationId":"b69e8dd8-ed26-467f-933d-ede8d850a722","protocol":"PRT-20261127-0002","beneficiaryId":"BEN-001","status":"PENDING","totalAmount":450.00,"createdAt":"2026-11-27T14:10:40.554459Z","updatedAt":"2026-11-27T14:10:40.598013Z"}],"page":0,"size":2,"totalElements":4,"totalPages":2}
+   [status 200 em 0.119408s]
+   --- GET /api/v1/portability-operations?page=1&size=2 ---
+   {"items":[{"operationId":"da049309-294e-459c-98b4-8b93aafcbe32","protocol":"PRT-20261127-0003","beneficiaryId":"BEN-001","status":"PENDING","totalAmount":450.00,"createdAt":"2026-11-27T14:10:40.719190Z","updatedAt":"2026-11-27T14:10:40.756997Z"},{"operationId":"be11d340-9cda-4783-811d-66b463f76722","protocol":"PRT-20261127-0004","beneficiaryId":"BEN-REJ","status":"PENDING","totalAmount":250.00,"createdAt":"2026-11-27T14:10:40.847504Z","updatedAt":"2026-11-27T14:10:40.873239Z"}],"page":1,"size":2,"totalElements":4,"totalPages":2}
+   [status 200 em 0.015074s]
+   --- GET /api/v1/portability-operations?status=PENDING&size=50 ---
+   {"items":[... 4 operacoes ...],"page":0,"size":50,"totalElements":4,"totalPages":1}
+   [status 200 em 0.026242s]
+
+   === 5. as operacoes chegam ao estado terminal ===
+   tres operacoes foram completadas apos 4 ciclos de 2 s
+   uma operacao foi rejeitada apos 1 ciclos de 2 s
+                     id                  |  status   |     protocol      |  rejection_reason   | retry_count |      account_updated_at       |          created_at           |          updated_at
+    --------------------------------------+-----------+-------------------+---------------------+-------------+-------------------------------+-------------------------------+-------------------------------
+    2bae1e18-e54f-4e6c-91ba-61ee931bd5b6 | COMPLETED | PRT-20261127-0001 |                     |           0 | 2026-11-27 14:10:49.768553+00 | 2026-11-27 14:10:40.000927+00 | 2026-11-27 14:10:49.773078+00
+    b69e8dd8-ed26-467f-933d-ede8d850a722 | COMPLETED | PRT-20261127-0002 |                     |           0 | 2026-11-27 14:10:49.805537+00 | 2026-11-27 14:10:40.554459+00 | 2026-11-27 14:10:49.808591+00
+    da049309-294e-459c-98b4-8b93aafcbe32 | COMPLETED | PRT-20261127-0003 |                     |           0 | 2026-11-27 14:10:49.83032+00  | 2026-11-27 14:10:40.71919+00  | 2026-11-27 14:10:49.834731+00
+    be11d340-9cda-4783-811d-66b463f76722 | REJECTED  | PRT-20261127-0004 | MARGIN_INSUFFICIENT |           0 |                               | 2026-11-27 14:10:40.847504+00 | 2026-11-27 14:10:49.867472+00
+   (4 rows)
+
+   === 6. a lista filtrada pelo estado terminal ===
+   --- GET /api/v1/portability-operations?status=COMPLETED ---
+   {"items":[... 3 operacoes COMPLETED ...],"page":0,"size":20,"totalElements":3,"totalPages":1}
+   [status 200 em 0.013517s]
+   --- GET /api/v1/portability-operations?status=REJECTED ---
+   {"items":[{"operationId":"be11d340-9cda-4783-811d-66b463f76722","protocol":"PRT-20261127-0004","beneficiaryId":"BEN-REJ","status":"REJECTED","totalAmount":250.00,"createdAt":"2026-11-27T14:10:40.847504Z","updatedAt":"2026-11-27T14:10:49.867472Z"}],"page":0,"size":20,"totalElements":1,"totalPages":1}
+   [status 200 em 0.014023s]
+
+   === 7. o detalhe de uma operacao ===
+   GET /api/v1/portability-operations/2bae1e18-e54f-4e6c-91ba-61ee931bd5b6
+   {"operationId":"2bae1e18-e54f-4e6c-91ba-61ee931bd5b6","protocol":"PRT-20261127-0001","beneficiaryId":"BEN-001","status":"COMPLETED","totalAmount":450.00,"createdAt":"2026-11-27T14:10:40.000927Z","updatedAt":"2026-11-27T14:10:49.773078Z","agreementId":"AGR-001","installments":[{"installmentId":"PAR-001","agreementId":"AGR-001","amount":450.00,"discountDate":"2026-12-05"}],"assigneeCreditor":"ConsigPort","receivingAccount":{"bank":"001","branch":"1234","account":"56789-0"},"rejectionReason":null,"retryCount":0,"accountUpdatedAt":"2026-11-27T14:10:49.768553Z"}
+   [status 200 em 0.021853s]
+
+   === 8. a operacao que nao existe: 404 OPERATION_NOT_FOUND ===
+   {"code":"OPERATION_NOT_FOUND","message":"Operação não encontrada.","locale":"pt-BR","timestamp":"2026-11-27T14:10:52.489497495Z","path":"/api/v1/portability-operations/e15e3c0a-7528-4370-941d-db9a1b2c2005","details":[]}
+   [status 404 em 0.030967s]
+
+   === 9. os parametros recusados: 400 VALIDATION_ERROR ===
+   --- GET /api/v1/portability-operations?page=-1 ---
+   {"code":"VALIDATION_ERROR","message":"A requisição é inválida.","locale":"pt-BR","timestamp":"2026-11-27T14:10:52.514347452Z","path":"/api/v1/portability-operations","details":[]}
+   [status 400 em 0.006868s]
+   --- GET /api/v1/portability-operations?size=101 ---
+   {"code":"VALIDATION_ERROR","message":"A requisição é inválida.","locale":"pt-BR","timestamp":"2026-11-27T14:10:52.528767588Z","path":"/api/v1/portability-operations","details":[]}
+   [status 400 em 0.004534s]
+   --- GET /api/v1/portability-operations?status=UNKNOWN ---
+   {"code":"VALIDATION_ERROR","message":"A requisição é inválida.","locale":"pt-BR","timestamp":"2026-11-27T14:10:52.555392898Z","path":"/api/v1/portability-operations","details":[]}
+   [status 400 em 0.019155s]
+
+   === 10. a trilha da operacao, em ordem cronologica ===
+    id  |     event_type      | previous_status | new_status |          created_at           |                                details
+   -----+---------------------+-----------------+------------+-------------------------------+------------------------------------------------------------------------
+    285 | OPERATION_CREATED   |                 | CREATED    | 2026-11-27 14:10:40.000927+00 | Operation created
+    286 | OPERATION_SUBMITTED | CREATED         | PENDING    | 2026-11-27 14:10:40.347019+00 | Central accepted the operation with protocol PRT-20261127-0001
+    ... (16 POLL_ATTEMPT) ...
+    309 | OPERATION_CONFIRMED | PENDING         | CONFIRMED  | 2026-11-27 14:10:49.768553+00 | The Central confirmed the operation
+    310 | ACCOUNT_UPDATED     | CONFIRMED       | COMPLETED  | 2026-11-27 14:10:49.768553+00 | The receiving account of the operation was updated
+    311 | OPERATION_COMPLETED | CONFIRMED       | COMPLETED  | 2026-11-27 14:10:49.768553+00 | The operation was completed
+    ...
+    318 | OPERATION_REJECTED  | PENDING         | REJECTED   | 2026-11-27 14:10:49.864348+00 | The Central rejected the operation: MARGIN_INSUFFICIENT
+   (34 rows)
+
+   === 11. encerramento dos processos e dos containers ===
+   containers restantes: 0
+   processos restantes: 0
+   === fim ===
+   ```
+4. **Gates locais:**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → OK (65 documentos, todo link relativo resolve, exit 0)
+   node scripts/check-specs.mjs                → OK (exatamente 1 task em voo, tasks catalogadas, exit 0)
+   node scripts/check-architecture.mjs         → OK (22 testes de validação dos desenhos, exit 0)
+   node scripts/check-theme-tokens.mjs         → OK (exit 0)
+   node scripts/check-ai-log.mjs               → OK (40 sessões, estrutura válida, exit 0)
+   ```
+
+#### Conteúdo Entregue:
+- `application/portability/ListOperations.java` — a consulta paginada e filtrada pelo
+  estado; a página carrega o total do conjunto, então quem chama sabe quantas páginas
+  existem sem carregar todas.
+- `application/portability/FindOperation.java` — o detalhe de uma operação; a operação
+  inexistente vira `DomainError.OperationNotFound` com o código `OPERATION_NOT_FOUND`.
+- `application/audit/ListOperationEvents.java` — a trilha da auditoria da operação, em
+  ordem cronológica; a operação inexistente responde o mesmo `404`.
+- `domain/shared/Page.java` — a página imutável com o total do conjunto e o número de
+  páginas.
+- `domain/portability/OperationFilter.java` — o filtro da consulta: todas as operações ou
+  as de um estado; não existe `null` que signifique "sem filtro".
+- `domain/portability/OperationSummary.java` e `OperationDetail.java` — os modelos de
+  leitura da consulta.
+- `adapters/out/persistence/JpaPortabilityOperationRepository.java` — as duas consultas
+  (contagem e página), com a ordem estável `createdAt, id`.
+- `adapters/in/web/PortabilityOperationResource.java` — `GET /portability-operations` e
+  `GET /portability-operations/{id}`.
+- `adapters/in/web/dto/` — `OperationSummaryResponse`, `OperationDetailResponse`,
+  `OperationPageResponse`, `InstallmentSnapshotResponse` e `ReceivingAccountResponse`.
+- `adapters/in/web/ApiExceptionHandler.java` — `OPERATION_NOT_FOUND` traduzido em `404`.
+- Testes: 2 do `FindOperation`, 6 do `ListOperations`, 3 do `ListOperationEvents`, 6 do
+  `Page`, 5 de integração da persistência (25 operações) e 9 da borda HTTP.
+
+#### Descobertas e Decisões:
+- O agregado `PortabilityOperation` não carrega o instante da última escrita da linha:
+  `updated_at` pertence ao armazenamento, e o contrato público exige `updatedAt` no
+  resumo e no detalhe. A consulta sai por **modelos de leitura** (`OperationSummary` e
+  `OperationDetail`) em vez de forçar a coluna para dentro do agregado, que é a máquina
+  de estados e não o bookkeeping da linha.
+- A ordenação da página é `createdAt, id`: sem o desempate pelo identificador, duas
+  operações criadas no mesmo instante poderiam trocar de lugar entre uma página e a
+  outra, e o E2E leria a mesma operação duas vezes.
+- `OPERATION_NOT_FOUND` já estava documentado no contrato e no `ARCHITECTURE.md` §8, mas
+  o handler não o mapeava: a consulta de uma operação inexistente respondia `500`. Agora
+  responde `404` com o código estável.
+- Os parâmetros fora do alcance são recusados com `400 VALIDATION_ERROR`: página negativa,
+  tamanho acima de 100 e estado que não existe.
+- A rota REST da trilha (`GET /portability-operations/{id}/events`) fica para a task
+  2.15, que entrega `OperationEventResource` junto com os recursos de autorização e de
+  agenda: a trilha já está pronta na aplicação, lida em ordem cronológica.
+
+#### Arquivos Tocados:
+- `backend/src/main/java/br/com/consigport/application/portability/FindOperation.java`
+- `backend/src/main/java/br/com/consigport/application/portability/ListOperations.java`
+- `backend/src/main/java/br/com/consigport/application/audit/ListOperationEvents.java`
+- `backend/src/main/java/br/com/consigport/domain/portability/OperationSummary.java`
+- `backend/src/main/java/br/com/consigport/domain/portability/OperationDetail.java`
+- `backend/src/main/java/br/com/consigport/domain/portability/OperationFilter.java`
+- `backend/src/main/java/br/com/consigport/domain/portability/PortabilityOperationRepository.java`
+- `backend/src/main/java/br/com/consigport/domain/shared/Page.java`
+- `backend/src/main/java/br/com/consigport/domain/shared/DomainError.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/persistence/JpaPortabilityOperationRepository.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/PortabilityOperationResource.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/ApiExceptionHandler.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/OperationSummaryResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/OperationDetailResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/OperationPageResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/InstallmentSnapshotResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/ReceivingAccountResponse.java`
+- `backend/src/main/java/br/com/consigport/config/CompositionRoot.java`
+- `backend/src/test/java/br/com/consigport/application/portability/FindOperationTest.java`
+- `backend/src/test/java/br/com/consigport/application/portability/ListOperationsTest.java`
+- `backend/src/test/java/br/com/consigport/application/audit/ListOperationEventsTest.java`
+- `backend/src/test/java/br/com/consigport/domain/shared/SharedValueObjectsTest.java`
+- `backend/src/test/java/br/com/consigport/domain/portability/InMemoryPortabilityOperationRepository.java`
+- `backend/src/test/java/br/com/consigport/application/portability/StartOperationTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/out/persistence/QueryPersistenceTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/in/web/OperationQueryResourceTest.java`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`

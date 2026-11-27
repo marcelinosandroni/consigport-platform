@@ -6,8 +6,11 @@ import br.com.consigport.adapters.out.central.HmacSigner;
 import br.com.consigport.adapters.out.central.acl.CentralAcl;
 import br.com.consigport.adapters.out.central.acl.PortabilityAcl;
 import br.com.consigport.adapters.out.resilience.CircuitBreaker;
+import br.com.consigport.application.audit.ListOperationEvents;
 import br.com.consigport.application.portability.CompleteOperation;
+import br.com.consigport.application.portability.FindOperation;
 import br.com.consigport.application.portability.IntegrationBackoff;
+import br.com.consigport.application.portability.ListOperations;
 import br.com.consigport.application.portability.PollOperation;
 import br.com.consigport.application.portability.StartOperation;
 import br.com.consigport.application.portability.TransitionRecorder;
@@ -225,6 +228,41 @@ public class CompositionRoot {
   @Bean
   public CompleteOperation completeOperation(TransitionRecorder recorder, Clock clock) {
     return new CompleteOperation(recorder, clock);
+  }
+
+  /**
+   * The consultation of one portability operation.
+   *
+   * @param operations the storage of the operations
+   * @return the use case
+   */
+  @Bean
+  public FindOperation findOperation(PortabilityOperationRepository operations) {
+    return new FindOperation(operations);
+  }
+
+  /**
+   * The paginated consultation of the portability operations.
+   *
+   * @param operations the storage of the operations
+   * @return the use case
+   */
+  @Bean
+  public ListOperations listOperations(PortabilityOperationRepository operations) {
+    return new ListOperations(operations);
+  }
+
+  /**
+   * The consultation of the trail of the audit of one operation.
+   *
+   * @param operations the storage of the operations
+   * @param events the append-only trail of the audit
+   * @return the use case
+   */
+  @Bean
+  public ListOperationEvents listOperationEvents(
+      PortabilityOperationRepository operations, OperationEventRepository events) {
+    return new ListOperationEvents(operations, events);
   }
 
   /**

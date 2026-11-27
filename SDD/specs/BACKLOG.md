@@ -214,9 +214,16 @@
 
 ### 2.14 — Consulta de operações e trilha
 - **Objetivo:** expor leitura paginada e timeline.
-- **Arquivos:** `application/portability/FindOperation.java`, `ListOperations.java`, `application/audit/ListOperationEvents.java`.
+- **Arquivos:** `application/portability/FindOperation.java`, `ListOperations.java`, `application/audit/ListOperationEvents.java`, `domain/portability/OperationSummary.java`, `OperationDetail.java`, `OperationFilter.java`, `domain/shared/Page.java`, `adapters/out/persistence/JpaPortabilityOperationRepository.java`, `adapters/in/web/PortabilityOperationResource.java`, `adapters/in/web/dto/OperationSummaryResponse.java`, `OperationDetailResponse.java`, `OperationPageResponse.java`, `InstallmentSnapshotResponse.java`, `ReceivingAccountResponse.java`, `adapters/in/web/ApiExceptionHandler.java`.
 - **Aceite:** filtro por status, página e tamanho; eventos em ordem cronológica; `404 OPERATION_NOT_FOUND`.
 - **Verificação:** testes de integração com 25 operações e paginação conferida.
+- **Realizado:** a consulta paginada e o detalhe saem pela porta com o modelo de leitura
+  (`OperationSummary`, `OperationDetail`), porque o instante da última escrita da linha
+  pertence ao armazenamento e não ao agregado; `GET /portability-operations` aceita
+  `status`, `page` e `size` (1 a 100) e `GET /portability-operations/{id}` devolve o
+  detalhe; a operação inexistente responde `404 OPERATION_NOT_FOUND`; a trilha continua
+  sendo lida em ordem cronológica por `ListOperationEvents` (a rota REST da trilha
+  entra na task 2.15, com `OperationEventResource`).
 
 ### 2.15 — Recursos REST e tratamento de erros
 - **Objetivo:** completar a superfície `/api/v1`.

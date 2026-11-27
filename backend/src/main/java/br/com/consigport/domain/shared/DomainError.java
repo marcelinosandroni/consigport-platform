@@ -1,5 +1,7 @@
 package br.com.consigport.domain.shared;
 
+import java.util.UUID;
+
 /**
  * Error of the domain, with the stable code exposed by the public API.
  *
@@ -12,6 +14,7 @@ public sealed abstract class DomainError extends RuntimeException
         DomainError.IdempotencyConflict,
         DomainError.IdempotencyKeyRequired,
         DomainError.InstallmentNotEligible,
+        DomainError.OperationNotFound,
         DomainError.CentralUnavailable {
 
   private static final long serialVersionUID = 1L;
@@ -174,9 +177,42 @@ public sealed abstract class DomainError extends RuntimeException
   }
 
   /**
-   * The Central is unavailable, so the operation cannot be started (BR-08).
+   * The operation does not exist.
    */
-  public static final class CentralUnavailable extends DomainError {
+  public static final class OperationNotFound extends DomainError {
+
+    private static final long serialVersionUID = 1L;
+
+    private final transient UUID operationId;
+
+    /**
+     * Builds the error.
+     *
+     * @param operationId the identity of the unknown operation
+     */
+    public OperationNotFound(UUID operationId) {
+      super("operation not found: " + operationId);
+      this.operationId = operationId;
+    }
+
+    @Override
+    public String code() {
+      return "OPERATION_NOT_FOUND";
+    }
+
+    /**
+     * The identity of the unknown operation.
+     *
+     * @return the identity
+     */
+    public UUID operationId() {
+      return operationId;
+    }
+  }
+
+  /**
+   * The Central is unavailable, so the operation cannot be started (BR-08).
+   */  public static final class CentralUnavailable extends DomainError {
 
     private static final long serialVersionUID = 1L;
 

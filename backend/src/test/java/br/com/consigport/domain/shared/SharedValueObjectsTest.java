@@ -3,6 +3,7 @@ package br.com.consigport.domain.shared;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -107,6 +108,52 @@ class SharedValueObjectsTest {
       assertThatThrownBy(() -> new InstallmentId("P".repeat(65)))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessage("installmentId must have at most 64 characters");
+    }
+  }
+
+  @Nested
+  class PageTest {
+
+    @Test
+    void countsThePagesOfTheResultSet() {
+      assertThat(new Page<>(List.of("a", "b"), 0, 20, 25).totalPages()).isEqualTo(2);
+      assertThat(new Page<>(List.of("a"), 0, 20, 1).totalPages()).isEqualTo(1);
+      assertThat(new Page<>(List.of(), 0, 20, 0).totalPages()).isZero();
+    }
+
+    @Test
+    void knowsWhenThePageIsTheLastOne() {
+      assertThat(new Page<>(List.of("a"), 0, 20, 25).isLast()).isFalse();
+      assertThat(new Page<>(List.of("a"), 1, 20, 25).isLast()).isTrue();
+      assertThat(new Page<>(List.of(), 0, 20, 0).isLast()).isTrue();
+    }
+
+    @Test
+    void rejectsAPageBeforeTheFirstOne() {
+      assertThatThrownBy(() -> new Page<>(List.of(), -1, 20, 0))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("page must not be negative");
+    }
+
+    @Test
+    void rejectsASizeThatFitsNoItem() {
+      assertThatThrownBy(() -> new Page<>(List.of(), 0, 0, 0))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("size must be positive");
+    }
+
+    @Test
+    void rejectsMoreItemsThanTheSize() {
+      assertThatThrownBy(() -> new Page<>(List.of("a", "b"), 0, 1, 2))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("items must not exceed size");
+    }
+
+    @Test
+    void rejectsANegativeTotal() {
+      assertThatThrownBy(() -> new Page<>(List.of(), 0, 20, -1))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("totalElements must not be negative");
     }
   }
 
