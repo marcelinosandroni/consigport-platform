@@ -1245,3 +1245,72 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
     - `./mvnw -B -pl backend test -Dtest='FindOperationTest,ListOperationsTest,ListOperationEventsTest,SharedValueObjectsTest,QueryPersistenceTest,OperationQueryResourceTest'` → 49 testes verdes.
     - `./mvnw -B verify` → reactor verde (backend 332 testes, mock 39 testes).
     - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).
+
+## Sessão #41 — Task 2.15 (Recursos REST e tratamento de erros)
+
+- **Data:** 2026-11-27
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/035-backend-rest-resources`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** completar a superfície `/api/v1` com o opt-in, a consulta do opt-in, a
+  agenda e a trilha da auditoria, e fechar o tratamento de erros com o formato do
+  contrato público (`code`, `message`, `locale`, `timestamp`, `path`, `details`) e os
+  códigos EN estáveis.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/AGENTS.md`, `SDD/specs/PLAN.md` (task 2.15 em voo),
+   `SDD/stacks/java.md` e `SDD/stacks/testing.md`; o `ARCHITECTURE.md` §8 e o contrato
+   público já declaravam as rotas, os status e o formato do erro — nenhuma regra precisou
+   ser alterada, e nem `SDD/ARCHITECTURE.md` nem os contratos foram tocados.
+2. **Aplicação:**
+   - `RegisterAuthorization`: devolve o registro e o sinal de criação, para o recurso
+     distinguir `201` do opt-in novo do `200` do opt-in repetido.
+   - `FindAuthorization`: a consulta do opt-in mais recente do beneficiário.
+   - `QueryAgenda`: o caso de uso da agenda, que exige o opt-in registrado.
+3. **Domínio:** `DomainError.AuthorizationNotFound` (código estável
+   `AUTHORIZATION_NOT_FOUND`) e a porta `AuthorizationRepository.findLatestByBeneficiary`,
+   com a ordem estável `createdAt desc, id desc`.
+4. **Persistência:** o adaptador JPA implementa a porta nova; o fake em memória dos testes
+   também, para a porta ter um único contrato.
+5. **Borda HTTP:** `POST /api/v1/authorizations` (`201`/`200`),
+   `GET /api/v1/authorizations/{beneficiaryId}` (`200`/`404`),
+   `GET /api/v1/beneficiaries/{beneficiaryId}/agenda` (`200`/`403`/`404`) e
+   `GET /api/v1/portability-operations/{id}/events` (`200`/`404`), com os DTOs do contrato.
+6. **Tratamento de erros:** o handler traduz `AUTHORIZATION_NOT_FOUND` em `404` e ganhou um
+   tratador genérico para `500 INTERNAL_ERROR`, no formato do contrato, com a causa real
+   apenas no log do servidor.
+7. **Adaptador da Central:** `CentralHttpClient` passou a implementar também a
+   `CentralAuthorizationPort` — a porta existia no domínio, mas só tinha fake em memória.
+   O consentimento é replicado em `POST /autorizacoes`, assinado em HMAC como as outras
+   chamadas; a falha da Central vira `DomainError.CentralUnavailable` (`503`).
+8. **Testes:** 5 do recurso de autorização, 3 do recurso de agenda, 3 do recurso de
+   trilha, 10 do handler (um caso por código estável), 4 novos do cliente da Central e o
+   fake do repositório de autorizações com a porta nova.
+9. **End-to-end com o backend real contra o mock real:** o opt-in novo respondeu `201`, o
+   repetido `200` sem duplicar no banco; a consulta do opt-in devolveu `200` e `404`; o
+   opt-in sem beneficiário devolveu `400 VALIDATION_ERROR` com o campo no detalhe; a
+   agenda devolveu `200` com as parcelas, `403 AUTHORIZATION_REQUIRED` sem opt-in e
+   `404 BENEFICIARY_NOT_FOUND` para um beneficiário que a Central não conhece; a trilha
+   saiu em ordem cronológica, do `CREATED` ao `COMPLETED`, com o payload bruto da Central
+   como objeto; a trilha de uma operação inexistente devolveu
+   `404 OPERATION_NOT_FOUND`; o erro público exibiu os seis campos do contrato; e a
+   Central recebeu a réplica do opt-in. Nenhum processo ou container sobrou.
+10. **Descoberta:** a primeira chamada do mock da Central leva ~8 s numa JVM fria (o
+    `Mac.init` carrega as classes do JCE e a validação do corpo carrega o MVC), acima do
+    timeout de leitura de 3 s do backend — o `POST /api/v1/authorizations` respondia
+    `503 CENTRAL_UNAVAILABLE` sem que a Central tivesse recusado a requisição. Diagnóstico
+    com proxy TCP e `jstack` do mock durante a chamada. O E2E passa a aquecer o mock e a
+    zerar o estado com `POST /_admin/reset` antes das asserções.
+11. **Descoberta:** `AUTHORIZATION_NOT_FOUND` não era mapeado no handler — a consulta de um
+    beneficiário sem opt-in respondia `500` em vez de `404`.
+12. **Decisão:** `GET /authorizations/{beneficiaryId}` devolve **um** registro, como manda o
+    contrato, e o backend pode ter um opt-in por convênio: a resposta é o mais recente
+    (`createdAt`, depois `id` como desempate), nunca um registro arbitrário.
+13. **Dívida registrada:** `POST /api/v1/authorizations` responde `503 CENTRAL_UNAVAILABLE`
+    quando a Central não registra o consentimento, mas o contrato público lista apenas
+    `400` e `500` para essa rota. A dívida está no `BACKLOG.md`, para alinhar contrato e
+    mapeamento com a autorização do responsável; o contrato não foi alterado.
+14. **Validação:**
+    - `./mvnw -B -pl backend test -Dtest='ApiExceptionHandlerTest,AuthorizationResourceTest,AgendaResourceTest,OperationEventResourceTest,RegisterAuthorizationTest,FindAuthorizationTest,AuthorizationRepositoryContractTest,CentralHttpClientTest'` → 59 testes verdes.
+    - `./mvnw -B verify` → reactor verde (backend 357 testes, mock 39 testes).
+    - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).

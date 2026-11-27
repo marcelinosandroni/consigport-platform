@@ -35,4 +35,18 @@ public final class FindAuthorization {
   public Optional<Authorization> execute(BeneficiaryId beneficiaryId, AgreementId agreementId) {
     return repository.findByBeneficiaryAndAgreement(beneficiaryId, agreementId);
   }
+
+  /**
+   * Finds the latest authorization of a beneficiary.
+   *
+   * <p>The beneficiary can authorize more than one agreement; the consultation of the
+   * public API answers one record, so it answers the most recent opt-in.
+   *
+   * @param beneficiaryId the beneficiary that granted the consent
+   * @return the most recent authorization of the beneficiary, or empty when the
+   *     beneficiary never authorized
+   */
+  public Optional<Authorization> findLatest(BeneficiaryId beneficiaryId) {
+    return repository.findLatestByBeneficiary(beneficiaryId);
+  }
 }

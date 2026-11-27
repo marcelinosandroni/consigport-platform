@@ -43,13 +43,13 @@ public final class RegisterAuthorization {
    *
    * @param beneficiaryId the beneficiary that granted the consent
    * @param agreementId the agreement covered by the consent
-   * @return the authorization, existing or new
+   * @return the authorization, existing or new, and whether it was created now
    */
-  public Authorization execute(BeneficiaryId beneficiaryId, AgreementId agreementId) {
+  public AuthorizationResult execute(BeneficiaryId beneficiaryId, AgreementId agreementId) {
     Optional<Authorization> existing =
         repository.findByBeneficiaryAndAgreement(beneficiaryId, agreementId);
     if (existing.isPresent()) {
-      return existing.get();
+      return new AuthorizationResult(existing.get(), false);
     }
 
     central.register(beneficiaryId, agreementId);
@@ -58,10 +58,20 @@ public final class RegisterAuthorization {
     try {
       repository.save(authorization);
     } catch (AuthorizationAlreadyExistsException exception) {
-      return repository
-          .findByBeneficiaryAndAgreement(beneficiaryId, agreementId)
-          .orElseThrow(() -> exception);
+      return new AuthorizationResult(
+          repository
+              .findByBeneficiaryAndAgreement(beneficiaryId, agreementId)
+              .orElseThrow(() -> exception),
+          false);
     }
-    return authorization;
+    return new AuthorizationResult(authorization, true);
   }
+
+  /**
+   * Answer of the registration of the opt-in.
+   *
+   * @param authorization the authorization, existing or new
+   * @param created whether the opt-in was created by this call
+   */
+  public record AuthorizationResult(Authorization authorization, boolean created) {}
 }

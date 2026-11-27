@@ -3,16 +3,20 @@ package br.com.consigport.adapters.out.central;
 import br.com.consigport.adapters.out.central.acl.CentralAcl;
 import br.com.consigport.adapters.out.central.acl.PortabilityAcl;
 import br.com.consigport.adapters.out.central.dto.AgendaResponse;
+import br.com.consigport.adapters.out.central.dto.CentralAuthorizationRequest;
+import br.com.consigport.adapters.out.central.dto.CentralAuthorizationResponse;
 import br.com.consigport.adapters.out.central.dto.CentralPortabilityRequest;
 import br.com.consigport.adapters.out.central.dto.CentralPortabilityResponse;
 import br.com.consigport.adapters.out.resilience.CircuitBreaker;
 import br.com.consigport.domain.agenda.AgendaGateway;
 import br.com.consigport.domain.agenda.BeneficiaryAgenda;
+import br.com.consigport.domain.authorization.CentralAuthorizationPort;
 import br.com.consigport.domain.portability.CentralPortabilityPort;
 import br.com.consigport.domain.portability.CentralStatus;
 import br.com.consigport.domain.portability.CentralStatusPort;
 import br.com.consigport.domain.portability.CentralSubmissionException;
 import br.com.consigport.domain.portability.PortabilityOperation;
+import br.com.consigport.domain.shared.AgreementId;
 import br.com.consigport.domain.shared.BeneficiaryId;
 import br.com.consigport.domain.shared.DomainError;
 import java.time.Clock;
@@ -37,11 +41,17 @@ import org.springframework.web.client.RestClientResponseException;
  * the operation resumable, never duplicated (BR-11, BR-15): every attempt carries the
  * same idempotency key.
  *
+ * <p>The client of the Central answers four ports of the domain: {@code AgendaGateway},
+ * {@code CentralAuthorizationPort}, {@code CentralPortabilityPort} and {@code CentralStatusPort}.
+ *
  * <p>Every call goes through the circuit: a Central that is failing is not hammered, and
  * the calls are refused while the circuit is open ({@code ARCHITECTURE.md} §11).
  */
 public final class CentralHttpClient
-    implements AgendaGateway, CentralPortabilityPort, CentralStatusPort {
+    implements AgendaGateway, CentralAuthorizationPort, CentralPortabilityPort, CentralStatusPort {
+
+  /** The path of the registration of the opt-in. */
+  private static final String AUTHORIZATION_PATH = "/autorizacoes";
 
   /** The path of the submission of an operation. */
   private static final String PORTABILITY_PATH = "/operacoes-portabilidade";
@@ -128,6 +138,52 @@ public final class CentralHttpClient
     } catch (RestClientResponseException exception) {
       circuit.recordFailure();
       throw agendaFailure(exception, beneficiaryId);
+    } catch (RestClientException exception) {
+      circuit.recordFailure();
+      throw new DomainError.CentralUnavailable();
+    }
+  }
+
+  /**
+   * Replicates the opt-in of the beneficiary in the Central.
+   *
+   * <p>The replication is idempotent: the Central answers {@code 201} the first time and
+   * {@code 200} when the pair was already authorized. Both answers mean the same thing
+   * for the domain — the consent is known by the Central — so the identifier the Central
+   * returns is read and dropped: the public API answers with the identity of the local
+   * record.
+   *
+   * @param beneficiaryId the beneficiary that granted the consent
+   * @param agreementId the agreement covered by the consent
+   * @throws DomainError.CentralUnavailable when the Central does not register the consent
+   */
+  @Override
+  public void register(BeneficiaryId beneficiaryId, AgreementId agreementId) {
+    requireClosedCircuit();
+    String body =
+        signer.canonicalJson(
+            new CentralAuthorizationRequest(beneficiaryId.value(), agreementId.value()));
+    long timestamp = clock.instant().getEpochSecond();
+    String signature = signer.sign("POST", AUTHORIZATION_PATH, timestamp, body);
+    try {
+      CentralAuthorizationResponse answer =
+          rest.post()
+              .uri(AUTHORIZATION_PATH)
+              .header(SIGNATURE_HEADER, signature)
+              .header(TIMESTAMP_HEADER, Long.toString(timestamp))
+              .contentType(MediaType.APPLICATION_JSON)
+              .body(body)
+              .retrieve()
+              .body(CentralAuthorizationResponse.class);
+      circuit.recordSuccess();
+      if (answer == null || answer.autorizacaoId() == null) {
+        throw new DomainError.CentralUnavailable(
+            "the Central answered the authorization without an identifier");
+      }
+    } catch (RestClientResponseException exception) {
+      circuit.recordFailure();
+      throw new DomainError.CentralUnavailable(
+          "the Central refused the authorization with " + exception.getStatusCode().value());
     } catch (RestClientException exception) {
       circuit.recordFailure();
       throw new DomainError.CentralUnavailable();

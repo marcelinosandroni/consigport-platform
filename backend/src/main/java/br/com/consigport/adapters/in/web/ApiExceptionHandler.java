@@ -8,6 +8,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -34,6 +36,8 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
+  private static final Logger LOG = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
   private static final String VALIDATION_ERROR = "VALIDATION_ERROR";
   private static final String INTERNAL_ERROR = "INTERNAL_ERROR";
 
@@ -42,6 +46,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
           Map.entry(VALIDATION_ERROR, HttpStatus.BAD_REQUEST),
           Map.entry("IDEMPOTENCY_KEY_REQUIRED", HttpStatus.BAD_REQUEST),
           Map.entry("AUTHORIZATION_REQUIRED", HttpStatus.FORBIDDEN),
+          Map.entry("AUTHORIZATION_NOT_FOUND", HttpStatus.NOT_FOUND),
           Map.entry("BENEFICIARY_NOT_FOUND", HttpStatus.NOT_FOUND),
           Map.entry("OPERATION_NOT_FOUND", HttpStatus.NOT_FOUND),
           Map.entry("IDEMPOTENCY_CONFLICT", HttpStatus.CONFLICT),
@@ -56,6 +61,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
           Map.entry(
               "AUTHORIZATION_REQUIRED",
               "É necessário registrar a autorização antes de consultar a agenda."),
+          Map.entry("AUTHORIZATION_NOT_FOUND", "Autorização não encontrada."),
           Map.entry("BENEFICIARY_NOT_FOUND", "Beneficiário não encontrado."),
           Map.entry("OPERATION_NOT_FOUND", "Operação não encontrada."),
           Map.entry(
@@ -99,6 +105,24 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   public ResponseEntity<ErrorResponse> handleInvalidArgument(
       IllegalArgumentException exception, HttpServletRequest request) {
     return answer(VALIDATION_ERROR, request, List.of());
+  }
+
+  /**
+   * Answers a failure that nobody classified.
+   *
+   * <p>The answer keeps the shape of the error of the public API: the caller always
+   * reads the same fields, even when the failure is unexpected. The reason of the
+   * failure stays in the log of the server, never in the answer.
+   *
+   * @param exception the failure that was not classified
+   * @param request the request that failed
+   * @return the error of the public API
+   */
+  @ExceptionHandler(Exception.class)
+  public ResponseEntity<ErrorResponse> handleUnexpected(
+      Exception exception, HttpServletRequest request) {
+    LOG.error("unexpected failure on {} {}", request.getMethod(), request.getRequestURI(), exception);
+    return answer(INTERNAL_ERROR, request, List.of());
   }
 
   @Override

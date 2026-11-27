@@ -3365,3 +3365,239 @@
 - `SDD/specs/ROADMAP.md`
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+### Task 2.15 — Recursos REST e tratamento de erros
+
+- **Data de Conclusão:** 2026-11-27
+- **Branch:** `feat/035-backend-rest-resources`
+- **PR:** #47 — https://github.com/marcelinosandroni/consigport-platform/pull/47
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** completar a superfície `/api/v1` com o opt-in, a consulta do opt-in, a
+  agenda e a trilha da auditoria, e fechar o tratamento de erros com o formato do
+  contrato público (`code`, `message`, `locale`, `timestamp`, `path`, `details`) e os
+  códigos EN estáveis.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Recorte da task (caso de uso, adaptador da Central e borda HTTP):**
+   ```text
+   ./mvnw -B -pl backend test -Dtest='ApiExceptionHandlerTest,AuthorizationResourceTest,AgendaResourceTest,OperationEventResourceTest,RegisterAuthorizationTest,FindAuthorizationTest,AuthorizationRepositoryContractTest,CentralHttpClientTest'
+   → Tests run: 6, Failures: 0, Errors: 0, Skipped: 0 -- in AuthorizationRepositoryContractTest
+   → Tests run: 3, Failures: 0, Errors: 0, Skipped: 0 -- in FindAuthorizationTest
+   → Tests run: 6, Failures: 0, Errors: 0, Skipped: 0 -- in RegisterAuthorizationTest
+   → Tests run: 23, Failures: 0, Errors: 0, Skipped: 0 -- in CentralHttpClientTest
+   → Tests run: 3, Failures: 0, Errors: 0, Skipped: 0 -- in AgendaResourceTest
+   → Tests run: 10, Failures: 0, Errors: 0, Skipped: 0 -- in ApiExceptionHandlerTest
+   → Tests run: 5, Failures: 0, Errors: 0, Skipped: 0 -- in AuthorizationResourceTest
+   → Tests run: 3, Failures: 0, Errors: 0, Skipped: 0 -- in OperationEventResourceTest
+   → Tests run: 59, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   → EXIT=0
+   ```
+2. **Reator completo (backend + mock da Central):**
+   ```text
+   ./mvnw -B verify
+   → Tests run: 357, Failures: 0, Errors: 0, Skipped: 0   (backend)
+   → Tests run: 39, Failures: 0, Errors: 0, Skipped: 0    (central-convenios-mock)
+   → ConsigPort Platform ................................ SUCCESS [  0.003 s]
+   → ConsigPort Backend ................................. SUCCESS [01:27 min]
+   → Central de Convênios Mock .......................... SUCCESS [ 22.659 s]
+   → BUILD SUCCESS
+   → EXIT=0
+   ```
+3. **End-to-end com o backend real contra o mock real da Central** (PostgreSQL 16 do
+   compose, backend em `:8080`, mock em `:8081`; o mock confirma em 8 s; roteiro
+   `/tmp/opencode/e2e-2.15.sh`, log `/tmp/opencode/e2e-2.15.log`):
+   ```text
+   === 0. ambiente ===
+   data: 2026-11-27T20:34:36Z
+    Container consigport-postgres Waiting 
+    Container consigport-postgres Healthy 
+
+   === 1. mock da Central em :8081 (confirmacao em 8 s) ===
+   mock saudável em 9s
+
+   === 1b. aquecimento do mock: a primeira chamada carrega as classes do JCE e do MVC ===
+   POST /autorizacoes (aquecimento, BEN-WARMUP) -> 201 em 0.211683s
+   POST /_admin/reset (devolve o mock ao estado inicial) -> 204
+
+   === 2. limpeza das tabelas e backend em :8080 (JVM fria) ===
+   TRUNCATE TABLE
+   backend saudável em 17s
+
+   === 3. o opt-in novo responde 201 Created ===
+   --- POST /api/v1/authorizations (BEN-001 / AGR-001) ---
+   {"authorizationId":"1ddf7b6c-7af9-4868-96ae-dc11dd3d2abb","beneficiaryId":"BEN-001","agreementId":"AGR-001","createdAt":"2026-11-27T20:35:10.553236409Z"}
+   [status 201]
+
+   === 4. o mesmo opt-in repetido responde 200 OK, sem duplicar ===
+   --- POST /api/v1/authorizations (BEN-001 / AGR-001) de novo ---
+   {"authorizationId":"1ddf7b6c-7af9-4868-96ae-dc11dd3d2abb","beneficiaryId":"BEN-001","agreementId":"AGR-001","createdAt":"2026-11-27T20:35:10.553236Z"}
+   [status 200]
+                     id                  | beneficiary_id | agreement_id |          created_at           
+   --------------------------------------+----------------+--------------+-------------------------------
+    1ddf7b6c-7af9-4868-96ae-dc11dd3d2abb | BEN-001        | AGR-001      | 2026-11-27 20:35:10.553236+00
+   (1 row)
+
+
+   === 5. a consulta do opt-in: 200 e 404 AUTHORIZATION_NOT_FOUND ===
+   --- GET /api/v1/authorizations/BEN-001 ---
+   {"authorizationId":"1ddf7b6c-7af9-4868-96ae-dc11dd3d2abb","beneficiaryId":"BEN-001","agreementId":"AGR-001","createdAt":"2026-11-27T20:35:10.553236Z"}
+   [status 200]
+   --- GET /api/v1/authorizations/BEN-404 ---
+   {"code":"AUTHORIZATION_NOT_FOUND","message":"Autorização não encontrada.","locale":"pt-BR","timestamp":"2026-11-27T20:35:11.244584466Z","path":"/api/v1/authorizations/BEN-404","details":[]}
+   [status 404]
+
+   === 6. o opt-in sem o beneficiario: 400 VALIDATION_ERROR com detalhes ===
+   --- POST /api/v1/authorizations sem beneficiaryId ---
+   {"code":"VALIDATION_ERROR","message":"A requisição é inválida.","locale":"pt-BR","timestamp":"2026-11-27T20:35:11.320575647Z","path":"/api/v1/authorizations","details":[{"field":"beneficiaryId","message":"não deve estar em branco"}]}
+   [status 400]
+
+   === 7. a agenda do beneficiario autorizado: 200 com as parcelas ===
+   --- GET /api/v1/beneficiaries/BEN-001/agenda ---
+   {"beneficiaryId":"BEN-001","installments":[{"installmentId":"PAR-001","agreementId":"AGR-001","amount":450.00,"discountDate":"2026-12-05","status":"OPEN"},{"installmentId":"PAR-002","agreementId":"AGR-001","amount":300.00,"discountDate":"2027-01-05","status":"OPEN"},{"installmentId":"PAR-003","agreementId":"AGR-002","amount":1200.00,"discountDate":"2027-02-05","status":"OPEN"}]}
+   [status 200]
+
+   === 8. a agenda sem opt-in: 403 AUTHORIZATION_REQUIRED ===
+   --- GET /api/v1/beneficiaries/BEN-MARGIN/agenda ---
+   {"code":"AUTHORIZATION_REQUIRED","message":"É necessário registrar a autorização antes de consultar a agenda.","locale":"pt-BR","timestamp":"2026-11-27T20:35:13.255567786Z","path":"/api/v1/beneficiaries/BEN-MARGIN/agenda","details":[]}
+   [status 403]
+
+   === 9. a agenda de um beneficiario que a Central nao conhece: 404 BENEFICIARY_NOT_FOUND ===
+   --- GET /api/v1/beneficiaries/BEN-404/agenda ---
+   {"code":"BENEFICIARY_NOT_FOUND","message":"Beneficiário não encontrado.","locale":"pt-BR","timestamp":"2026-11-27T20:35:13.360934006Z","path":"/api/v1/beneficiaries/BEN-404/agenda","details":[]}
+   [status 404]
+
+   === 10. a operacao de portabilidade, para ter uma trilha ===
+   POST /api/v1/portability-operations -> {"operationId":"e1cb7c4e-4cc8-494c-b66c-392c68d2d477","protocol":"PRT-20261127-0001","status":"PENDING","totalAmount":450.00,"createdAt":"2026-11-27T20:35:13.638974Z"} | 202
+   a operacao foi completada apos 5 ciclos de 2 s
+   operacao: e1cb7c4e-4cc8-494c-b66c-392c68d2d477
+
+   === 11. a trilha da operacao, em ordem cronologica ===
+   --- GET /api/v1/portability-operations/e1cb7c4e-4cc8-494c-b66c-392c68d2d477/events ---
+   {"operationId":"e1cb7c4e-4cc8-494c-b66c-392c68d2d477","events":[{"eventId":346,"previousStatus":null,"newStatus":"CREATED","eventType":"OPERATION_CREATED","details":"Operation created","rawPayload":null,"createdAt":"2026-11-27T20:35:13.638974Z"},{"eventId":347,"previousStatus":"CREATED","newStatus":"PENDING","eventType":"OPERATION_SUBMITTED","details":"Central accepted the operation with protocol PRT-20261127-0001","rawPayload":null,"createdAt":"2026-11-27T20:35:15.187142Z"},{"eventId":348,"previousStatus":"PENDING","newStatus":"PENDING","eventType":"POLL_ATTEMPT","details":"The Central is still processing the operation; the next poll is in 2 s","rawPayload":null,"createdAt":"2026-11-27T20:35:16.829442Z"},{"eventId":349,"previousStatus":"PENDING","newStatus":"PENDING","eventType":"POLL_ATTEMPT","details":"The Central is still processing the operation; the next poll is in 2 s","rawPayload":null,"createdAt":"2026-11-27T20:35:18.877088Z"},{"eventId":350,"previousStatus":"PENDING","newStatus":"PENDING","eventType":"POLL_ATTEMPT","details":"The Central is still processing the operation; the next poll is in 2 s","rawPayload":null,"createdAt":"2026-11-27T20:35:20.909524Z"},{"eventId":351,"previousStatus":"PENDING","newStatus":"PENDING","eventType":"POLL_ATTEMPT","details":"The Central is still processing the operation; the next poll is in 2 s","rawPayload":null,"createdAt":"2026-11-27T20:35:22.943375Z"},{"eventId":352,"previousStatus":"PENDING","newStatus":"CONFIRMED","eventType":"OPERATION_CONFIRMED","details":"The Central confirmed the operation","rawPayload":{"status":"CONFIRMADA","motivoRejeicao":null},"createdAt":"2026-11-27T20:35:24.977757Z"},{"eventId":353,"previousStatus":"CONFIRMED","newStatus":"COMPLETED","eventType":"ACCOUNT_UPDATED","details":"The receiving account of the operation was updated","rawPayload":null,"createdAt":"2026-11-27T20:35:24.977757Z"},{"eventId":354,"previousStatus":"CONFIRMED","newStatus":"COMPLETED","eventType":"OPERATION_COMPLETED","details":"The operation was completed","rawPayload":null,"createdAt":"2026-11-27T20:35:24.977757Z"}]}
+   [status 200]
+
+   === 12. a trilha de uma operacao que nao existe: 404 OPERATION_NOT_FOUND ===
+   {"code":"OPERATION_NOT_FOUND","message":"Operação não encontrada.","locale":"pt-BR","timestamp":"2026-11-27T20:35:26.084746844Z","path":"/api/v1/portability-operations/940bb99e-4beb-4657-b9a5-5be16020b59c/events","details":[]}
+   [status 404]
+
+   === 13. o erro publico tem os seis campos do contrato ===
+   campos: ['code', 'details', 'locale', 'message', 'path', 'timestamp']
+   code: AUTHORIZATION_NOT_FOUND
+   message: Autorização não encontrada.
+   locale: pt-BR
+   timestamp: 2026-11-27T20:35:26.159549924Z
+   path: /api/v1/authorizations/BEN-404
+   details: []
+
+   === 14. a Central recebeu a replica do opt-in ===
+   autorizacoes na Central: {"AUT-20261127-0001": {"autorizacaoId": "AUT-20261127-0001", "beneficiarioId": "BEN-001", "convenioId": "AGR-001", "criadaEm": "2026-11-27T20:35:10.180556222Z"}}
+
+   === 15. encerramento dos processos e dos containers ===
+    Container consigport-postgres Removed 
+    Network consigport-net Removing 
+    Network consigport-net Removed 
+   containers restantes: 0
+   processos restantes: 0
+   === fim ===
+   ```
+4. **Gates locais:**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → OK (65 documentos, todo link relativo resolve, exit 0)
+   node scripts/check-specs.mjs                → OK (exatamente 1 task em voo, tasks catalogadas, exit 0)
+   node scripts/check-architecture.mjs         → OK (22 testes de validação dos desenhos, exit 0)
+   node scripts/check-theme-tokens.mjs         → OK (exit 0)
+   node scripts/check-ai-log.mjs               → OK (41 sessões, estrutura válida, exit 0)
+   ```
+
+#### Conteúdo Entregue:
+- `adapters/in/web/AuthorizationResource.java` — `POST /api/v1/authorizations`
+  (`201` no opt-in novo, `200` no opt-in repetido) e
+  `GET /api/v1/authorizations/{beneficiaryId}` (`200` ou `404 AUTHORIZATION_NOT_FOUND`).
+- `adapters/in/web/AgendaResource.java` — `GET /api/v1/beneficiaries/{beneficiaryId}/agenda`,
+  com as parcelas no formato do contrato (`OPEN`/`CLOSED`).
+- `adapters/in/web/OperationEventResource.java` — `GET /api/v1/portability-operations/{id}/events`,
+  a trilha em ordem cronológica e o payload bruto da Central como objeto.
+- `adapters/in/web/dto/` — `AuthorizationRequest`, `AuthorizationResponse`, `AgendaResponse`
+  e `OperationEventsResponse`.
+- `adapters/in/web/ApiExceptionHandler.java` — `AUTHORIZATION_NOT_FOUND` traduzido em `404`,
+  tratador genérico para `500 INTERNAL_ERROR` com a causa apenas no log do servidor.
+- `adapters/out/central/CentralHttpClient.java` — a quarta porta do domínio
+  (`CentralAuthorizationPort`): replica o consentimento em `POST /autorizacoes`, assinado
+  em HMAC, com o circuito e o tratamento de falha da Central.
+- `adapters/out/central/dto/CentralAuthorizationRequest.java` e
+  `CentralAuthorizationResponse.java` — o contrato PT da Central para o opt-in.
+- `application/authorization/RegisterAuthorization.java` — devolve o registro e se foi
+  criado agora, para o recurso distinguir `201` de `200`.
+- `application/authorization/FindAuthorization.java` — a consulta do opt-in mais recente.
+- `domain/authorization/AuthorizationRepository.java` e
+  `adapters/out/persistence/JpaAuthorizationRepository.java` — a porta
+  `findLatestByBeneficiary`, com a ordem estável `createdAt, id`.
+- `domain/shared/DomainError.java` — o erro `AUTHORIZATION_NOT_FOUND`, com o
+  beneficiário desconhecido.
+- `config/CompositionRoot.java` — os beans `queryAgenda`, `registerAuthorization` e
+  `findAuthorization`.
+- Testes: 10 do handler (um caso por código estável), 5 do recurso de autorização,
+  3 do recurso de agenda, 3 do recurso de trilha, 4 novos do cliente da Central e o
+  fake do repositório de autorizações com a porta nova.
+
+#### Descobertas e Decisões:
+- O opt-in novo não tinha adaptador de produção: a porta `CentralAuthorizationPort` estava
+  declarada no domínio e só existia como fake em memória. `CentralHttpClient` passou a
+  responder a quarta porta, com o mesmo HMAC, o mesmo circuito e a mesma tradução de
+  falha das outras chamadas.
+- `RegisterAuthorization` devolvia apenas o registro: o recurso não conseguia distinguir o
+  opt-in novo do repetido, e o contrato exige `201` e `200`. O caso de uso devolve agora o
+  registro e o sinal de criação, sem mudar o que ele grava.
+- `GET /authorizations/{beneficiaryId}` devolve **um** registro, como manda o contrato, e o
+  backend pode ter um opt-in por convênio: a resposta é o mais recente (`createdAt`, depois
+  `id` como desempate), nunca um registro arbitrário.
+- `AUTHORIZATION_NOT_FOUND` não era mapeado: a consulta de um beneficiário sem opt-in
+  respondia `500`. Agora responde `404` com o código estável do contrato.
+- O `ApiExceptionHandler` não tinha tratador para as falhas não classificadas: elas
+  escapavam do advice. Agora há um tratador genérico que devolve `500 INTERNAL_ERROR` no
+  formato do contrato e registra a causa real no log do servidor.
+- A primeira chamada do mock da Central leva ~8 s numa JVM fria (o `Mac.init` carrega as
+  classes do JCE e a validação do corpo carrega o MVC), acima do timeout de leitura de 3 s
+  do backend. O E2E aquece o mock com uma chamada assinada antes das asserções e zera o
+  estado com `POST /_admin/reset`; com o mock aquecido, a primeira chamada real do backend
+  responde em milissegundos. Diagnóstico: `jstack` do mock durante a chamada mostrou a
+  thread do Tomcat em `javax.crypto.Mac.init` → `Provider.newInstanceOf`.
+- `POST /api/v1/authorizations` responde `503 CENTRAL_UNAVAILABLE` quando a Central não
+  registra o consentimento, mas o contrato público lista `400` e `500` para essa rota: a
+  divergência está registrada como dívida da Fase 2, para alinhar contrato e mapeamento
+  com a autorização do responsável.
+
+#### Arquivos Tocados:
+- `backend/src/main/java/br/com/consigport/adapters/in/web/AuthorizationResource.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/AgendaResource.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/OperationEventResource.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/ApiExceptionHandler.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/AuthorizationRequest.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/AuthorizationResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/AgendaResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/OperationEventsResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/central/CentralHttpClient.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/central/dto/CentralAuthorizationRequest.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/central/dto/CentralAuthorizationResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/out/persistence/JpaAuthorizationRepository.java`
+- `backend/src/main/java/br/com/consigport/application/authorization/RegisterAuthorization.java`
+- `backend/src/main/java/br/com/consigport/application/authorization/FindAuthorization.java`
+- `backend/src/main/java/br/com/consigport/domain/authorization/AuthorizationRepository.java`
+- `backend/src/main/java/br/com/consigport/domain/shared/DomainError.java`
+- `backend/src/main/java/br/com/consigport/config/CompositionRoot.java`
+- `backend/src/test/java/br/com/consigport/adapters/in/web/AuthorizationResourceTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/in/web/AgendaResourceTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/in/web/OperationEventResourceTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/in/web/ApiExceptionHandlerTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/out/central/CentralHttpClientTest.java`
+- `backend/src/test/java/br/com/consigport/application/authorization/RegisterAuthorizationTest.java`
+- `backend/src/test/java/br/com/consigport/domain/authorization/InMemoryAuthorizationRepository.java`
+- `backend/src/test/java/br/com/consigport/support/FixedClockConfig.java`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`

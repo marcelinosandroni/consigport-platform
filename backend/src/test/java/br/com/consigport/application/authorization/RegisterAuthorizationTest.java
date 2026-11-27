@@ -41,13 +41,14 @@ class RegisterAuthorizationTest {
 
   @Test
   void storesTheAuthorizationWithTheInstantOfTheClock() {
-    Authorization authorization = useCase.execute(BENEFICIARY, AGREEMENT);
+    RegisterAuthorization.AuthorizationResult result = useCase.execute(BENEFICIARY, AGREEMENT);
 
-    assertThat(authorization.beneficiaryId()).isEqualTo(BENEFICIARY);
-    assertThat(authorization.agreementId()).isEqualTo(AGREEMENT);
-    assertThat(authorization.createdAt()).isEqualTo(NOW);
+    assertThat(result.created()).isTrue();
+    assertThat(result.authorization().beneficiaryId()).isEqualTo(BENEFICIARY);
+    assertThat(result.authorization().agreementId()).isEqualTo(AGREEMENT);
+    assertThat(result.authorization().createdAt()).isEqualTo(NOW);
     assertThat(repository.findByBeneficiaryAndAgreement(BENEFICIARY, AGREEMENT))
-        .contains(authorization);
+        .contains(result.authorization());
   }
 
   @Test
@@ -59,11 +60,12 @@ class RegisterAuthorizationTest {
 
   @Test
   void returnsTheExistingAuthorizationWhenTheOptInIsRepeated() {
-    Authorization first = useCase.execute(BENEFICIARY, AGREEMENT);
+    RegisterAuthorization.AuthorizationResult first = useCase.execute(BENEFICIARY, AGREEMENT);
 
-    Authorization second = useCase.execute(BENEFICIARY, AGREEMENT);
+    RegisterAuthorization.AuthorizationResult second = useCase.execute(BENEFICIARY, AGREEMENT);
 
-    assertThat(second).isEqualTo(first);
+    assertThat(second.authorization()).isEqualTo(first.authorization());
+    assertThat(second.created()).isFalse();
     assertThat(repository.size()).isEqualTo(1);
   }
 
@@ -93,7 +95,7 @@ class RegisterAuthorizationTest {
         new RegisterAuthorization(
             racingRepository, central, Clock.fixed(NOW, ZoneOffset.UTC));
 
-    Authorization result = racingUseCase.execute(BENEFICIARY, AGREEMENT);
+    Authorization result = racingUseCase.execute(BENEFICIARY, AGREEMENT).authorization();
 
     assertThat(result).isEqualTo(winner);
     assertThat(central.replicationCount()).isEqualTo(1);
@@ -120,6 +122,11 @@ class RegisterAuthorizationTest {
         return Optional.empty();
       }
       return delegate.findByBeneficiaryAndAgreement(beneficiaryId, agreementId);
+    }
+
+    @Override
+    public Optional<Authorization> findLatestByBeneficiary(BeneficiaryId beneficiaryId) {
+      return delegate.findLatestByBeneficiary(beneficiaryId);
     }
 
     @Override
