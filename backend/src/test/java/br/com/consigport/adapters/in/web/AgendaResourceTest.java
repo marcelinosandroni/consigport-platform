@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import br.com.consigport.application.agenda.QueryAgenda;
+import br.com.consigport.config.MessageSourceConfig;
 import br.com.consigport.domain.agenda.BeneficiaryAgenda;
 import br.com.consigport.domain.agenda.Installment;
 import br.com.consigport.domain.agenda.InstallmentStatus;
@@ -34,7 +35,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * Central em `403` e `404`.
  */
 @WebMvcTest(AgendaResource.class)
-@Import(FixedClockConfig.class)
+@Import({FixedClockConfig.class, MessageSourceConfig.class})
 class AgendaResourceTest {
 
   @Autowired private MockMvc mvc;

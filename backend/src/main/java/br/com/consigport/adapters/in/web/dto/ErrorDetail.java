@@ -1,9 +1,12 @@
 package br.com.consigport.adapters.in.web.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 /**
- * Detail of an error of validation, by field.
+ * The detail of a validation failure, by field.
  *
- * @param field the field or the path related to the error
- * @param message the localized explanation of the problem
+ * @param field the field that failed
+ * @param message the explanation, localized for the locale of the caller
  */
+@Schema(name = "ErrorDetail", requiredProperties = {"field", "message"})
 public record ErrorDetail(String field, String message) {}

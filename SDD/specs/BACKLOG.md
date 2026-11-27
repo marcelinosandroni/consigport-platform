@@ -260,6 +260,39 @@
 - **Arquivos:** `backend/src/main/resources/i18n/messages_pt_BR.properties`, `messages_en.properties`, `messages_es.properties`, `config/MessageSourceConfig.java`, `config/OpenApiConfig.java`.
 - **Aceite:** `Accept-Language` com fallback `pt-BR`; `code` nunca traduzido; `/v3/api-docs` gera contrato equivalente a `contracts/consigport-api.yaml`.
 - **Verificação:** teste de negociação para os três locales e comparação do contrato no CI.
+- **Realizado:** as mensagens humanas saem de três catálogos (`messages_pt_BR`, `messages_en`
+  e `messages_es`), com a chave do catálogo sendo o próprio código estável do erro: o
+  código nunca é traduzido, só a mensagem. O `MessageSourceConfig` publica o
+  `MessageSource` (basename `i18n/messages`, UTF-8, sem fallback para o locale da JVM),
+  o `AcceptHeaderLocaleResolver` (padrão `pt-BR`, idiomas `pt-BR`/`en`/`es`) e o
+  `LocalValidatorFactoryBean` ligado aos mesmos catálogos — assim o detalhe de uma
+  falha de validação também vem no idioma do chamador, e não no locale da JVM. O
+  `OpenApiConfig` publica a informação da API (título, versão `1.0.0`, contato, licença
+  MIT, servidor local, quatro tags) e um `OpenApiCustomizer` que injeta o header
+  `Accept-Language` em todas as operações. Os quatro recursos receberam `@Tag`,
+  `@Operation` (com o `operationId` do contrato público), `@ApiResponse` por status e o
+  header `Idempotent-Replay` no `202`; o `Idempotency-Key` é publicado como obrigatório.
+  Os DTOs receberam `@Schema(name=..., requiredProperties=...)` e os dois DTOs da conta de
+  recebimento foram colapsados em um só (`ReceivingAccount`), como manda o contrato, que
+  publica um único schema. O `GeneratedContractTest` compara o `/v3/api-docs` do
+  backend real com o snapshot `contracts/consigport-api.yaml` (rotas, métodos,
+  `operationId`, parâmetros, status, corpo obrigatório e shape dos schemas, resolvendo
+  `$ref`/`allOf`/`oneOf`); a prova de vida quebrou o `404` de uma rota e o teste ficou
+  vermelho com a diferença apontada. Arquivos reais:
+  `backend/src/main/resources/i18n/messages_pt_BR.properties`, `messages_en.properties`,
+  `messages_es.properties`, `backend/src/main/java/br/com/consigport/config/MessageSourceConfig.java`,
+  `OpenApiConfig.java`, `backend/src/main/java/br/com/consigport/adapters/in/web/ApiExceptionHandler.java`,
+  `AuthorizationResource.java`, `AgendaResource.java`, `OperationEventResource.java`,
+  `PortabilityOperationResource.java`, `backend/src/main/java/br/com/consigport/adapters/in/web/dto/AuthorizationResponse.java`,
+  `AgendaResponse.java`, `ErrorResponse.java`, `ErrorDetail.java`, `InstallmentSnapshotResponse.java`,
+  `OperationAcceptedResponse.java`, `OperationDetailResponse.java`, `OperationEventsResponse.java`,
+  `OperationPageResponse.java`, `OperationSummaryResponse.java`, `PortabilityOperationRequest.java`,
+  `ReceivingAccount.java`, `backend/pom.xml` (dependência `jackson-dataformat-yaml`, que o
+  springdoc usa para ler o YAML do contrato) e os testes
+  `backend/src/test/java/br/com/consigport/adapters/in/web/LocaleNegotiationTest.java`,
+  `ApiExceptionHandlerTest.java`, `AuthorizationResourceTest.java`, `AgendaResourceTest.java`,
+  `OperationEventResourceTest.java`, `backend/src/test/java/br/com/consigport/contracts/GeneratedContractTest.java`
+  e `ContractComparator.java`.
 
 ### 2.17 — Fechamento do backend
 - **Objetivo:** provar domínio, persistência e resiliência juntos.

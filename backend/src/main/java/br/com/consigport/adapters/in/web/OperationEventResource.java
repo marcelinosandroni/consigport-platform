@@ -1,5 +1,6 @@
 package br.com.consigport.adapters.in.web;
 
+import br.com.consigport.adapters.in.web.dto.ErrorResponse;
 import br.com.consigport.adapters.in.web.dto.OperationEventsResponse;
 import br.com.consigport.adapters.in.web.dto.OperationEventsResponse.OperationEventResponse;
 import br.com.consigport.application.audit.ListOperationEvents;
@@ -9,8 +10,14 @@ import br.com.consigport.domain.shared.DomainError;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import java.util.Map;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,6 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/v1/portability-operations")
+@Tag(name = "Audit", description = "Trilha imutável de eventos de uma operação.")
 public class OperationEventResource {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -51,6 +59,28 @@ public class OperationEventResource {
    * @throws DomainError.OperationNotFound when the operation does not exist
    */
   @GetMapping("/{operationId}/events")
+  @Operation(
+      operationId = "listOperationEvents",
+      summary = "Lista a trilha de eventos da operação",
+      description = "Devolve os eventos em ordem cronológica. A trilha é append-only.")
+  @ApiResponse(
+      responseCode = "200",
+      description = "Eventos da operação.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = OperationEventsResponse.class)))
+  @ApiResponse(
+      responseCode = "404",
+      description = "Recurso não encontrado.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = ErrorResponse.class)))
+  @ApiResponse(
+      responseCode = "500",
+      description = "Erro interno inesperado.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = ErrorResponse.class)))
   public OperationEventsResponse events(@PathVariable String operationId) {
     PortabilityOperation.OperationId id = PortabilityOperation.OperationId.parse(operationId);
     List<OperationEvent> trail = listOperationEvents.execute(id);

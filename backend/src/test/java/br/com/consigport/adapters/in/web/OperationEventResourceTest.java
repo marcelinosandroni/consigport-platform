@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import br.com.consigport.application.audit.ListOperationEvents;
+import br.com.consigport.config.MessageSourceConfig;
 import br.com.consigport.domain.audit.EventType;
 import br.com.consigport.domain.audit.OperationEvent;
 import br.com.consigport.domain.portability.OperationStatus;
@@ -31,7 +32,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * Central como objeto e o `404` da operação que não existe.
  */
 @WebMvcTest(OperationEventResource.class)
-@Import(FixedClockConfig.class)
+@Import({FixedClockConfig.class, MessageSourceConfig.class})
 class OperationEventResourceTest {
 
   private static final UUID OPERATION = UUID.fromString("c1a2b3c4-d5e6-4f70-8a91-b2c3d4e5f601");

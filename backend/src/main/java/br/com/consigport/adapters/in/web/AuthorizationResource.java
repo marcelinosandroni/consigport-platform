@@ -2,14 +2,21 @@ package br.com.consigport.adapters.in.web;
 
 import br.com.consigport.adapters.in.web.dto.AuthorizationRequest;
 import br.com.consigport.adapters.in.web.dto.AuthorizationResponse;
+import br.com.consigport.adapters.in.web.dto.ErrorResponse;
 import br.com.consigport.application.authorization.FindAuthorization;
 import br.com.consigport.application.authorization.RegisterAuthorization;
 import br.com.consigport.domain.authorization.Authorization;
 import br.com.consigport.domain.shared.AgreementId;
 import br.com.consigport.domain.shared.BeneficiaryId;
 import br.com.consigport.domain.shared.DomainError;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/v1/authorizations")
+@Tag(name = "Authorizations", description = "Opt-in do beneficiário para consulta da agenda.")
 public class AuthorizationResource {
 
   private final RegisterAuthorization registerAuthorization;
@@ -51,6 +59,39 @@ public class AuthorizationResource {
    * @return the authorization, created or already existing
    */
   @PostMapping
+  @Operation(
+      operationId = "registerAuthorization",
+      summary = "Registra a autorização (opt-in) do beneficiário",
+      description =
+          """
+          Registra o consentimento do beneficiário para um convênio. O par
+          `(beneficiaryId, agreementId)` é único: repetir a chamada devolve `200` com
+          a autorização existente em vez de criar outra.
+          """)
+  @ApiResponse(
+      responseCode = "201",
+      description = "Autorização criada.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = AuthorizationResponse.class)))
+  @ApiResponse(
+      responseCode = "200",
+      description = "Autorização já existente para o par beneficiário/convênio.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = AuthorizationResponse.class)))
+  @ApiResponse(
+      responseCode = "400",
+      description = "Requisição inválida.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = ErrorResponse.class)))
+  @ApiResponse(
+      responseCode = "500",
+      description = "Erro interno inesperado.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = ErrorResponse.class)))
   public ResponseEntity<AuthorizationResponse> register(
       @Valid @RequestBody AuthorizationRequest request) {
     RegisterAuthorization.AuthorizationResult result =
@@ -69,6 +110,28 @@ public class AuthorizationResource {
    * @throws DomainError.AuthorizationNotFound when the beneficiary never authorized
    */
   @GetMapping("/{beneficiaryId}")
+  @Operation(
+      operationId = "findAuthorization",
+      summary = "Consulta a autorização de um beneficiário",
+      description = "Devolve a autorização registrada para o beneficiário.")
+  @ApiResponse(
+      responseCode = "200",
+      description = "Autorização encontrada.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = AuthorizationResponse.class)))
+  @ApiResponse(
+      responseCode = "404",
+      description = "Recurso não encontrado.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = ErrorResponse.class)))
+  @ApiResponse(
+      responseCode = "500",
+      description = "Erro interno inesperado.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = ErrorResponse.class)))
   public AuthorizationResponse find(@PathVariable String beneficiaryId) {
     BeneficiaryId id = new BeneficiaryId(beneficiaryId);
     Authorization authorization =

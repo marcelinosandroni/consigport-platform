@@ -1315,3 +1315,80 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
     - `./mvnw -B -pl backend test -Dtest='ApiExceptionHandlerTest,AuthorizationResourceTest,AgendaResourceTest,OperationEventResourceTest,RegisterAuthorizationTest,FindAuthorizationTest,AuthorizationRepositoryContractTest,CentralHttpClientTest'` → 59 testes verdes.
     - `./mvnw -B verify` → reactor verde (backend 357 testes, mock 39 testes).
     - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).
+
+## Sessão #42 — Task 2.16 (i18n, Swagger e snapshot OpenAPI)
+
+- **Data:** 2026-11-27
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/036-backend-i18n-openapi`
+- **PR:** #48 — https://github.com/marcelinosandroni/consigport-platform/pull/48
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** localizar as mensagens humanas pela negociação do `Accept-Language` (com
+  fallback `pt-BR` e o código do erro nunca traduzido), publicar a documentação viva da
+  API em `/v3/api-docs` e no Swagger UI, e provar que o contrato gerado é equivalente ao
+  snapshot público `contracts/consigport-api.yaml`.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/AGENTS.md`, `SDD/specs/PLAN.md` (task 2.16 em voo), o
+   `ARCHITECTURE.md` §8 e §12 e o ADR-0004 (regras de i18n e OpenAPI). Nenhuma regra
+   precisou ser alterada: nem o `SDD/ARCHITECTURE.md` nem os contratos públicos foram
+   tocados.
+2. **Catálogos das mensagens:** três bundles — `messages_pt_BR.properties`,
+   `messages_en.properties` e `messages_es.properties` — com a chave de cada entrada
+   sendo o próprio código estável do erro. O código nunca é traduzido; só a mensagem
+   humana. As chaves da Bean Validation (`jakarta.validation.constraints.*.message`)
+   também estão nos três catálogos.
+3. **Negociação do locale:** `config/MessageSourceConfig.java` publica o `MessageSource`
+   (basename `i18n/messages`, UTF-8, `fallbackToSystemLocale=false`), o
+   `AcceptHeaderLocaleResolver` (padrão `pt-BR`, idiomas `pt-BR`/`en`/`es`) e o
+   `LocalValidatorFactoryBean` ligado aos mesmos catálogos.
+4. **Handler de erros:** o mapa fixo de mensagens pt-BR do `ApiExceptionHandler` foi
+   removido; a mensagem vem do catálogo, resolvida pelo código e pelo locale negociado
+   (`LocaleContextHolder.getLocale()`).
+5. **Documentação viva:** `config/OpenApiConfig.java` publica a informação da API
+   (título `ConsigPort API`, versão `1.0.0`, contato, licença MIT, servidor local, quatro
+   tags) e um `OpenApiCustomizer` que injeta o header `Accept-Language` em todas as
+   operações.
+6. **Borda HTTP:** os quatro recursos receberam `@Tag`, `@Operation` com o `operationId`
+   do contrato público (`registerAuthorization`, `findAuthorization`,
+   `getBeneficiaryAgenda`, `startPortabilityOperation`, `listPortabilityOperations`,
+   `findPortabilityOperation`, `listOperationEvents`), `@ApiResponse` por status, o
+   `Idempotency-Key` publicado como obrigatório e o header `Idempotent-Replay` no `202`.
+7. **DTOs:** todos receberam `@Schema(name=..., requiredProperties=...)`; os dois DTOs da
+   conta de recebimento (`ReceivingAccountRequest` e `ReceivingAccountResponse`) foram
+   colapsados em um só (`ReceivingAccount`), como manda o contrato, que publica um
+   único schema.
+8. **Teste de contrato:** `GeneratedContractTest` sobe o backend real (Testcontainers) e
+   compara o `/v3/api-docs` com o snapshot `contracts/consigport-api.yaml`, por meio do
+   `ContractComparator`: rotas, métodos, `operationId`, parâmetros (nome, lugar,
+   obrigatoriedade), status, corpo obrigatório e o shape dos schemas (propriedades,
+   tipos, enums e obrigatoriedade), resolvendo `$ref`/`allOf`/`oneOf`.
+9. **Prova de vida:** a anotação do `404` de uma rota foi removida do recurso e o teste
+   de contrato ficou vermelho, apontando a diferença; com a anotação restaurada, o
+   teste voltou ao verde.
+10. **Descoberta:** `@Schema(requiredMode=REQUIRED)` no nível do tipo **não** propaga
+    para as propriedades; `@Schema(requiredProperties={...})` no tipo **gera** o array
+    `required` do componente. Verificado empiricamente antes de ser aplicado.
+11. **Descoberta:** o springdoc não sobe sem `jackson-dataformat-yaml` no classpath — o
+    bean `OpenAPI` declara a dependência do YAML e o backend falhava ao subir. A
+    dependência foi declarada explicitamente no `backend/pom.xml`.
+12. **Descoberta:** o comparador precisa resolver as referências **de cada documento no
+    seu próprio `components`**. Resolver a referência de um documento no `components` do
+    outro produzia diferenças falsas (o `beneficiaryId` do contrato era lido como um
+    parâmetro vazio).
+13. **Decisão:** a comparação canônica ignora o que não muda o contrato do consumidor
+    (descrições, exemplos, `format`, limites numéricos, nome dos componentes) e compara
+    o que muda (rota, método, `operationId`, parâmetros, status, corpo obrigatório e
+    shape do schema). O contrato público é a fonte de verdade e não foi alterado.
+14. **End-to-end com o backend real:** a mensagem seguiu o `Accept-Language` em `en`,
+    `es` e `pt-BR`, com o código `AUTHORIZATION_NOT_FOUND` intacto; um idioma não
+    suportado (`fr`) e a ausência de header caíram no fallback `pt-BR`; o detalhe da
+    falha de validação também veio no idioma do chamador (`must not be blank` em en,
+    `no debe estar en blanco` em es); o `/v3/api-docs` publicado traz os sete
+    `operationId` do contrato, o header `Accept-Language` em todas as operações e os
+    status esperados; o Swagger UI respondeu `302` e `200`. Nenhum processo ou container
+    sobrou no final.
+15. **Validação:**
+    - `./mvnw -B -pl backend test -Dtest='ApiExceptionHandlerTest,LocaleNegotiationTest,GeneratedContractTest,AuthorizationResourceTest,AgendaResourceTest,OperationEventResourceTest'` → 43 testes verdes.
+    - `./mvnw -B verify` → reactor verde (backend 379 testes, mock 39 testes).
+    - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).
