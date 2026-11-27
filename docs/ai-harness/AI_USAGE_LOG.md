@@ -1151,3 +1151,48 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
     - `./mvnw -B -pl backend test -Dtest='PortabilityOperationTest,RejectionReasonTest,PollOperationTest,CentralHttpClientTest,PortabilityAclTest'` → 104 testes verdes.
     - `./mvnw -B verify` → reactor verde (backend 289 testes, mock 39 testes).
     - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).
+
+## Sessão #39 — Task 2.13 (Confirmação e atualização de conta)
+
+- **Data:** 2026-11-27
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/033-backend-complete-operation`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** fechar o ciclo da operação em uma única transação: a confirmação da
+  Central vira `CONFIRMED` e, na mesma transação, a conta recebe a atualização e a
+  operação vira `COMPLETED` com `account_updated_at`; a rejeição fecha a operação como
+  `REJECTED` com o motivo.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/AGENTS.md`, `SDD/specs/PLAN.md` (task 2.13 em voo),
+   `SDD/stacks/java.md` e `SDD/stacks/testing.md`; o `ARCHITECTURE.md` §7 e §11 e o
+   ADR-0003 já declaravam o caminho `CONFIRMED` → `COMPLETED` — nenhuma regra precisou
+   ser alterada.
+2. **Aplicação:**
+   - `CompleteOperation`: a confirmação fecha a operação (`CONFIRMED` → `COMPLETED` com
+     `account_updated_at`) e a rejeição a encerra como `REJECTED` com o motivo.
+   - `TransitionRecorder`: a fronteira de transação e a política do lock otimista em um
+     lugar só, compartilhada pelo worker e pelo fechamento.
+   - `PollOperation`: entrega a resposta terminal da Central ao `CompleteOperation`.
+3. **Domínio:** `PortabilityOperation` ganhou o invariante `account_updated_at` existe
+   apenas quando a operação está `COMPLETED`.
+4. **Wiring:** `CompositionRoot` instancia os dois casos de uso novos.
+5. **Testes:** 7 do `CompleteOperation` (caminho completo, uma transação só, o
+   `rawPayload` só no evento da Central, transições recusadas), 3 de integração da
+   persistência sobre PostgreSQL 16 (fechamento, rejeição e **rollback completo**),
+   7 do polling persistido, 16 do worker, 48 do agregado e 2 do agendamento.
+6. **Prova de vida:** com os eventos gravados fora da transação, o teste de rollback
+   ficou vermelho (`expected: PENDING but was: COMPLETED`); com a trilha dentro da
+   transação, voltou a ficar verde.
+7. **End-to-end com o backend real contra o mock real:** a operação confirmada percorreu
+   `CREATED` → `PENDING` → `CONFIRMED` → `COMPLETED` com `account_updated_at` gravado e
+   a trilha com `OPERATION_CONFIRMED`, `ACCOUNT_UPDATED` e `OPERATION_COMPLETED`; a
+   rejeitada fechou como `REJECTED` com `MARGIN_INSUFFICIENT` e o corpo bruto da Central
+   na trilha. Nenhum processo ou container sobrou.
+8. **Descoberta:** a primeira execução do end-to-end usou o jar anterior à task e a
+   operação parou em `CONFIRMED` — a lacuna real da task, observada antes de existir a
+   correção.
+9. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest='CompleteOperationTest,PollOperationTest,CompletionPersistenceTest,PollingPersistenceTest,PortabilityOperationTest,SchedulingConfigTest'` → 93 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend 301 testes, mock 39 testes).
+   - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).

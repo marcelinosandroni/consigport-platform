@@ -71,7 +71,7 @@
 
 > Objetivo: core DDD/hexagonal na porta `8080`, com PostgreSQL, Flyway, ACL, i18n,
 > polling resiliente e Swagger.
-> Task em voo: **2.13 — Confirmação e atualização de conta**.
+> Task em voo: **2.14 — Consulta de operações e trilha**.
 
 ### Tasks
 
@@ -118,10 +118,10 @@
       caminho único de falha; `404` da Central vira resposta tipada, fora do circuito e
       com o corpo bruto na trilha; rejeição com motivo fora do contrato fecha a
       operação como `REJECTED` com o código `UNMAPPED_REJECTION`.
-- [-] **2.13 — Confirmação e atualização de conta**
+- [x] **2.13 — Confirmação e atualização de conta**
       `CONFIRMADA` → `CONFIRMED` → `COMPLETED` com `account_updated_at`; `REJEITADA` →
       `REJECTED` com o motivo; os dois eventos gravados na mesma transação.
-- [ ] **2.14 — Consulta de operações e trilha**
+- [-] **2.14 — Consulta de operações e trilha**
       Leitura paginada com filtro por status; eventos em ordem cronológica;
       `404 OPERATION_NOT_FOUND`.
 - [ ] **2.15 — Recursos REST e tratamento de erros**

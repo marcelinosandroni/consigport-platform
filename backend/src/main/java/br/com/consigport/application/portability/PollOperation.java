@@ -2,18 +2,14 @@ package br.com.consigport.application.portability;
 
 import br.com.consigport.domain.audit.EventType;
 import br.com.consigport.domain.audit.OperationEvent;
-import br.com.consigport.domain.audit.OperationEventRepository;
 import br.com.consigport.domain.portability.CentralPortabilityPort;
 import br.com.consigport.domain.portability.CentralStatus;
 import br.com.consigport.domain.portability.CentralStatusPort;
 import br.com.consigport.domain.portability.CentralSubmissionException;
-import br.com.consigport.domain.portability.ConcurrentOperationUpdateException;
 import br.com.consigport.domain.portability.OperationStatus;
 import br.com.consigport.domain.portability.PortabilityOperation;
 import br.com.consigport.domain.portability.PortabilityOperationRepository;
-import br.com.consigport.domain.portability.RejectionReason;
 import br.com.consigport.domain.shared.DomainError;
-import br.com.consigport.domain.shared.TransactionRunner;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -27,10 +23,11 @@ import java.util.List;
  * Central about each one. An operation without a protocol is sent again with the same
  * idempotency key, never as a new operation. An operation with a protocol is polled:
  * {@code 204} records a {@code POLL_ATTEMPT} and schedules the next poll with the
- * {@code Retry-After} of the Central, a terminal answer records the new status, and a
- * failure of the Central records an {@code INTEGRATION_FAILED} and schedules the retry
- * with the backoff. A {@code 404} of the Central is a failure too: the operation stays
- * resumable, because the Central may know the protocol again.
+ * {@code Retry-After} of the Central, a terminal answer closes the operation through
+ * {@link CompleteOperation}, and a failure of the Central records an {@code
+ * INTEGRATION_FAILED} and schedules the retry with the backoff. A {@code 404} of the
+ * Central is a failure too: the operation stays resumable, because the Central may know
+ * the protocol again.
  *
  * <p>Every transition is written with its event in one transaction (BR-12): the trail of
  * the audit proves what happened with the operation.
@@ -40,8 +37,8 @@ public final class PollOperation {
   private final PortabilityOperationRepository operations;
   private final CentralPortabilityPort central;
   private final CentralStatusPort status;
-  private final OperationEventRepository events;
-  private final TransactionRunner transactions;
+  private final CompleteOperation completion;
+  private final TransitionRecorder recorder;
   private final Clock clock;
   private final IntegrationBackoff backoff;
   private final int batchSize;
@@ -52,8 +49,8 @@ public final class PollOperation {
    * @param operations the storage of the operations
    * @param central the submission of the operation to the Central
    * @param status the read of the situation of the operation in the Central
-   * @param events the append-only trail of the audit
-   * @param transactions the boundary of the transaction of each transition
+   * @param completion the closure of the operation when the Central answers terminally
+   * @param recorder the writer of the transition and of its trail
    * @param clock the clock that dates the polls
    * @param backoff the wait between two attempts after a failure
    * @param batchSize how many operations a single batch polls
@@ -62,16 +59,16 @@ public final class PollOperation {
       PortabilityOperationRepository operations,
       CentralPortabilityPort central,
       CentralStatusPort status,
-      OperationEventRepository events,
-      TransactionRunner transactions,
+      CompleteOperation completion,
+      TransitionRecorder recorder,
       Clock clock,
       IntegrationBackoff backoff,
       int batchSize) {
     this.operations = operations;
     this.central = central;
     this.status = status;
-    this.events = events;
-    this.transactions = transactions;
+    this.completion = completion;
+    this.recorder = recorder;
     this.clock = clock;
     this.backoff = backoff;
     this.batchSize = batchSize;
@@ -122,17 +119,10 @@ public final class PollOperation {
                   stillPending, previousStatus, answeredAt, pending.retryAfter(), pending.rawPayload()));
         }
         case CentralStatus.Confirmed confirmed -> {
-          PortabilityOperation confirmedOperation = operation.confirm();
-          record(
-              confirmedOperation,
-              confirmedEvent(confirmedOperation, previousStatus, answeredAt, confirmed.rawPayload()));
+          completion.confirm(operation, confirmed.rawPayload());
         }
         case CentralStatus.Rejected rejected -> {
-          PortabilityOperation rejectedOperation = operation.reject(rejected.reason());
-          record(
-              rejectedOperation,
-              rejectedEvent(
-                  rejectedOperation, previousStatus, answeredAt, rejected.reason(), rejected.rawPayload()));
+          completion.reject(operation, rejected.reason(), rejected.rawPayload());
         }
         case CentralStatus.NotFound notFound -> {
           // The Central does not know the protocol: the operation stays resumable and the
@@ -214,15 +204,7 @@ public final class PollOperation {
    * @param event the event of the transition
    */
   private void record(PortabilityOperation operation, OperationEvent event) {
-    try {
-      transactions.run(
-          () -> {
-            operations.save(operation);
-            events.append(event);
-          });
-    } catch (ConcurrentOperationUpdateException conflict) {
-      // Another worker moved the operation forward: the stored state is the truth.
-    }
+    recorder.record(operation, List.of(event));
   }
 
   private static OperationEvent pollAttemptEvent(
@@ -239,37 +221,6 @@ public final class PollOperation {
         "The Central is still processing the operation; the next poll is in "
             + retryAfter.toSeconds()
             + " s",
-        rawPayload,
-        now);
-  }
-
-  private static OperationEvent confirmedEvent(
-      PortabilityOperation operation,
-      OperationStatus previousStatus,
-      Instant now,
-      String rawPayload) {
-    return OperationEvent.record(
-        operation.id(),
-        previousStatus,
-        OperationStatus.CONFIRMED,
-        EventType.OPERATION_CONFIRMED,
-        "The Central confirmed the operation",
-        rawPayload,
-        now);
-  }
-
-  private static OperationEvent rejectedEvent(
-      PortabilityOperation operation,
-      OperationStatus previousStatus,
-      Instant now,
-      RejectionReason reason,
-      String rawPayload) {
-    return OperationEvent.record(
-        operation.id(),
-        previousStatus,
-        OperationStatus.REJECTED,
-        EventType.OPERATION_REJECTED,
-        "The Central rejected the operation: " + reason.code(),
         rawPayload,
         now);
   }

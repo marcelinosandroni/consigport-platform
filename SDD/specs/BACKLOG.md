@@ -208,7 +208,7 @@
 
 ### 2.13 — Confirmação e atualização de conta
 - **Objetivo:** fechar o ciclo em uma única transação.
-- **Arquivos:** `application/portability/CompleteOperation.java`, `PortabilityOperation.java`, testes de integração.
+- **Arquivos:** `application/portability/CompleteOperation.java`, `application/portability/TransitionRecorder.java`, `application/portability/PollOperation.java`, `PortabilityOperation.java`, testes de integração.
 - **Aceite:** `CONFIRMADA` → `CONFIRMED` → `COMPLETED` com `account_updated_at`; `REJEITADA` → `REJECTED` com motivo; dois eventos gravados na mesma transação.
 - **Verificação:** teste que simula falha entre as etapas e confirma rollback completo.
 

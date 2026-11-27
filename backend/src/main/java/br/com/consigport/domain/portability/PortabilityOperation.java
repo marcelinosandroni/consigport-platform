@@ -20,8 +20,8 @@ import java.util.UUID;
  *
  * <p>Absent values are {@code null}: the protocol is unknown while the operation is
  * {@code CREATED}, the rejection reason exists only when the operation is
- * {@code REJECTED}, and the next poll and the account update are set only when they
- * happen.
+ * {@code REJECTED}, the next poll and the account update are set only when they
+ * happen, and the account update exists only when the operation is {@code COMPLETED}.
  */
 public record PortabilityOperation(
     OperationId id,
@@ -101,6 +101,12 @@ public record PortabilityOperation(
     }
     if (status != OperationStatus.REJECTED && rejectionReason != null) {
       throw new IllegalArgumentException("rejectionReason must be null unless rejected");
+    }
+    if (status == OperationStatus.COMPLETED && accountUpdatedAt == null) {
+      throw new IllegalArgumentException("accountUpdatedAt must not be null when completed");
+    }
+    if (status != OperationStatus.COMPLETED && accountUpdatedAt != null) {
+      throw new IllegalArgumentException("accountUpdatedAt must be null unless completed");
     }
     if (retryCount < 0) {
       throw new IllegalArgumentException("retryCount must not be negative");

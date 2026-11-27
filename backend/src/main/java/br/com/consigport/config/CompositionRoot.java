@@ -6,9 +6,11 @@ import br.com.consigport.adapters.out.central.HmacSigner;
 import br.com.consigport.adapters.out.central.acl.CentralAcl;
 import br.com.consigport.adapters.out.central.acl.PortabilityAcl;
 import br.com.consigport.adapters.out.resilience.CircuitBreaker;
+import br.com.consigport.application.portability.CompleteOperation;
 import br.com.consigport.application.portability.IntegrationBackoff;
 import br.com.consigport.application.portability.PollOperation;
 import br.com.consigport.application.portability.StartOperation;
+import br.com.consigport.application.portability.TransitionRecorder;
 import br.com.consigport.domain.agenda.AgendaGateway;
 import br.com.consigport.domain.audit.OperationEventRepository;
 import br.com.consigport.domain.portability.CentralPortabilityPort;
@@ -195,13 +197,44 @@ public class CompositionRoot {
   }
 
   /**
+   * The writer of every transition of an operation and of the trail that proves it.
+   *
+   * <p>The transaction boundary of the use cases lives here: the state and the events
+   * are written together or not at all (BR-12).
+   *
+   * @param operations the storage of the operations
+   * @param events the append-only trail of the audit
+   * @param transactions the boundary of the transaction of each transition
+   * @return the recorder
+   */
+  @Bean
+  public TransitionRecorder transitionRecorder(
+      PortabilityOperationRepository operations,
+      OperationEventRepository events,
+      TransactionRunner transactions) {
+    return new TransitionRecorder(operations, events, transactions);
+  }
+
+  /**
+   * The closure of the operation when the Central answers with a terminal situation.
+   *
+   * @param recorder the writer of the transition and of its trail
+   * @param clock the clock that dates the closure
+   * @return the use case
+   */
+  @Bean
+  public CompleteOperation completeOperation(TransitionRecorder recorder, Clock clock) {
+    return new CompleteOperation(recorder, clock);
+  }
+
+  /**
    * The worker that follows the operations until the Central answers.
    *
    * @param operations the storage of the operations
    * @param central the submission of the operation to the Central
    * @param status the read of the situation of the operation in the Central
-   * @param events the append-only trail of the audit
-   * @param transactions the boundary of the transaction of each transition
+   * @param completion the closure of the operation when the Central answers terminally
+   * @param recorder the writer of the transition and of its trail
    * @param clock the clock that dates the polls
    * @param backoff the wait between two attempts after a failure
    * @param batchSize how many operations a single batch polls
@@ -212,12 +245,12 @@ public class CompositionRoot {
       PortabilityOperationRepository operations,
       CentralPortabilityPort central,
       CentralStatusPort status,
-      OperationEventRepository events,
-      TransactionRunner transactions,
+      CompleteOperation completion,
+      TransitionRecorder recorder,
       Clock clock,
       IntegrationBackoff backoff,
       @Value("${central.poll.batch-size:20}") int batchSize) {
     return new PollOperation(
-        operations, central, status, events, transactions, clock, backoff, batchSize);
+        operations, central, status, completion, recorder, clock, backoff, batchSize);
   }
 }
