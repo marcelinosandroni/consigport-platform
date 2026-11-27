@@ -3602,6 +3602,190 @@
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
 
+### Task 2.17 — Gate de cobertura do núcleo
+
+- **Data de Conclusão:** 2026-11-27
+- **Branch:** `feat/037-backend-coverage-gate`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** ativar o portão de cobertura do backend sobre o núcleo (domínio e casos de
+  uso), cobrar **80% de linhas e de branches** como manda o portão 3.2 do
+  `docs/quality/GATES.md`, fechar as lacunas de branch e publicar o relatório no CI.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Medição da cobertura antes das correções** (o JaCoCo foi ativado no módulo e o
+   portão cobrou 80% de branches):
+   ```text
+   ./mvnw -B -pl backend -am verify
+   → Tests run: 379, Failures: 0, Errors: 0, Skipped: 0
+   → --- jacoco:0.8.12:report (report) @ consigport-backend ---
+   → --- jacoco:0.8.12:check (check) @ consigport-backend ---
+   → [WARNING] Rule violated for bundle consigport-backend: branches covered ratio is 0.74, but expected minimum is 0.80
+   → [ERROR] ConsigPort Backend ................................. FAILURE [01:34 min]
+   → [ERROR] BUILD FAILURE
+   → EXIT=1
+   ```
+   Relatório do bundle (`backend/target/site/jacoco/jacoco.xml`):
+   ```text
+   INSTRUCTION missed= 340 covered=2687 ratio=88.77%
+   BRANCH     missed=  87 covered= 256 ratio=74.64%
+   LINE       missed=  71 covered= 621 ratio=89.74%
+   CLASS      missed=   0 covered=  59 ratio=100.00%
+   ```
+   Lacunas por classe (branches perdidos):
+   ```text
+   domain/portability.OperationDetail     23 perdidos de 42 (45,2%)
+   domain/portability.PortabilityOperation 20 perdidos de 70 (71,4%)
+   domain/portability.OperationRequest     15 perdidos de 32 (53,1%)
+   domain/portability.OperationSummary      6 perdidos de 12 (50,0%)
+   domain/agenda.Installment                5 perdidos de 10 (50,0%)
+   domain/shared.Page                       2 perdidos de 16 (87,5%)
+   domain/portability.PortabilityOperation$OperationId  2 perdidos de 6
+   domain/portability.CentralSubmissionException        2 perdidos de 4
+   domain/portability.CentralStatus$Pending             2 perdidos de 4
+   domain/portability.CentralStatus$NotFound             2 perdidos de 4
+   domain/agenda.BeneficiaryAgenda            2 perdidos de 6
+   application/portability.IntegrationBackoff 2 perdidos de 14
+   domain/portability.RejectionReason         1 perdido de 7
+   domain/portability.OperationFilter$WithStatus 1 perdido de 2
+   domain/portability.CentralStatus$Rejected   1 perdido de 2
+   domain/audit.OperationEvent                1 perdido de 16
+   ```
+2. **Reator completo depois das correções:**
+   ```text
+   ./mvnw -B verify
+   → Tests run: 478, Failures: 0, Errors: 0, Skipped: 0   (backend)
+   → Tests run: 39, Failures: 0, Errors: 0, Skipped: 0    (central-convenios-mock)
+   → ConsigPort Platform ................................ SUCCESS [  0.003 s]
+   → ConsigPort Backend ................................. SUCCESS [01:36 min]
+   → Central de Convênios Mock .......................... SUCCESS [ 21.095 s]
+   → BUILD SUCCESS
+   → EXIT=0
+   ```
+   Cobertura final do núcleo (domínio + aplicação):
+   ```text
+   INSTRUCTION   98.58%  (2984 de 3027)
+   BRANCH        99.71%  (342 de 343)
+   LINE          98.12%  (679 de 692)
+   CLASS        100.00%  (59 de 59)
+   ```
+3. **Prova de vida do portão (limiar artificialmente inalcançável):** o limiar de branches
+   foi elevado para `1.00` e o build ficou vermelho, com a regra apontada; com o limiar
+   restaurado em `0.80`, o build voltou ao verde.
+   ```text
+   (limiar de branches elevado para 1.00)
+   → [WARNING] Rule violated for bundle consigport-backend: branches covered ratio is 0.99, but expected minimum is 1.00
+   → [ERROR] ConsigPort Backend ................................. FAILURE [  6.293 s]
+   → [ERROR] BUILD FAILURE
+   → EXIT=1
+   (limiar restaurado em 0.80)
+   → BUILD SUCCESS
+   → EXIT=0
+   ```
+4. **Testes novos do núcleo** (recorte da task):
+   ```text
+   ./mvnw -B -pl backend test -Dtest='OperationReadModelsTest,OperationRequestTest,AgendaReadModelsTest,CentralStatusTest,PortabilityOperationTest,SharedValueObjectsTest,OperationEventTest'
+   → Tests run: 3, Failures: 0, Errors: 0, Skipped: 0 -- in CentralStatusTest$FilterTest
+   → Tests run: 4, Failures: 0, Errors: 0, Skipped: 0 -- in CentralStatusTest$SubmissionFailureTest
+   → Tests run: 1, Failures: 0, Errors: 0, Skipped: 0 -- in CentralStatusTest$ConfirmedTest
+   → Tests run: 3, Failures: 0, Errors: 0, Skipped: 0 -- in CentralStatusTest$NotFoundTest
+   → Tests run: 2, Failures: 0, Errors: 0, Skipped: 0 -- in CentralStatusTest$RejectedTest
+   → Tests run: 3, Failures: 0, Errors: 0, Skipped: 0 -- in CentralStatusTest$PendingTest
+   → Tests run: 18, Failures: 0, Errors: 0, Skipped: 0 -- in OperationReadModelsTest$DetailTest
+   → Tests run: 7, Failures: 0, Errors: 0, Skipped: 0 -- in OperationReadModelsTest$SummaryTest
+   → Tests run: 8, Failures: 0, Errors: 0, Skipped: 0 -- in OperationRequestTest$MatchesTest
+   → Tests run: 10, Failures: 0, Errors: 0, Skipped: 0 -- in OperationRequestTest$InvariantsTest
+   → Tests run: 4, Failures: 0, Errors: 0, Skipped: 0 -- in PortabilityOperationTest$OperationIdTest
+   → Tests run: 18, Failures: 0, Errors: 0, Skipped: 0 -- in PortabilityOperationTest$Creation
+   → Tests run: 52, Failures: 0, Errors: 0, Skipped: 0 -- in PortabilityOperationTest
+   → Tests run: 9, Failures: 0, Errors: 0, Skipped: 0 -- in SharedValueObjectsTest$PageTest
+   → Tests run: 13, Failures: 0, Errors: 0, Skipped: 0 -- in OperationEventTest
+   → Tests run: 4, Failures: 0, Errors: 0, Skipped: 0 -- in AgendaReadModelsTest$BeneficiaryAgendaTest
+   → Tests run: 6, Failures: 0, Errors: 0, Skipped: 0 -- in AgendaReadModelsTest$InstallmentTest
+   → BUILD SUCCESS
+   ```
+5. **Gates locais:**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → OK (65 documentos, todo link relativo resolve, exit 0)
+   node scripts/check-specs.mjs                → OK (exatamente 1 task em voo, tasks catalogadas, exit 0)
+   node scripts/check-architecture.mjs         → OK (22 testes de validação dos desenhos, exit 0)
+   node scripts/check-theme-tokens.mjs         → OK (exit 0)
+   node scripts/check-ai-log.mjs               → OK (43 sessões, estrutura válida, exit 0)
+   ```
+
+#### Conteúdo Entregue:
+- `pom.xml` — a propriedade `jacoco.branch.coverage` (0,80, ao lado da
+  `jacoco.line.coverage`), a configuração do `pluginManagement` do JaCoCo com os
+  `includes` do núcleo (`br/com/consigport/domain/**` e
+  `br/com/consigport/application/**`) e o segundo limite da regra (`BRANCH` com
+  `COVEREDRATIO`).
+- `backend/pom.xml` — a ativação do plugin JaCoCo no módulo, que passa a instrumentar
+  os testes, publicar o relatório em `backend/target/site/jacoco` e falhar o build quando
+  o portão é descumprido.
+- `.github/workflows/ci.yml` — o job `backend` publica o relatório como o artefato
+  `backend-coverage`.
+- `backend/src/main/java/br/com/consigport/domain/portability/OperationRequest.java` —
+  a recusa da parcela nula vem **antes** da cópia defensiva da lista.
+- Testes: `OperationReadModelsTest` (25 casos: cada invariante do resumo e do detalhe),
+  `OperationRequestTest` (18 casos: os invariantes da seleção e a comparação de
+  idempotência), `AgendaReadModelsTest` (10 casos: a parcela e a agenda), `CentralStatusTest`
+  (13 casos: os quatro status da Central, a falha da submissão e o filtro), além das
+  ampliações em `PortabilityOperationTest`, `SharedValueObjectsTest`, `OperationEventTest`,
+  `RejectionReasonTest` e `IntegrationBackoffTest`.
+
+#### Descobertas e Decisões:
+- O JaCoCo já estava declarado no `pom.xml` raiz (com `pluginManagement`, a propriedade
+  `jacoco.line.coverage` e as execuções `prepare-agent`, `report` e `check`), mas
+  **nenhum módulo declarava o plugin**: o portão de cobertura existia no papel e não
+  existia no build.
+- O portão do `GATES.md` §3.2 exige 80% de **linhas e de branches**; a raiz só cobrava
+  linhas. O segundo limite foi adicionado, com a propriedade própria
+  `jacoco.branch.coverage`.
+- O `GATES.md` §3.2 restringe a cobertura ao domínio e aos casos de uso: a medição sem
+  `includes` contaria os adaptadores, a composição e a borda HTTP, o que tornaria o
+  portão um número sem relação com o núcleo. Os `includes` ficaram na raiz, e o módulo
+  `backend` é o único que declara o plugin.
+- A lacuna de branch não era feita de código morto: eram os invariantes recusados pelo
+  domínio que nenhum teste exercitava — os read models (`OperationDetail`,
+  `OperationSummary`), a seleção do pedido, a parcela da agenda, os status da Central e
+  o construtor do agregado. Os testes novos exercitam cada recusa, e a cobertura subiu
+  de 74,64% para 99,71% de branches.
+- **Defeito encontrado pelo portão:** a recusa da parcela nula em `OperationRequest` era
+  código morto. `List.copyOf` recusa um elemento nulo com `NullPointerException`, e a
+  cópia vinha **antes** da checagem: o invariante declarado pelo domínio
+  (`installmentIds must not contain null`) nunca podia ser disparado, e o chamador
+  recebia uma `NullPointerException` em vez da `IllegalArgumentException` do contrato do
+  domínio. A recusa agora vem antes da cópia.
+- O portão 3.2 do `GATES.md` também exige `./mvnw -q spotless:check`, mas nenhum `pom.xml`
+  declara o plugin Spotless: o comando falha com "no such goal". Ativar o Spotless exige
+  formatar o código existente, o que produz um diff largo que deve ficar em task
+  própria. A dívida está registrada no `BACKLOG.md`, nas dívidas da Fase 2.
+- A task 2.17 foi dividida em duas antes de começar, como manda a regra de tamanho: o
+  portão de cobertura com os testes do núcleo virou a 2.17, e a prova do ciclo de vida
+  completo com o PostgreSQL real virou a 2.18.
+
+#### Arquivos Tocados:
+- `pom.xml`
+- `backend/pom.xml`
+- `.github/workflows/ci.yml`
+- `backend/src/main/java/br/com/consigport/domain/portability/OperationRequest.java`
+- `backend/src/test/java/br/com/consigport/domain/portability/OperationReadModelsTest.java`
+- `backend/src/test/java/br/com/consigport/domain/portability/OperationRequestTest.java`
+- `backend/src/test/java/br/com/consigport/domain/portability/CentralStatusTest.java`
+- `backend/src/test/java/br/com/consigport/domain/portability/PortabilityOperationTest.java`
+- `backend/src/test/java/br/com/consigport/domain/portability/RejectionReasonTest.java`
+- `backend/src/test/java/br/com/consigport/domain/agenda/AgendaReadModelsTest.java`
+- `backend/src/test/java/br/com/consigport/domain/shared/SharedValueObjectsTest.java`
+- `backend/src/test/java/br/com/consigport/domain/audit/OperationEventTest.java`
+- `backend/src/test/java/br/com/consigport/application/portability/IntegrationBackoffTest.java`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`
+
 ### Task 2.16 — i18n, Swagger e snapshot OpenAPI
 
 - **Data de Conclusão:** 2026-11-27

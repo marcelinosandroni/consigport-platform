@@ -130,9 +130,12 @@
 - [x] **2.16 — i18n, Swagger e snapshot OpenAPI**
       `Accept-Language` com fallback `pt-BR`; `code` nunca traduzido; contrato gerado
       equivalente a `contracts/consigport-api.yaml`.
-- [-] **2.17 — Fechamento do backend**
-      Cobertura ≥ 80% no domínio e na aplicação; fluxos `CREATED` → `COMPLETED` e
-      `REJECTED` comprovados com o banco real.
+- [x] **2.17 — Gate de cobertura do núcleo**
+      Domínio e aplicação com ≥ 80% de linhas e de branches; o build falha quando a
+      cobertura cai; relatório anexado no CI.
+- [-] **2.18 — Fluxo completo com o banco real**
+      `CREATED` → `COMPLETED` e `CREATED` → `REJECTED` comprovados com o PostgreSQL real
+      e a trilha completa de eventos.
 
 ### Como usar este arquivo
 

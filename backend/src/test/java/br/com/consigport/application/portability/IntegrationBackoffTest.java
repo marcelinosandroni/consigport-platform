@@ -44,6 +44,27 @@ class IntegrationBackoffTest {
   }
 
   @Test
+  void refusesAMissingBase() {
+    assertThatThrownBy(() -> new IntegrationBackoff(null, CEILING))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("base must be positive");
+  }
+
+  @Test
+  void refusesAMissingCeiling() {
+    assertThatThrownBy(() -> new IntegrationBackoff(BASE, null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("ceiling must not be shorter than the base");
+  }
+
+  @Test
+  void waitsTheCeilingWhenTheMultiplicationOverflows() {
+    IntegrationBackoff wide = new IntegrationBackoff(CEILING, CEILING);
+
+    assertThat(wide.delayFor(33)).isEqualTo(CEILING);
+  }
+
+  @Test
   void refusesACeilingShorterThanTheBase() {
     assertThatThrownBy(() -> new IntegrationBackoff(BASE, Duration.ofSeconds(1)))
         .isInstanceOf(IllegalArgumentException.class);

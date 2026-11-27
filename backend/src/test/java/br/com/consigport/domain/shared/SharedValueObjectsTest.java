@@ -155,6 +155,28 @@ class SharedValueObjectsTest {
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessage("totalElements must not be negative");
     }
+
+    @Test
+    void rejectsAMissingList() {
+      assertThatThrownBy(() -> new Page<>(null, 0, 20, 0))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("items must not be null");
+    }
+
+    @Test
+    void rejectsMoreItemsThanTheWholeResultSet() {
+      assertThatThrownBy(() -> new Page<>(List.of("a", "b"), 0, 20, 1))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("items must not exceed totalElements");
+    }
+
+    @Test
+    void freezesTheItems() {
+      Page<String> page = new Page<>(List.of("a"), 0, 20, 1);
+
+      assertThatThrownBy(() -> page.items().clear())
+          .isInstanceOf(UnsupportedOperationException.class);
+    }
   }
 
   @Nested

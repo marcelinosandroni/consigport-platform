@@ -1392,3 +1392,63 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
     - `./mvnw -B -pl backend test -Dtest='ApiExceptionHandlerTest,LocaleNegotiationTest,GeneratedContractTest,AuthorizationResourceTest,AgendaResourceTest,OperationEventResourceTest'` → 43 testes verdes.
     - `./mvnw -B verify` → reactor verde (backend 379 testes, mock 39 testes).
     - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).
+
+## Sessão #43 — Task 2.17 (Gate de cobertura do núcleo)
+
+- **Data:** 2026-11-27
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/037-backend-coverage-gate`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** ativar o portão de cobertura do backend sobre o núcleo (domínio e casos de
+  uso), cobrar **80% de linhas e de branches** como manda o portão 3.2 do
+  `docs/quality/GATES.md`, fechar as lacunas de branch e publicar o relatório no CI.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/AGENTS.md`, `SDD/specs/PLAN.md` (task 2.17 em voo) e o
+   portão 3.2 do `docs/quality/GATES.md`, que exige 80% de linhas e de branches no
+   domínio e nos casos de uso. Nenhuma regra precisou ser alterada.
+2. **Divisão da task:** a 2.17 original ("Fechamento do backend") reunia o portão de
+   cobertura, os testes do núcleo e a prova do ciclo de vida com o banco real — mais de
+   uma hora de trabalho. Foi dividida antes de começar: a **2.17** virou o portão de
+   cobertura com os testes do núcleo, e a **2.18** ficou com a prova do ciclo de vida
+   completo com o PostgreSQL real. O `PLAN.md`, o `BACKLOG.md` e o `ROADMAP.md` foram
+   atualizados (a Fase 2 passa de 17 para 18 tasks; o total do projeto, de 52 para 53).
+3. **Medição da baseline:** o JaCoCo foi ativado no módulo `backend` e o portão foi
+   medido pela primeira vez: **74,64% de branches** (linhas em 89,74%), abaixo dos 80%
+   exigidos, com o build vermelho e a regra apontada.
+4. **Mapeamento das lacunas:** as branches perdidas estavam concentradas nos invariantes
+   recusados pelo domínio e nunca exercitados — `OperationDetail` (23 perdidas),
+   `PortabilityOperation` (20), `OperationRequest` (15), `OperationSummary` (6),
+   `Installment` (5), `Page`, `OperationId`, `CentralSubmissionException`, os três status
+   tipados da Central, `BeneficiaryAgenda`, `IntegrationBackoff`, `RejectionReason`, o
+   filtro e o evento de auditoria.
+5. **Portão:** `pom.xml` ganhou a propriedade `jacoco.branch.coverage` (0,80), os
+   `includes` que restringem a medição ao núcleo (`br/com/consigport/domain/**` e
+   `br/com/consigport/application/**`) e o segundo limite da regra (`BRANCH` com
+   `COVEREDRATIO`); `backend/pom.xml` passou a declarar o plugin.
+6. **Testes novos:** `OperationReadModelsTest` (25 casos), `OperationRequestTest`
+   (18 casos), `AgendaReadModelsTest` (10 casos) e `CentralStatusTest` (13 casos), mais as
+   ampliações em `PortabilityOperationTest`, `SharedValueObjectsTest`, `OperationEventTest`,
+   `RejectionReasonTest` e `IntegrationBackoffTest`.
+7. **Descoberta — defeito no domínio:** a recusa da parcela nula em `OperationRequest` era
+   código morto. `List.copyOf` recusa um elemento nulo com `NullPointerException`, e a
+   cópia vinha **antes** da checagem: o invariante declarado pelo domínio
+   (`installmentIds must not contain null`) nunca podia ser disparado, e o chamador
+   recebia uma `NullPointerException` em vez da `IllegalArgumentException` do contrato.
+   A recusa agora vem antes da cópia.
+8. **Descoberta — portão sem implementação:** o `GATES.md` §3.2 exige
+   `./mvnw -q spotless:check`, mas nenhum `pom.xml` declara o plugin Spotless: o comando
+   falha com "no such goal". Ativar o Spotless exige formatar o código existente, o que
+   produz um diff largo que deve ficar em task própria. A dívida está registrada no
+   `BACKLOG.md`, nas dívidas da Fase 2.
+9. **CI:** o job `backend` publica o relatório de cobertura como o artefato
+   `backend-coverage`.
+10. **Prova de vida:** o limiar de branches foi elevado artificialmente para `1,00` e o
+    build ficou vermelho, com a regra apontada; com o limiar restaurado em `0,80`, o
+    build voltou ao verde.
+11. **Validação:**
+    - `./mvnw -B -pl backend test -Dtest='OperationReadModelsTest,OperationRequestTest,AgendaReadModelsTest,CentralStatusTest,PortabilityOperationTest,SharedValueObjectsTest,OperationEventTest'` → 179 testes verdes.
+    - `./mvnw -B verify` → reactor verde (backend 478 testes, mock 39 testes).
+    - Cobertura final do núcleo: **99,71% de branches**, 98,12% de linhas, 100% de classes.
+    - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).
