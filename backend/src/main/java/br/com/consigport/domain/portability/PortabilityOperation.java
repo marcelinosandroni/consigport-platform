@@ -171,6 +171,13 @@ public record PortabilityOperation(
   /**
    * The integration failed after the retries.
    *
+   * <p>The operation may already be in {@code INTEGRATION_ERROR}: the state machine of
+   * {@code ARCHITECTURE.md} §7 declares the self-transition {@code INTEGRATION_ERROR} to
+   * {@code INTEGRATION_ERROR}, with the {@code INTEGRATION_FAILED} event. The status does
+   * not change in that case; what changes is the count of the failures and the schedule
+   * of the next attempt, which grow with the backoff (the flow of the worker, {@code
+   * ARCHITECTURE.md} §11).
+   *
    * @param nextPollAt when the next attempt happens
    * @return the operation in {@code INTEGRATION_ERROR}
    * @throws InvalidTransitionException when the operation cannot fail from its current
@@ -178,31 +185,10 @@ public record PortabilityOperation(
    */
   public PortabilityOperation registerIntegrationFailure(Instant nextPollAt) {
     requireSource(
-        OperationStatus.INTEGRATION_ERROR, OperationStatus.CREATED, OperationStatus.PENDING);
-    if (nextPollAt == null) {
-      throw new IllegalArgumentException("nextPollAt must not be null");
-    }
-    return transition(
-        OperationStatus.INTEGRATION_ERROR, protocol, rejectionReason, retryCount + 1, nextPollAt, accountUpdatedAt);
-  }
-
-  /**
-   * The integration failed again while the operation was already in {@code
-   * INTEGRATION_ERROR}.
-   *
-   * <p>The state machine of {@code ARCHITECTURE.md} §7 has no transition from {@code
-   * INTEGRATION_ERROR} to {@code INTEGRATION_ERROR}: the status does not change, the
-   * operation keeps waiting for the Central. What changes is the schedule of the next
-   * attempt and the count of the failures, which grow with the backoff (the flow of the
-   * worker, {@code ARCHITECTURE.md} §11).
-   *
-   * @param nextPollAt when the next attempt happens
-   * @return the operation in {@code INTEGRATION_ERROR}, with the renewed backoff
-   * @throws InvalidTransitionException when the operation is not in {@code
-   *     INTEGRATION_ERROR}
-   */
-  public PortabilityOperation renewIntegrationBackoff(Instant nextPollAt) {
-    requireSource(OperationStatus.INTEGRATION_ERROR, OperationStatus.INTEGRATION_ERROR);
+        OperationStatus.INTEGRATION_ERROR,
+        OperationStatus.CREATED,
+        OperationStatus.PENDING,
+        OperationStatus.INTEGRATION_ERROR);
     if (nextPollAt == null) {
       throw new IllegalArgumentException("nextPollAt must not be null");
     }

@@ -1094,3 +1094,60 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - `./mvnw -B -pl backend test -Dtest='PollOperationTest,IntegrationBackoffTest,CircuitBreakerTest,CentralHttpClientTest'` → 44 testes verdes.
    - `./mvnw -B -pl backend test -Dtest='PollingPersistenceTest,SchedulingConfigTest,PortabilityOperationTest'` → 64 testes verdes.
    - `./mvnw -B verify` → reactor verde (backend 273 testes, mock 39 testes).
+
+## Sessão #38 — Task 2.12 (Auto-transição de integração e respostas tipadas da Central)
+
+- **Data:** 2026-11-27
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/032-backend-typed-central-answers`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** alinhar a máquina de estados, a trilha e o fluxo do worker, e distinguir as
+  respostas da Central que antes caíam no mesmo balde de falha: o `404` da Central e a
+  rejeição com um motivo que o contrato não declara.
+
+### Atividades Realizadas:
+1. **Decisão com o responsável:** três pontos foram levados à decisão — a auto-transição
+   `INTEGRATION_ERROR` → `INTEGRATION_ERROR`, o tratamento do `404`
+   (`OPERACAO_NAO_ENCONTRADA`) e o motivo de rejeição desconhecido. A escolha foi a
+   auto-transição explícita (opção B), com a linha nova na §7 e a autorização para
+   editar o `ARCHITECTURE.md`; e a tipagem das respostas da Central com o fechamento da
+   rejeição desconhecida (opções 1+2), sem alterar o contrato público.
+2. **Domínio:**
+   - `PortabilityOperation.registerIntegrationFailure` aceita a origem
+     `INTEGRATION_ERROR`; `renewIntegrationBackoff` foi removido e o caminho de falha
+     ficou único.
+   - `CentralStatus.NotFound`: a Central não conhece o protocolo, com o corpo bruto.
+   - `RejectionReason.Unmapped`: o motivo fora do contrato, com o código público
+     `UNMAPPED_REJECTION`.
+3. **Adaptadores:**
+   - `PortabilityAcl.toRejectionReason` traduz o motivo desconhecido para `Unmapped`; a
+     rejeição sem motivo continua violando o contrato.
+   - `CentralHttpClient.statusOf`: o `404` vira `NotFound` e conta como chamada
+     bem-sucedida no circuito — a Central respondeu, ela está disponível.
+4. **Aplicação:** `PollOperation` trata o `NotFound` como falha retomável, grava o corpo
+   bruto da Central no evento e usa `registerIntegrationFailure` em todos os caminhos de
+   falha.
+5. **Regras e specs:** `ARCHITECTURE.md` §7 (linha da auto-transição), §3 (tradução do
+   motivo desconhecido) e §11 (passo do `404` no fluxo do worker); ADR-0003 (protocolo de
+   polling); `BACKLOG.md` (task 2.12, renumeração de 2.12–2.16 para 2.13–2.17 e três
+   dívidas registradas); `PLAN.md` e `ROADMAP.md`.
+6. **Testes:** 45 do agregado (com a auto-transição na matriz), 16 do worker, 19 do
+   cliente HTTP, 8 da nova `PortabilityAclTest` e 6 da razão selada.
+7. **Prova de vida:** sem a linha da §7 na matriz, a suíte quebrou
+   (`Tests run: 45, Failures: 1`); a linha foi restaurada e a suíte voltou a ficar verde.
+8. **End-to-end com o backend real contra o mock real:** o reset administrativo do mock
+   (`POST /_admin/reset → 204`) fez a Central esquecer as operações sem sair do ar; o
+   `404` virou `INTEGRATION_FAILED` com o corpo bruto (`OPERACAO_NAO_ENCONTRADA`), a
+   segunda falha provou a auto-transição (`previous_status = new_status =
+   INTEGRATION_ERROR`) com o backoff dobrando de 2 s para 4 s, uma nova operação foi
+   aceita e confirmada depois de 14 `404`s (o circuito não foi poluído) e uma rejeição
+   com o motivo `LIMITE_DE_PARCELAS` (patch temporário no mock, revertido depois) fechou a
+   operação como `REJECTED` com o código `UNMAPPED_REJECTION`.
+9. **Descoberta fora do escopo:** o end-to-end expôs um defeito pré-existente — a
+   sequência de protocolos do mock reinicia a cada reset e o esquema garante `protocol`
+   único, então a colisão respondia `500` em vez de um erro mapeado. Registrado como
+   dívida no `BACKLOG.md`.
+10. **Validação:**
+    - `./mvnw -B -pl backend test -Dtest='PortabilityOperationTest,RejectionReasonTest,PollOperationTest,CentralHttpClientTest,PortabilityAclTest'` → 104 testes verdes.
+    - `./mvnw -B verify` → reactor verde (backend 289 testes, mock 39 testes).
+    - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).

@@ -396,7 +396,7 @@ class CentralHttpClientTest {
   }
 
   @Test
-  void answersCentralUnavailableWhenTheCentralDoesNotKnowTheProtocol() {
+  void answersNotFoundWhenTheCentralDoesNotKnowTheProtocol() {
     server
         .expect(requestTo(BASE_URL + "/operacoes-portabilidade/" + PROTOCOL))
         .andRespond(
@@ -405,9 +405,80 @@ class CentralHttpClientTest {
                 .body(
                     "{\"codigo\":\"OPERACAO_NAO_ENCONTRADA\",\"mensagem\":\"Operação não encontrada.\"}"));
 
-    assertThatThrownBy(() -> client.statusOf(PROTOCOL))
-        .isInstanceOf(DomainError.CentralUnavailable.class)
-        .hasMessageContaining("does not know the protocol " + PROTOCOL);
+    CentralStatus answer = client.statusOf(PROTOCOL);
+
+    assertThat(answer).isInstanceOfSatisfying(
+        CentralStatus.NotFound.class,
+        notFound -> {
+          assertThat(notFound.protocol()).isEqualTo(PROTOCOL);
+          assertThat(notFound.rawPayload()).contains("OPERACAO_NAO_ENCONTRADA");
+        });
+    server.verify();
+  }
+
+  @Test
+  void doesNotOpenTheCircuitWhenTheCentralDoesNotKnowTheProtocol() {
+    CircuitBreaker shortCircuit =
+        new CircuitBreaker(
+            2,
+            0.5,
+            Duration.ofSeconds(10),
+            3,
+            Clock.fixed(Instant.ofEpochSecond(TIMESTAMP), ZoneOffset.UTC));
+    RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
+    server = MockRestServiceServer.bindTo(builder).build();
+    CentralHttpClient protectedClient =
+        new CentralHttpClient(
+            builder.build(),
+            new HmacSigner(SECRET),
+            new PortabilityAcl(),
+            new CentralAcl(),
+            Clock.fixed(Instant.ofEpochSecond(TIMESTAMP), ZoneOffset.UTC),
+            new CentralProperties(
+                BASE_URL,
+                SECRET,
+                3,
+                Duration.ZERO,
+                Duration.ofSeconds(2),
+                Duration.ofSeconds(3),
+                Duration.ofSeconds(2)),
+            shortCircuit);
+    for (int attempt = 0; attempt < 6; attempt++) {
+      server
+          .expect(requestTo(BASE_URL + "/operacoes-portabilidade/" + PROTOCOL))
+          .andRespond(
+              withStatus(HttpStatus.NOT_FOUND)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .body("{\"codigo\":\"OPERACAO_NAO_ENCONTRADA\"}"));
+    }
+
+    // The Central answered every time: it is available, so the circuit never opens.
+    for (int attempt = 0; attempt < 6; attempt++) {
+      assertThat(protectedClient.statusOf(PROTOCOL)).isInstanceOf(CentralStatus.NotFound.class);
+    }
+
+    assertThat(shortCircuit.isOpen()).isFalse();
+    server.verify();
+  }
+
+  @Test
+  void readsTheRejectionWithAReasonTheDomainDoesNotMap() {
+    server
+        .expect(requestTo(BASE_URL + "/operacoes-portabilidade/" + PROTOCOL))
+        .andRespond(
+            withStatus(HttpStatus.OK)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"status\":\"REJEITADA\",\"motivoRejeicao\":\"LIMITE_DE_PARCELAS\"}"));
+
+    CentralStatus answer = client.statusOf(PROTOCOL);
+
+    assertThat(answer).isInstanceOfSatisfying(
+        CentralStatus.Rejected.class,
+        rejected -> {
+          assertThat(rejected.reason())
+              .isEqualTo(new br.com.consigport.domain.portability.RejectionReason.Unmapped());
+          assertThat(rejected.rawPayload()).contains("LIMITE_DE_PARCELAS");
+        });
     server.verify();
   }
 

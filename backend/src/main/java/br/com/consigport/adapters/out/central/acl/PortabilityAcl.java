@@ -145,9 +145,15 @@ public final class PortabilityAcl {
   /**
    * Translates the reason of the rejection of the Central into the domain.
    *
+   * <p>A reason that the contract of the Central does not declare is translated into
+   * {@link RejectionReason.Unmapped}: the rejection is a decision of the Central and
+   * closes the operation, while the reason it wrote stays in the raw payload of the
+   * event. Only a rejection without a reason breaks the contract of the Central.
+   *
    * @param motivoRejeicao the reason as the Central writes it
    * @return the reason in the domain
-   * @throws IllegalArgumentException when the reason is unknown
+   * @throws IllegalArgumentException when the Central rejected the operation without a
+   *     reason
    */
   public RejectionReason toRejectionReason(String motivoRejeicao) {
     if (motivoRejeicao == null || motivoRejeicao.isBlank()) {
@@ -155,7 +161,7 @@ public final class PortabilityAcl {
     }
     return switch (motivoRejeicao.trim()) {
       case CENTRAL_MARGIN_INSUFFICIENT -> new RejectionReason.MarginInsufficient();
-      default -> throw new IllegalArgumentException("unknown Central rejection reason: " + motivoRejeicao);
+      default -> new RejectionReason.Unmapped();
     };
   }
 
