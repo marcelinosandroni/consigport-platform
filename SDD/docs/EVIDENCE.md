@@ -2982,7 +2982,7 @@
 
 - **Data de Conclusão:** 2026-11-27
 - **Branch:** `feat/033-backend-complete-operation`
-- **PR:** a abrir para `develop`
+- **PR:** #45 — https://github.com/marcelinosandroni/consigport-platform/pull/45
 - **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** fechar o ciclo da operação em uma única transação: a confirmação da
