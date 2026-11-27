@@ -2515,7 +2515,7 @@
 
 - **Data de Conclusão:** 2026-11-27
 - **Branch:** `feat/031-backend-resilient-polling`
-- **PR:** a abrir para `develop`
+- **PR:** #43 — https://github.com/marcelinosandroni/consigport-platform/pull/43
 - **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** acompanhar a Central até o estado terminal, com worker de 2 s e lote de
