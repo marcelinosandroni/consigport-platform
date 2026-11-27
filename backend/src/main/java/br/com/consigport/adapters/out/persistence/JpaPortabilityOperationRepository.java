@@ -4,7 +4,10 @@ import br.com.consigport.domain.portability.ConcurrentOperationUpdateException;
 import br.com.consigport.domain.portability.IdempotencyKeyAlreadyUsedException;
 import br.com.consigport.domain.portability.InstallmentSnapshot;
 import br.com.consigport.domain.portability.Money;
+import br.com.consigport.domain.portability.OperationDetail;
+import br.com.consigport.domain.portability.OperationFilter;
 import br.com.consigport.domain.portability.OperationStatus;
+import br.com.consigport.domain.portability.OperationSummary;
 import br.com.consigport.domain.portability.PortabilityOperation;
 import br.com.consigport.domain.portability.PortabilityOperationRepository;
 import br.com.consigport.domain.portability.ReceivingAccount;
@@ -13,6 +16,7 @@ import br.com.consigport.domain.shared.AgreementId;
 import br.com.consigport.domain.shared.BeneficiaryId;
 import br.com.consigport.domain.shared.IdempotencyKey;
 import br.com.consigport.domain.shared.InstallmentId;
+import br.com.consigport.domain.shared.Page;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.persistence.PersistenceException;
@@ -186,6 +190,139 @@ public class JpaPortabilityOperationRepository implements PortabilityOperationRe
         .getResultStream()
         .map(JpaPortabilityOperationRepository::toDomain)
         .toList();
+  }
+
+  /**
+   * Lists the operations of a page, from the oldest to the newest.
+   *
+   * <p>The count and the page are two queries: the count says how many operations the
+   * whole result set has, the page says which ones come in it. The identifier breaks the
+   * tie of operations created in the same instant, so the order never changes between two
+   * pages.
+   *
+   * @param filter the filter of the consultation
+   * @param page the zero-based index of the page
+   * @param size the maximum number of operations of the page
+   * @return the page of the operations
+   */
+  @Override
+  @Transactional(readOnly = true)
+  public Page<OperationSummary> list(OperationFilter filter, int page, int size) {
+    if (filter instanceof OperationFilter.WithStatus withStatus) {
+      return pageOfStatus(withStatus.status(), page, size);
+    }
+    return pageOfEveryOperation(page, size);
+  }
+
+  private Page<OperationSummary> pageOfStatus(OperationStatus status, int page, int size) {
+    long total =
+        entityManager
+            .createQuery(
+                "select count(operation) from PortabilityOperationJpaEntity operation"
+                    + " where operation.status = :status",
+                Long.class)
+            .setParameter("status", status.name())
+            .getSingleResult();
+    List<OperationSummary> items =
+        entityManager
+            .createQuery(
+                "select operation from PortabilityOperationJpaEntity operation"
+                    + " where operation.status = :status"
+                    + " order by operation.createdAt, operation.id",
+                PortabilityOperationJpaEntity.class)
+            .setParameter("status", status.name())
+            .setFirstResult(offsetOf(page, size))
+            .setMaxResults(size)
+            .getResultStream()
+            .map(JpaPortabilityOperationRepository::toSummary)
+            .toList();
+    return new Page<>(items, page, size, total);
+  }
+
+  private Page<OperationSummary> pageOfEveryOperation(int page, int size) {
+    long total =
+        entityManager
+            .createQuery(
+                "select count(operation) from PortabilityOperationJpaEntity operation", Long.class)
+            .getSingleResult();
+    List<OperationSummary> items =
+        entityManager
+            .createQuery(
+                "select operation from PortabilityOperationJpaEntity operation"
+                    + " order by operation.createdAt, operation.id",
+                PortabilityOperationJpaEntity.class)
+            .setFirstResult(offsetOf(page, size))
+            .setMaxResults(size)
+            .getResultStream()
+            .map(JpaPortabilityOperationRepository::toSummary)
+            .toList();
+    return new Page<>(items, page, size, total);
+  }
+
+  /**
+   * Finds the read model of one operation.
+   *
+   * @param id the identity of the operation
+   * @return the detail of the operation, when the row exists
+   */
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<OperationDetail> findDetailById(PortabilityOperation.OperationId id) {
+    return Optional.ofNullable(entityManager.find(PortabilityOperationJpaEntity.class, id.value()))
+        .map(JpaPortabilityOperationRepository::toDetail);
+  }
+
+  /**
+   * The offset of the page, without overflowing when the caller asks for a page far
+   * beyond the end of the result set.
+   */
+  private static int offsetOf(int page, int size) {
+    return (int) Math.min((long) page * size, Integer.MAX_VALUE);
+  }
+
+  /**
+   * Rebuilds the read model of the list from its row.
+   */
+  private static OperationSummary toSummary(PortabilityOperationJpaEntity entity) {
+    return new OperationSummary(
+        new PortabilityOperation.OperationId(entity.getId()),
+        entity.getProtocol(),
+        new BeneficiaryId(entity.getBeneficiaryId()),
+        OperationStatus.valueOf(entity.getStatus()),
+        new Money(entity.getTotalAmount()),
+        entity.getCreatedAt(),
+        entity.getUpdatedAt());
+  }
+
+  /**
+   * Rebuilds the read model of the detail from its row.
+   *
+   * <p>The schema of {@code ARCHITECTURE.md} §6 has no column for the agreement of the
+   * operation: the agreement is the one of the installments, which the request selects
+   * from a single agreement.
+   */
+  private static OperationDetail toDetail(PortabilityOperationJpaEntity entity) {
+    List<InstallmentSnapshot> installments = toSnapshots(entity.getInstallments());
+    return new OperationDetail(
+        new PortabilityOperation.OperationId(entity.getId()),
+        entity.getProtocol(),
+        new BeneficiaryId(entity.getBeneficiaryId()),
+        new AgreementId(installments.get(0).agreementId().value()),
+        installments,
+        entity.getAssigneeCreditor(),
+        new ReceivingAccount(
+            entity.getReceivingBank(),
+            entity.getReceivingBranch(),
+            entity.getReceivingAccount()),
+        new Money(entity.getTotalAmount()),
+        OperationStatus.valueOf(entity.getStatus()),
+        entity.getRejectionReason() == null
+            ? null
+            : RejectionReason.fromCode(entity.getRejectionReason()),
+        entity.getRetryCount(),
+        entity.getAccountUpdatedAt(),
+        entity.getCreatedAt(),
+        entity.getUpdatedAt());
   }
 
   /**

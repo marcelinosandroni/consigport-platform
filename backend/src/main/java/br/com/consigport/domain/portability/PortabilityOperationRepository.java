@@ -1,6 +1,7 @@
 package br.com.consigport.domain.portability;
 
 import br.com.consigport.domain.shared.IdempotencyKey;
+import br.com.consigport.domain.shared.Page;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -61,4 +62,28 @@ public interface PortabilityOperationRepository {
    * @return the operations due for polling, from the oldest to the newest
    */
   List<PortabilityOperation> findDueForPolling(Instant now, int limit);
+
+  /**
+   * Lists the operations of a page, from the oldest to the newest.
+   *
+   * <p>The consultation is paginated: the page says how many operations the whole result
+   * set has, so the caller can navigate without loading everything.
+   *
+   * @param filter the filter of the consultation
+   * @param page the zero-based index of the page
+   * @param size the maximum number of operations of the page
+   * @return the page of the operations
+   */
+  Page<OperationSummary> list(OperationFilter filter, int page, int size);
+
+  /**
+   * Finds the read model of one operation.
+   *
+   * <p>The detail carries the snapshot of the request and the instant of the last write
+   * of the row, which the aggregate does not carry.
+   *
+   * @param id the identity of the operation
+   * @return the detail of the operation, when it exists
+   */
+  Optional<OperationDetail> findDetailById(PortabilityOperation.OperationId id);
 }

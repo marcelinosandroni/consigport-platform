@@ -71,7 +71,7 @@
 
 > Objetivo: core DDD/hexagonal na porta `8080`, com PostgreSQL, Flyway, ACL, i18n,
 > polling resiliente e Swagger.
-> Task em voo: **2.14 — Consulta de operações e trilha**.
+> Task em voo: **2.15 — Recursos REST e tratamento de erros**.
 
 ### Tasks
 
@@ -121,10 +121,10 @@
 - [x] **2.13 — Confirmação e atualização de conta**
       `CONFIRMADA` → `CONFIRMED` → `COMPLETED` com `account_updated_at`; `REJEITADA` →
       `REJECTED` com o motivo; os dois eventos gravados na mesma transação.
-- [-] **2.14 — Consulta de operações e trilha**
+- [x] **2.14 — Consulta de operações e trilha**
       Leitura paginada com filtro por status; eventos em ordem cronológica;
       `404 OPERATION_NOT_FOUND`.
-- [ ] **2.15 — Recursos REST e tratamento de erros**
+- [-] **2.15 — Recursos REST e tratamento de erros**
       Rotas do `ARCHITECTURE.md` §8 e erro com `code`, `message`, `locale`,
       `timestamp`, `path` e `details`.
 - [ ] **2.16 — i18n, Swagger e snapshot OpenAPI**
