@@ -7,9 +7,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -30,8 +32,9 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  * the instant, the path of the request and the details of the validation. The code is
  * never translated.
  *
- * <p>The messages are the pt-BR defaults; the bundles of the locales arrive with the
- * i18n task and replace them without changing the shape of the answer.
+ * <p>The message comes from the bundles of the locales, keyed by the code itself: the
+ * caller that asks for {@code en} reads the message in English and the code stays the
+ * same.
  */
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
@@ -54,31 +57,18 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
           Map.entry("CENTRAL_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE),
           Map.entry(INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
 
-  private static final Map<String, String> MESSAGES =
-      Map.ofEntries(
-          Map.entry(VALIDATION_ERROR, "A requisição é inválida."),
-          Map.entry("IDEMPOTENCY_KEY_REQUIRED", "O header Idempotency-Key é obrigatório."),
-          Map.entry(
-              "AUTHORIZATION_REQUIRED",
-              "É necessário registrar a autorização antes de consultar a agenda."),
-          Map.entry("AUTHORIZATION_NOT_FOUND", "Autorização não encontrada."),
-          Map.entry("BENEFICIARY_NOT_FOUND", "Beneficiário não encontrado."),
-          Map.entry("OPERATION_NOT_FOUND", "Operação não encontrada."),
-          Map.entry(
-              "IDEMPOTENCY_CONFLICT", "A chave de idempotência já foi usada com outro conteúdo."),
-          Map.entry("INSTALLMENT_NOT_ELIGIBLE", "Uma ou mais parcelas não são elegíveis."),
-          Map.entry("CENTRAL_UNAVAILABLE", "A Central de Convênios está indisponível."),
-          Map.entry(INTERNAL_ERROR, "Erro interno."));
-
   private final Clock clock;
+  private final MessageSource messageSource;
 
   /**
    * Builds the handler.
    *
    * @param clock the clock that dates the errors
+   * @param messageSource the source of the messages of the locales
    */
-  public ApiExceptionHandler(Clock clock) {
+  public ApiExceptionHandler(Clock clock, MessageSource messageSource) {
     this.clock = clock;
+    this.messageSource = messageSource;
   }
 
   /**
@@ -167,13 +157,29 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   }
 
   private ErrorResponse body(String code, String path, List<ErrorDetail> details) {
+    Locale locale = LocaleContextHolder.getLocale();
     return new ErrorResponse(
         code,
-        MESSAGES.getOrDefault(code, MESSAGES.get(INTERNAL_ERROR)),
-        LocaleContextHolder.getLocale().toLanguageTag(),
+        message(code, locale),
+        locale.toLanguageTag(),
         Instant.now(clock),
         path,
         details);
+  }
+
+  /**
+   * The message of the code in the locale of the caller.
+   *
+   * <p>The key of the bundle is the code itself. A code without a message would answer
+   * the code as the message: the test of the bundles proves that every code has one in
+   * every locale, so the fallback never happens.
+   *
+   * @param code the stable code of the error
+   * @param locale the negotiated locale
+   * @return the message of the error
+   */
+  private String message(String code, Locale locale) {
+    return messageSource.getMessage(code, null, code, locale);
   }
 
   private static String pathOf(WebRequest request) {

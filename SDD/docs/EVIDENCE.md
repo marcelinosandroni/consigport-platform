@@ -3601,3 +3601,222 @@
 - `SDD/specs/ROADMAP.md`
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+### Task 2.16 — i18n, Swagger e snapshot OpenAPI
+
+- **Data de Conclusão:** 2026-11-27
+- **Branch:** `feat/036-backend-i18n-openapi`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** localizar as mensagens humanas pela negociação do `Accept-Language` (com
+  fallback `pt-BR` e o código do erro nunca traduzido), publicar a documentação viva da
+  API em `/v3/api-docs` e no Swagger UI, e provar que o contrato gerado é equivalente ao
+  snapshot público `contracts/consigport-api.yaml`.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Recorte da task (negociação de locale, handler e contrato gerado):**
+   ```text
+   ./mvnw -B -pl backend test -Dtest='ApiExceptionHandlerTest,LocaleNegotiationTest,GeneratedContractTest,AuthorizationResourceTest,AgendaResourceTest,OperationEventResourceTest'
+   → Tests run: 3, Failures: 0, Errors: 0, Skipped: 0 -- in AgendaResourceTest
+   → Tests run: 23, Failures: 0, Errors: 0, Skipped: 0 -- in ApiExceptionHandlerTest
+   → Tests run: 5, Failures: 0, Errors: 0, Skipped: 0 -- in AuthorizationResourceTest
+   → Tests run: 8, Failures: 0, Errors: 0, Skipped: 0 -- in LocaleNegotiationTest
+   → Tests run: 3, Failures: 0, Errors: 0, Skipped: 0 -- in OperationEventResourceTest
+   → Tests run: 1, Failures: 0, Errors: 0, Skipped: 0 -- in GeneratedContractTest
+   → Tests run: 43, Failures: 0, Errors: 0, Skipped: 0
+   → BUILD SUCCESS
+   → EXIT=0
+   ```
+2. **Reator completo (backend + mock da Central):**
+   ```text
+   ./mvnw -B verify
+   → Tests run: 379, Failures: 0, Errors: 0, Skipped: 0   (backend)
+   → Tests run: 39, Failures: 0, Errors: 0, Skipped: 0    (central-convenios-mock)
+   → ConsigPort Platform ................................ SUCCESS [  0.002 s]
+   → ConsigPort Backend ................................. SUCCESS [01:07 min]
+   → Central de Convênios Mock .......................... SUCCESS [ 27.037 s]
+   → BUILD SUCCESS
+   → EXIT=0
+   ```
+3. **Prova de vida do teste de contrato (quebra proposital):** a anotação do `404` de
+   `GET /api/v1/authorizations/{beneficiaryId}` foi removida do recurso e o teste ficou
+   vermelho, apontando a diferença; com a anotação restaurada, o teste voltou ao verde.
+   ```text
+   (quebra aplicada: a resposta 404 saiu do contrato gerado)
+   → Tests run: 1, Failures: 1, Errors: 0, Skipped: 0 -- in GeneratedContractTest
+   → Expecting empty but was: ["GET /api/v1/authorizations/{beneficiaryId}: the answer 404 is missing"]
+   → BUILD FAILURE
+   (anotação restaurada)
+   → Tests run: 1, Failures: 0, Errors: 0, Skipped: 0 -- in GeneratedContractTest
+   → BUILD SUCCESS
+   ```
+4. **End-to-end com o backend real** (PostgreSQL 16 do compose, backend em `:8080`;
+   roteiro `/tmp/opencode/e2e-2.16.sh`, log `/tmp/opencode/e2e-2.16.log`):
+   ```text
+   === 0. ambiente ===
+   data: 2026-11-27T22:46:14Z
+    Container consigport-postgres Waiting
+    Container consigport-postgres Healthy
+
+   === 1. backend em :8080 (JVM fria) ===
+   backend saudável em 15s
+
+   === 2. a mensagem segue o Accept-Language, o codigo nao muda ===
+   --- Accept-Language: en ---
+   {"code":"AUTHORIZATION_NOT_FOUND","message":"Authorization not found.","locale":"en","timestamp":"2026-11-27T22:46:36.318506170Z","path":"/api/v1/authorizations/BEN-404","details":[]}
+   --- Accept-Language: es ---
+   {"code":"AUTHORIZATION_NOT_FOUND","message":"Autorización no encontrada.","locale":"es","timestamp":"2026-11-27T22:46:36.380956282Z","path":"/api/v1/authorizations/BEN-404","details":[]}
+   --- Accept-Language: pt-BR ---
+   {"code":"AUTHORIZATION_NOT_FOUND","message":"Autorização não encontrada.","locale":"pt-BR","timestamp":"2026-11-27T22:46:36.405976813Z","path":"/api/v1/authorizations/BEN-404","details":[]}
+   --- Accept-Language: fr ---
+   {"code":"AUTHORIZATION_NOT_FOUND","message":"Autorização não encontrada.","locale":"pt-BR","timestamp":"2026-11-27T22:46:36.428150147Z","path":"/api/v1/authorizations/BEN-404","details":[]}
+   --- sem Accept-Language (fallback pt-BR) ---
+   {"code":"AUTHORIZATION_NOT_FOUND","message":"Autorização não encontrada.","locale":"pt-BR","timestamp":"2026-11-27T22:46:36.449335506Z","path":"/api/v1/authorizations/BEN-404","details":[]}
+
+   === 3. o detalhe da validacao tambem vem no idioma do chamador ===
+   --- POST sem beneficiaryId, Accept-Language: en ---
+   {"code":"VALIDATION_ERROR","message":"The request is invalid.","locale":"en","timestamp":"2026-11-27T22:46:36.627462138Z","path":"/api/v1/authorizations","details":[{"field":"beneficiaryId","message":"must not be blank"}]}
+   --- POST sem beneficiaryId, Accept-Language: es ---
+   {"code":"VALIDATION_ERROR","message":"La solicitud no es válida.","locale":"es","timestamp":"2026-11-27T22:46:36.652625071Z","path":"/api/v1/authorizations","details":[{"field":"beneficiaryId","message":"no debe estar en blanco"}]}
+
+   === 4. o contrato publicado pelo backend ===
+   openapi: 3.1.0
+   info: ConsigPort API 1.0.0
+   GET   /api/v1/portability-operations                   operationId=listPortabilityOperations  params=['status', 'page', 'size', 'Accept-Language'] responses=['200', '400', '500']
+   POST  /api/v1/portability-operations                   operationId=startPortabilityOperation  params=['Idempotency-Key', 'Accept-Language'] responses=['202', '400', '409', '422', '500', '503']
+   POST  /api/v1/authorizations                           operationId=registerAuthorization      params=['Accept-Language'] responses=['200', '201', '400', '500']
+   GET   /api/v1/portability-operations/{operationId}     operationId=findPortabilityOperation   params=['operationId', 'Accept-Language'] responses=['200', '404', '500']
+   GET   /api/v1/portability-operations/{operationId}/events operationId=listOperationEvents        params=['operationId', 'Accept-Language'] responses=['200', '404', '500']
+   GET   /api/v1/beneficiaries/{beneficiaryId}/agenda     operationId=getBeneficiaryAgenda       params=['beneficiaryId', 'Accept-Language'] responses=['200', '403', '404', '500']
+   GET   /api/v1/authorizations/{beneficiaryId}           operationId=findAuthorization          params=['beneficiaryId', 'Accept-Language'] responses=['200', '404', '500']
+   schemas: ['AgendaResponse', 'Authorization', 'AuthorizationRequest', 'ErrorDetail', 'ErrorResponse', 'Installment', 'InstallmentSnapshot', 'OperationAcceptedResponse', 'OperationDetail', 'OperationEvent', 'OperationEventsResponse', 'OperationPage', 'OperationSummary', 'PortabilityOperationRequest', 'ReceivingAccount']
+
+   === 5. o Swagger UI ===
+   GET /swagger-ui.html -> 302 (http://localhost:8080/swagger-ui/index.html)
+   GET /swagger-ui/index.html -> 200
+
+   === 6. encerramento dos processos e dos containers ===
+    Network consigport-net Removing
+    Network consigport-net Removed
+   containers restantes: 0
+   processos restantes: 0
+   === fim ===
+   ```
+5. **Gates locais:**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → OK (65 documentos, todo link relativo resolve, exit 0)
+   node scripts/check-specs.mjs                → OK (exatamente 1 task em voo, tasks catalogadas, exit 0)
+   node scripts/check-architecture.mjs         → OK (22 testes de validação dos desenhos, exit 0)
+   node scripts/check-theme-tokens.mjs         → OK (exit 0)
+   node scripts/check-ai-log.mjs               → OK (42 sessões, estrutura válida, exit 0)
+   ```
+
+#### Conteúdo Entregue:
+- `backend/src/main/resources/i18n/messages_pt_BR.properties`, `messages_en.properties` e
+  `messages_es.properties` — os catálogos das mensagens humanas; a chave de cada
+  entrada é o código estável do erro, e as mensagens da Bean Validation têm chave
+  `jakarta.validation.constraints.*.message`.
+- `backend/src/main/java/br/com/consigport/config/MessageSourceConfig.java` — o
+  `MessageSource` (basename `i18n/messages`, UTF-8, `fallbackToSystemLocale=false`), o
+  `AcceptHeaderLocaleResolver` (padrão `pt-BR`, idiomas `pt-BR`/`en`/`es`) e o
+  `LocalValidatorFactoryBean` ligado aos mesmos catálogos.
+- `backend/src/main/java/br/com/consigport/config/OpenApiConfig.java` — a informação da
+  API (título `ConsigPort API`, versão `1.0.0`, contato, licença MIT, servidor local, quatro
+  tags) e o `OpenApiCustomizer` que injeta o header `Accept-Language` em todas as
+  operações.
+- `backend/src/main/java/br/com/consigport/adapters/in/web/ApiExceptionHandler.java` — o
+  mapa fixo de mensagens pt-BR foi removido: a mensagem vem do catálogo, resolvida pelo
+  código e pelo locale negociado.
+- `backend/src/main/java/br/com/consigport/adapters/in/web/AuthorizationResource.java`,
+  `AgendaResource.java`, `OperationEventResource.java` e `PortabilityOperationResource.java`
+  — `@Tag`, `@Operation` com o `operationId` do contrato público, `@ApiResponse` por
+  status, `Idempotency-Key` publicado como obrigatório e o header `Idempotent-Replay` no
+  `202`.
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/` — `@Schema(name=...)` e
+  `@Schema(requiredProperties=...)` em todos os DTOs; `ReceivingAccountRequest` e
+  `ReceivingAccountResponse` colapsados em `ReceivingAccount`, como manda o contrato.
+- `backend/pom.xml` — a dependência `jackson-dataformat-yaml`, que o springdoc usa para
+  ler o YAML do contrato e que o teste de contrato usa para ler o snapshot.
+- Testes: `LocaleNegotiationTest` (8 casos: `en`, `es`, `pt-BR`, `pt`, `en-US,en;q=0.9`,
+  `fr`, sem header, e o detalhe da validação localizado),
+  `ApiExceptionHandlerTest` (23 casos: cada código estável tem mensagem em cada locale),
+  `GeneratedContractTest` com o `ContractComparator` (comparação canônica do contrato
+  gerado com o snapshot).
+
+#### Descobertas e Decisões:
+- O `ApiExceptionHandler` tinha as mensagens em um mapa fixo, em pt-BR: o `locale` do
+  erro era negociado, mas a mensagem nunca mudava. Agora a chave do catálogo é o
+  próprio código, e a mensagem sai do catálogo do locale negociado.
+- A validação de jakarta não negociava o locale: as mensagens vinham no idioma do
+  locale da JVM. O `LocalValidatorFactoryBean` ligado ao `MessageSource` faz o detalhe
+  da falha de validação viajar no idioma do chamador.
+- `AcceptHeaderLocaleResolver` com a lista de idiomas suportados faz o fallback para
+  `pt-BR` quando o chamador pede um idioma que a API não fala (`fr`), e também quando o
+  header é `pt` sem região.
+- `@Schema(requiredMode=REQUIRED)` no nível do tipo **não** propaga para as
+  propriedades; `@Schema(requiredProperties={...})` no tipo **gera** o array `required`
+  do componente. A regra foi verificada empiricamente antes de ser aplicada nos DTOs.
+- O `@Schema(name=...)` no tipo foi verificado empiricamente: `AuthorizationResponse` passa
+  a ser o componente `Authorization` do contrato.
+- O contrato público publica **um** schema para a conta de recebimento
+  (`ReceivingAccount`), enquanto o backend tinha dois DTOs (`ReceivingAccountRequest` e
+  `ReceivingAccountResponse`) com os mesmos campos. Os dois foram colapsados em um só
+  DTO, usado nos dois sentidos.
+- O `Idempotency-Key` era publicado com `required: false`, porque o parâmetro do Spring
+  é opcional (`required = false`, para devolver `400 IDEMPOTENCY_KEY_REQUIRED` no
+  formato do contrato). O contrato público exige o header: a anotação `@Parameter` o
+  publica como obrigatório, sem trocar o comportamento do servidor.
+- O springdoc não sobe sem `jackson-dataformat-yaml` no classpath: o bean `OpenAPI`
+  declarava a dependência do YAML e o backend falhava ao subir. A dependência foi
+  declarada explicitamente no `backend/pom.xml`.
+- O comparador do contrato precisa resolver as referências **de cada documento no seu
+  próprio `components`**: resolver a referência de um documento no `components` do outro
+  produzia diferenças falsas (o `beneficiaryId` do contrato, por exemplo, era lido como
+  um parâmetro vazio).
+- A comparação canônica ignora o que não muda o contrato do consumidor: descrições,
+  exemplos, `format`, limites numéricos e o nome dos componentes. O que compara é rota,
+  método, `operationId`, parâmetros (nome, lugar, obrigatoriedade), status, corpo
+  obrigatório e o shape do schema (propriedades, tipos, enums e obrigatoriedade).
+- O contrato público e o `SDD/ARCHITECTURE.md` **não** foram alterados: esta task toca
+  só o backend, e o snapshot é a fonte de verdade da comparação.
+
+#### Arquivos Tocados:
+- `backend/pom.xml`
+- `backend/src/main/java/br/com/consigport/config/MessageSourceConfig.java`
+- `backend/src/main/java/br/com/consigport/config/OpenApiConfig.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/ApiExceptionHandler.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/AuthorizationResource.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/AgendaResource.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/OperationEventResource.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/PortabilityOperationResource.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/AuthorizationResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/AgendaResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/ErrorDetail.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/ErrorResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/InstallmentSnapshotResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/OperationAcceptedResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/OperationDetailResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/OperationEventsResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/OperationPageResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/OperationSummaryResponse.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/PortabilityOperationRequest.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/ReceivingAccount.java`
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/ReceivingAccountRequest.java` (removido)
+- `backend/src/main/java/br/com/consigport/adapters/in/web/dto/ReceivingAccountResponse.java` (removido)
+- `backend/src/main/resources/i18n/messages_pt_BR.properties`
+- `backend/src/main/resources/i18n/messages_en.properties`
+- `backend/src/main/resources/i18n/messages_es.properties`
+- `backend/src/test/java/br/com/consigport/adapters/in/web/LocaleNegotiationTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/in/web/ApiExceptionHandlerTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/in/web/AuthorizationResourceTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/in/web/AgendaResourceTest.java`
+- `backend/src/test/java/br/com/consigport/adapters/in/web/OperationEventResourceTest.java`
+- `backend/src/test/java/br/com/consigport/contracts/GeneratedContractTest.java`
+- `backend/src/test/java/br/com/consigport/contracts/ContractComparator.java`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`

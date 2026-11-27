@@ -72,6 +72,13 @@
       <scope>test</scope>
     </dependency>
 
+    <!-- Springdoc parses the OpenAPI document in YAML, and the contract test reads
+         the snapshot of the public API in the same format. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.dataformat</groupId>
+      <artifactId>jackson-dataformat-yaml</artifactId>
+    </dependency>
+
     <!-- The persistence tests run against the real PostgreSQL 16 of the stack. -->
     <dependency>
       <groupId>org.springframework.boot</groupId>

@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.consigport.application.authorization.FindAuthorization;
 import br.com.consigport.application.authorization.RegisterAuthorization;
+import br.com.consigport.config.MessageSourceConfig;
 import br.com.consigport.domain.authorization.Authorization;
 import br.com.consigport.domain.shared.AgreementId;
 import br.com.consigport.domain.shared.BeneficiaryId;
@@ -31,7 +32,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * of the error — without the storage and without the Central.
  */
 @WebMvcTest(AuthorizationResource.class)
-@Import(FixedClockConfig.class)
+@Import({FixedClockConfig.class, MessageSourceConfig.class})
 class AuthorizationResourceTest {
 
   private static final Instant CREATED_AT = Instant.parse("2026-11-27T11:00:00Z");

@@ -1,21 +1,21 @@
 package br.com.consigport.adapters.in.web.dto;
 
 import br.com.consigport.domain.portability.OperationStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
- * Answer of the request that starts a portability operation.
- *
- * <p>The shape is the one of the public contract
- * ({@code contracts/consigport-api.yaml}). The protocol is {@code null} while the
- * Central has not accepted the operation.
+ * The operation accepted by the Central, as the public API answers it.
  *
  * @param operationId the identity of the operation
- * @param protocol the protocol of the Central, {@code null} while it is not accepted
- * @param status the current status of the operation
- * @param totalAmount the sum of the frozen installments
+ * @param protocol the protocol of the Central, null until the Central accepts it
+ * @param status the state of the operation
+ * @param totalAmount the sum of the installments
  * @param createdAt the instant of the creation
  */
+@Schema(
+    name = "OperationAcceptedResponse",
+    requiredProperties = {"operationId", "protocol", "status", "totalAmount", "createdAt"})
 public record OperationAcceptedResponse(
     String operationId, String protocol, OperationStatus status, BigDecimal totalAmount, Instant createdAt) {}

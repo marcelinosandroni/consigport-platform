@@ -71,7 +71,7 @@
 
 > Objetivo: core DDD/hexagonal na porta `8080`, com PostgreSQL, Flyway, ACL, i18n,
 > polling resiliente e Swagger.
-> Task em voo: **2.16 — i18n, Swagger e snapshot OpenAPI**.
+> Task em voo: **2.17 — Fechamento do backend**.
 
 ### Tasks
 
@@ -127,10 +127,10 @@
 - [x] **2.15 — Recursos REST e tratamento de erros**
       Rotas do `ARCHITECTURE.md` §8 e erro com `code`, `message`, `locale`,
       `timestamp`, `path` e `details`.
-- [-] **2.16 — i18n, Swagger e snapshot OpenAPI**
+- [x] **2.16 — i18n, Swagger e snapshot OpenAPI**
       `Accept-Language` com fallback `pt-BR`; `code` nunca traduzido; contrato gerado
       equivalente a `contracts/consigport-api.yaml`.
-- [ ] **2.17 — Fechamento do backend**
+- [-] **2.17 — Fechamento do backend**
       Cobertura ≥ 80% no domínio e na aplicação; fluxos `CREATED` → `COMPLETED` e
       `REJECTED` comprovados com o banco real.
 

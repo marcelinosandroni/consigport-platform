@@ -1,12 +1,13 @@
 package br.com.consigport.adapters.in.web;
 
+import br.com.consigport.adapters.in.web.dto.ErrorResponse;
 import br.com.consigport.adapters.in.web.dto.InstallmentSnapshotResponse;
 import br.com.consigport.adapters.in.web.dto.OperationAcceptedResponse;
 import br.com.consigport.adapters.in.web.dto.OperationDetailResponse;
 import br.com.consigport.adapters.in.web.dto.OperationPageResponse;
 import br.com.consigport.adapters.in.web.dto.OperationSummaryResponse;
 import br.com.consigport.adapters.in.web.dto.PortabilityOperationRequest;
-import br.com.consigport.adapters.in.web.dto.ReceivingAccountResponse;
+import br.com.consigport.adapters.in.web.dto.ReceivingAccount;
 import br.com.consigport.application.portability.FindOperation;
 import br.com.consigport.application.portability.ListOperations;
 import br.com.consigport.application.portability.StartOperation;
@@ -16,14 +17,21 @@ import br.com.consigport.domain.portability.OperationRequest;
 import br.com.consigport.domain.portability.OperationStatus;
 import br.com.consigport.domain.portability.OperationSummary;
 import br.com.consigport.domain.portability.PortabilityOperation;
-import br.com.consigport.domain.portability.ReceivingAccount;
 import br.com.consigport.domain.shared.AgreementId;
 import br.com.consigport.domain.shared.BeneficiaryId;
 import br.com.consigport.domain.shared.DomainError;
 import br.com.consigport.domain.shared.IdempotencyKey;
 import br.com.consigport.domain.shared.InstallmentId;
 import br.com.consigport.domain.shared.Page;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -46,6 +54,9 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/v1/portability-operations")
+@Tag(
+    name = "Portability Operations",
+    description = "Criação, consulta e acompanhamento de operações de portabilidade.")
 public class PortabilityOperationResource {
 
   /** The header that carries the key of the idempotency. */
@@ -88,6 +99,62 @@ public class PortabilityOperationResource {
    * @throws DomainError.InstallmentNotEligible when an installment is not eligible
    */
   @PostMapping
+  @Operation(
+      operationId = "startPortabilityOperation",
+      summary = "Cria uma operação de portabilidade",
+      description =
+          """
+          Cria a operação com snapshot das parcelas e envia a solicitação assinada à
+          Central. A resposta é `202` porque a confirmação é assíncrona. A mesma
+          `Idempotency-Key` com o mesmo payload devolve a operação existente e o
+          header `Idempotent-Replay: true`; com payload diferente devolve `409`.
+          """)
+  @Parameter(
+      name = IDEMPOTENCY_KEY_HEADER,
+      in = ParameterIn.HEADER,
+      required = true,
+      description = "UUID que identifica a tentativa de criação da operação.")
+  @ApiResponse(
+      responseCode = "202",
+      description = "Operação aceita e enviada à Central.",
+      headers =
+          @io.swagger.v3.oas.annotations.headers.Header(
+              name = IDEMPOTENT_REPLAY_HEADER,
+              description = "`true` quando a operação devolvida já existia para a chave enviada.",
+              schema = @Schema(type = "boolean")),
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = OperationAcceptedResponse.class)))
+  @ApiResponse(
+      responseCode = "400",
+      description = "Requisição inválida.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = ErrorResponse.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "A chave de idempotência já foi usada com outro conteúdo.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = ErrorResponse.class)))
+  @ApiResponse(
+      responseCode = "422",
+      description = "Parcela inelegível para portabilidade.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = ErrorResponse.class)))
+  @ApiResponse(
+      responseCode = "503",
+      description = "Central de Convênios indisponível.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = ErrorResponse.class)))
+  @ApiResponse(
+      responseCode = "500",
+      description = "Erro interno inesperado.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = ErrorResponse.class)))
   public ResponseEntity<OperationAcceptedResponse> start(
       @RequestHeader(value = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
       @Valid @RequestBody PortabilityOperationRequest request) {
@@ -110,6 +177,28 @@ public class PortabilityOperationResource {
    *     range
    */
   @GetMapping
+  @Operation(
+      operationId = "listPortabilityOperations",
+      summary = "Lista operações de portabilidade",
+      description = "Lista paginada, opcionalmente filtrada por status.")
+  @ApiResponse(
+      responseCode = "200",
+      description = "Página de operações.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = OperationPageResponse.class)))
+  @ApiResponse(
+      responseCode = "400",
+      description = "Requisição inválida.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = ErrorResponse.class)))
+  @ApiResponse(
+      responseCode = "500",
+      description = "Erro interno inesperado.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = ErrorResponse.class)))
   public OperationPageResponse list(
       @RequestParam(required = false) OperationStatus status,
       @RequestParam(defaultValue = "0") int page,
@@ -134,6 +223,29 @@ public class PortabilityOperationResource {
    * @throws DomainError.OperationNotFound when the operation does not exist
    */
   @GetMapping("/{operationId}")
+  @Operation(
+      operationId = "findPortabilityOperation",
+      summary = "Consulta uma operação de portabilidade",
+      description =
+          "Devolve o detalhe completo, incluindo snapshot, conta e motivo de rejeição.")
+  @ApiResponse(
+      responseCode = "200",
+      description = "Operação encontrada.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = OperationDetailResponse.class)))
+  @ApiResponse(
+      responseCode = "404",
+      description = "Recurso não encontrado.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = ErrorResponse.class)))
+  @ApiResponse(
+      responseCode = "500",
+      description = "Erro interno inesperado.",
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON_VALUE,
+          schema = @Schema(implementation = ErrorResponse.class)))
   public OperationDetailResponse find(@PathVariable String operationId) {
     OperationDetail detail =
         findOperation.execute(PortabilityOperation.OperationId.parse(operationId));
@@ -154,7 +266,9 @@ public class PortabilityOperationResource {
         new AgreementId(request.agreementId()),
         request.installmentIds().stream().map(InstallmentId::new).toList(),
         request.assigneeCreditor(),
-        new ReceivingAccount(
+        // The value object of the domain and the DTO of the edge share the name: the
+        // domain one is qualified to say which of the two the operation carries.
+        new br.com.consigport.domain.portability.ReceivingAccount(
             request.receivingAccount().bank(),
             request.receivingAccount().branch(),
             request.receivingAccount().account()));
@@ -200,7 +314,7 @@ public class PortabilityOperationResource {
                         installment.discountDate()))
             .toList(),
         detail.assigneeCreditor(),
-        new ReceivingAccountResponse(
+        new ReceivingAccount(
             detail.receivingAccount().bank(),
             detail.receivingAccount().branch(),
             detail.receivingAccount().account()),

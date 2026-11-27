@@ -3,6 +3,7 @@ package br.com.consigport.adapters.in.web;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import br.com.consigport.adapters.in.web.dto.ErrorResponse;
+import br.com.consigport.config.MessageSourceConfig;
 import br.com.consigport.domain.shared.BeneficiaryId;
 import br.com.consigport.domain.shared.DomainError;
 import br.com.consigport.domain.shared.IdempotencyKey;
@@ -10,6 +11,7 @@ import br.com.consigport.domain.shared.InstallmentId;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -19,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -41,7 +44,9 @@ class ApiExceptionHandlerTest {
 
   @BeforeEach
   void setUp() {
-    handler = new ApiExceptionHandler(Clock.fixed(NOW, ZoneOffset.UTC));
+    handler =
+        new ApiExceptionHandler(
+            Clock.fixed(NOW, ZoneOffset.UTC), MessageSourceConfig.createMessageSource());
     request = new MockHttpServletRequest("GET", PATH);
     LocaleContextHolder.setLocale(Locale.forLanguageTag("pt-BR"));
   }
@@ -87,6 +92,54 @@ class ApiExceptionHandlerTest {
     assertThat(response.getBody()).isNotNull();
     assertThat(response.getBody().code()).isEqualTo("INTERNAL_ERROR");
     assertThat(response.getBody().message()).isNotBlank();
+  }
+
+  @ParameterizedTest(name = "{0} speaks {1}")
+  @MethodSource("locales")
+  void translatesTheMessageAndKeepsTheCode(Locale locale, String expectedMessage) {
+    LocaleContextHolder.setLocale(locale);
+
+    ResponseEntity<ErrorResponse> response =
+        handler.handleDomainError(
+            new DomainError.OperationNotFound(UUID.randomUUID()), request);
+
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().code()).isEqualTo("OPERATION_NOT_FOUND");
+    assertThat(response.getBody().message()).isEqualTo(expectedMessage);
+    assertThat(response.getBody().locale()).isEqualTo(locale.toLanguageTag());
+  }
+
+  @ParameterizedTest(name = "{0} has a message in every locale")
+  @MethodSource("codes")
+  void everyCodeHasAMessageInEveryLocale(String code) {
+    MessageSource messages = MessageSourceConfig.createMessageSource();
+
+    for (Locale locale : MessageSourceConfig.SUPPORTED_LOCALES) {
+      assertThat(messages.getMessage(code, null, code, locale))
+          .as("the message of %s in %s", code, locale)
+          .isNotEqualTo(code);
+    }
+  }
+
+  private static Stream<Arguments> locales() {
+    return Stream.of(
+        Arguments.of(Locale.forLanguageTag("pt-BR"), "Operação não encontrada."),
+        Arguments.of(Locale.ENGLISH, "Operation not found."),
+        Arguments.of(Locale.forLanguageTag("es"), "Operación no encontrada."));
+  }
+
+  private static Stream<String> codes() {
+    return Stream.of(
+        "VALIDATION_ERROR",
+        "IDEMPOTENCY_KEY_REQUIRED",
+        "AUTHORIZATION_REQUIRED",
+        "AUTHORIZATION_NOT_FOUND",
+        "BENEFICIARY_NOT_FOUND",
+        "OPERATION_NOT_FOUND",
+        "IDEMPOTENCY_CONFLICT",
+        "INSTALLMENT_NOT_ELIGIBLE",
+        "CENTRAL_UNAVAILABLE",
+        "INTERNAL_ERROR");
   }
 
   private static Stream<Arguments> failures() {
