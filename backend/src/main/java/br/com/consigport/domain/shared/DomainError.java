@@ -10,6 +10,7 @@ import java.util.UUID;
  */
 public sealed abstract class DomainError extends RuntimeException
     permits DomainError.AuthorizationRequired,
+        DomainError.AuthorizationNotFound,
         DomainError.BeneficiaryNotFound,
         DomainError.IdempotencyConflict,
         DomainError.IdempotencyKeyRequired,
@@ -50,6 +51,40 @@ public sealed abstract class DomainError extends RuntimeException
     @Override
     public String code() {
       return "AUTHORIZATION_REQUIRED";
+    }
+  }
+
+  /**
+   * The authorization does not exist.
+   */
+  public static final class AuthorizationNotFound extends DomainError {
+
+    private static final long serialVersionUID = 1L;
+
+    private final transient BeneficiaryId beneficiaryId;
+
+    /**
+     * Builds the error.
+     *
+     * @param beneficiaryId the beneficiary whose authorization does not exist
+     */
+    public AuthorizationNotFound(BeneficiaryId beneficiaryId) {
+      super("authorization not found for beneficiary: " + beneficiaryId.value());
+      this.beneficiaryId = beneficiaryId;
+    }
+
+    @Override
+    public String code() {
+      return "AUTHORIZATION_NOT_FOUND";
+    }
+
+    /**
+     * The beneficiary whose authorization does not exist.
+     *
+     * @return the beneficiary
+     */
+    public BeneficiaryId beneficiaryId() {
+      return beneficiaryId;
     }
   }
 
@@ -212,7 +247,8 @@ public sealed abstract class DomainError extends RuntimeException
 
   /**
    * The Central is unavailable, so the operation cannot be started (BR-08).
-   */  public static final class CentralUnavailable extends DomainError {
+   */
+  public static final class CentralUnavailable extends DomainError {
 
     private static final long serialVersionUID = 1L;
 

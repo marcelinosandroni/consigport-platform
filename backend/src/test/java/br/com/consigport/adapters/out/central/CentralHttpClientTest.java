@@ -67,6 +67,10 @@ class CentralHttpClientTest {
           + "\"banco\":\"001\",\"conta\":\"56789-0\"},\"credorCessionario\":\"ConsigPort\","
           + "\"parcelas\":[\"PAR-001\",\"PAR-002\"]}";
 
+  /** The canonical body of the registration of the opt-in. */
+  private static final String AUTHORIZATION_BODY =
+      "{\"beneficiarioId\":\"BEN-001\",\"convenioId\":\"AGR-001\"}";
+
   private MockRestServiceServer server;
   private CentralHttpClient client;
   private CircuitBreaker circuit;
@@ -497,6 +501,66 @@ class CentralHttpClientTest {
     server.verify();
   }
 
+  @Test
+  void replicatesTheOptInInTheCentral() {
+    server
+        .expect(requestTo(BASE_URL + "/autorizacoes"))
+        .andExpect(method(HttpMethod.POST))
+        .andExpect(header("X-Signature", signatureOfTheAuthorization()))
+        .andExpect(header("X-Timestamp", Long.toString(TIMESTAMP)))
+        .andExpect(content().string(AUTHORIZATION_BODY))
+        .andRespond(
+            withStatus(HttpStatus.CREATED)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"autorizacaoId\":\"AUT-20261123-0001\"}"));
+
+    client.register(new BeneficiaryId("BEN-001"), new AgreementId("AGR-001"));
+
+    server.verify();
+  }
+
+  @Test
+  void acceptsTheReplicationOfAnOptInThatTheCentralAlreadyKnows() {
+    server
+        .expect(requestTo(BASE_URL + "/autorizacoes"))
+        .andRespond(
+            withStatus(HttpStatus.OK)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"autorizacaoId\":\"AUT-20261123-0001\"}"));
+
+    client.register(new BeneficiaryId("BEN-001"), new AgreementId("AGR-001"));
+
+    server.verify();
+  }
+
+  @Test
+  void answersCentralUnavailableWhenTheCentralRefusesTheOptIn() {
+    server
+        .expect(requestTo(BASE_URL + "/autorizacoes"))
+        .andRespond(
+            withStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"codigo\":\"ERRO_CENTRAL\",\"mensagem\":\"Indisponível.\"}"));
+
+    assertThatThrownBy(() -> client.register(new BeneficiaryId("BEN-001"), new AgreementId("AGR-001")))
+        .isInstanceOf(DomainError.CentralUnavailable.class);
+    server.verify();
+  }
+
+  @Test
+  void answersCentralUnavailableWhenTheCentralDoesNotAnswerTheOptIn() {
+    server
+        .expect(requestTo(BASE_URL + "/autorizacoes"))
+        .andRespond(
+            request -> {
+              throw new IOException("connection refused");
+            });
+
+    assertThatThrownBy(() -> client.register(new BeneficiaryId("BEN-001"), new AgreementId("AGR-001")))
+        .isInstanceOf(DomainError.CentralUnavailable.class);
+    server.verify();
+  }
+
   private String signatureOfTheStatus() {
     return new HmacSigner(SECRET)
         .sign("GET", "/operacoes-portabilidade/" + PROTOCOL, TIMESTAMP, "");
@@ -504,6 +568,11 @@ class CentralHttpClientTest {
 
   private String signatureOfTheAgenda() {
     return new HmacSigner(SECRET).sign("GET", "/beneficiarios/BEN-001/agenda", TIMESTAMP, "");
+  }
+
+  private String signatureOfTheAuthorization() {
+    return new HmacSigner(SECRET)
+        .sign("POST", "/autorizacoes", TIMESTAMP, AUTHORIZATION_BODY);
   }
 
   private static PortabilityOperation operation() {

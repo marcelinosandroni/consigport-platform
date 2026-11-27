@@ -24,6 +24,19 @@ public interface AuthorizationRepository {
       BeneficiaryId beneficiaryId, AgreementId agreementId);
 
   /**
+   * Finds the latest authorization of a beneficiary.
+   *
+   * <p>The beneficiary can authorize more than one agreement, but the public
+   * consultation answers one record: the port defines which one, so the answer is never
+   * arbitrary — the most recent opt-in wins.
+   *
+   * @param beneficiaryId the beneficiary that gave the opt-in
+   * @return the most recent authorization of the beneficiary, or empty when the
+   *     beneficiary never authorized
+   */
+  Optional<Authorization> findLatestByBeneficiary(BeneficiaryId beneficiaryId);
+
+  /**
    * Stores a new authorization.
    *
    * @param authorization the authorization to store

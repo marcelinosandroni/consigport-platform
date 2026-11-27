@@ -6,7 +6,10 @@ import br.com.consigport.adapters.out.central.HmacSigner;
 import br.com.consigport.adapters.out.central.acl.CentralAcl;
 import br.com.consigport.adapters.out.central.acl.PortabilityAcl;
 import br.com.consigport.adapters.out.resilience.CircuitBreaker;
+import br.com.consigport.application.agenda.QueryAgenda;
 import br.com.consigport.application.audit.ListOperationEvents;
+import br.com.consigport.application.authorization.FindAuthorization;
+import br.com.consigport.application.authorization.RegisterAuthorization;
 import br.com.consigport.application.portability.CompleteOperation;
 import br.com.consigport.application.portability.FindOperation;
 import br.com.consigport.application.portability.IntegrationBackoff;
@@ -16,6 +19,8 @@ import br.com.consigport.application.portability.StartOperation;
 import br.com.consigport.application.portability.TransitionRecorder;
 import br.com.consigport.domain.agenda.AgendaGateway;
 import br.com.consigport.domain.audit.OperationEventRepository;
+import br.com.consigport.domain.authorization.AuthorizationRepository;
+import br.com.consigport.domain.authorization.CentralAuthorizationPort;
 import br.com.consigport.domain.portability.CentralPortabilityPort;
 import br.com.consigport.domain.portability.CentralStatusPort;
 import br.com.consigport.domain.portability.OperationPolicy;
@@ -263,6 +268,42 @@ public class CompositionRoot {
   public ListOperationEvents listOperationEvents(
       PortabilityOperationRepository operations, OperationEventRepository events) {
     return new ListOperationEvents(operations, events);
+  }
+
+  /**
+   * The read of the agenda of discounts of a beneficiary.
+   *
+   * @param agenda the read of the agenda in the Central
+   * @return the use case
+   */
+  @Bean
+  public QueryAgenda queryAgenda(AgendaGateway agenda) {
+    return new QueryAgenda(agenda);
+  }
+
+  /**
+   * The registration of the opt-in of a beneficiary.
+   *
+   * @param authorizations the storage of the authorizations
+   * @param central the replication of the consent in the Central
+   * @param clock the clock that dates the opt-in
+   * @return the use case
+   */
+  @Bean
+  public RegisterAuthorization registerAuthorization(
+      AuthorizationRepository authorizations, CentralAuthorizationPort central, Clock clock) {
+    return new RegisterAuthorization(authorizations, central, clock);
+  }
+
+  /**
+   * The consultation of the opt-in of a beneficiary.
+   *
+   * @param authorizations the storage of the authorizations
+   * @return the use case
+   */
+  @Bean
+  public FindAuthorization findAuthorization(AuthorizationRepository authorizations) {
+    return new FindAuthorization(authorizations);
   }
 
   /**

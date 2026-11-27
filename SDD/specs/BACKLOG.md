@@ -230,6 +230,30 @@
 - **Arquivos:** `adapters/in/web/AuthorizationResource.java`, `AgendaResource.java`, `OperationEventResource.java`, `ApiExceptionHandler.java`.
 - **Aceite:** rotas do `ARCHITECTURE.md` §8; erro com `code`, `message`, `locale`, `timestamp`, `path`, `details`; códigos EN estáveis.
 - **Verificação:** `@WebMvcTest` por recurso e teste do handler para cada código.
+- **Realizado:** a superfície pública ficou completa — `POST /api/v1/authorizations` (`201`
+  no opt-in novo, `200` no opt-in repetido), `GET /api/v1/authorizations/{beneficiaryId}`
+  (`200`/`404 AUTHORIZATION_NOT_FOUND`), `GET /api/v1/beneficiaries/{beneficiaryId}/agenda`
+  (`200`/`403 AUTHORIZATION_REQUIRED`/`404 BENEFICIARY_NOT_FOUND`) e
+  `GET /api/v1/portability-operations/{operationId}/events`
+  (`200`/`404 OPERATION_NOT_FOUND`). O opt-in novo precisou do adaptador de produção da
+  porta `CentralAuthorizationPort`: `CentralHttpClient` responde agora a quarta porta do
+  domínio e replica o consentimento em `POST /autorizacoes`, assinado em HMAC como as
+  outras chamadas. O `ApiExceptionHandler` traduziu `AUTHORIZATION_NOT_FOUND` (antes
+  respondia `500`) e passou a ter um tratador genérico que devolve `500 INTERNAL_ERROR`
+  no formato do contrato, com a causa real apenas no log do servidor. A consulta do opt-in
+  responde o registro mais recente do beneficiário (`createdAt`, depois `id`), porque o
+  contrato público devolve uma autorização e o backend pode ter uma por convênio.
+  Arquivos reais: `adapters/in/web/AuthorizationResource.java`, `AgendaResource.java`,
+  `OperationEventResource.java`, `adapters/in/web/dto/AuthorizationRequest.java`,
+  `AuthorizationResponse.java`, `AgendaResponse.java`, `OperationEventsResponse.java`,
+  `adapters/in/web/ApiExceptionHandler.java`, `adapters/out/central/CentralHttpClient.java`,
+  `adapters/out/central/dto/CentralAuthorizationRequest.java`,
+  `CentralAuthorizationResponse.java`, `application/authorization/RegisterAuthorization.java`,
+  `FindAuthorization.java`, `domain/authorization/AuthorizationRepository.java`,
+  `domain/shared/DomainError.java`, `adapters/out/persistence/JpaAuthorizationRepository.java`,
+  `config/CompositionRoot.java` e os testes `AuthorizationResourceTest.java`,
+  `AgendaResourceTest.java`, `OperationEventResourceTest.java`, `ApiExceptionHandlerTest.java`,
+  `RegisterAuthorizationTest.java`, `CentralHttpClientTest.java`.
 
 ### 2.16 — i18n, Swagger e snapshot OpenAPI
 - **Objetivo:** documentação viva e mensagens localizadas.
@@ -247,6 +271,7 @@
 - **Teto de tentativas para `404` da Central:** hoje a operação que a Central não conhece continua em polling a cada 60 s, para sempre (`retry_count` cresce sem limite). Definir um orçamento de tentativas e um destino (alerta operacional ou estado que exija intervenção humana) sem tocar no contrato público.
 - **Alinhar "Falhas até `INTEGRATION_ERROR`":** o `ARCHITECTURE.md` §11 e o ADR-0003 dizem `5`, mas a implementação entra em `INTEGRATION_ERROR` assim que o cliente HTTP esgota as 3 tentativas. Decidir se o limiar de 5 é implementado no worker ou se a regra é corrigida.
 - **Protocolo repetido pela Central:** o esquema da §6 garante `protocol` único e o mock reinicia a sequência de protocolos a cada `POST /_admin/reset` ou a cada reinício do processo. Quando a Central reemite um protocolo já guardado, a violação da restrição chega como `DataIntegrityViolationException` e a API responde `500` em vez de um erro mapeado. Traduzir a colisão para um erro de domínio (falha de integração, operação retomável) no adaptador de persistência. Evidência: E2E da task 2.12, primeira rodada (`ERROR: duplicate key value violates unique constraint "uk_portability_operations_protocol"`).
+- **Central indisponível no opt-in:** `POST /api/v1/authorizations` responde `503 CENTRAL_UNAVAILABLE` quando a Central não registra o consentimento, mas o contrato público lista apenas `400` e `500` para essa rota. Alinhar o contrato (acrescentar `503`) ou o mapeamento (`500 INTERNAL_ERROR`), sem alterar o código estável `CENTRAL_UNAVAILABLE` sem autorização do responsável.
 
 ---
 

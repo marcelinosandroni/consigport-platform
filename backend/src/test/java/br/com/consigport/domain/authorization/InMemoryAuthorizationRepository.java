@@ -2,6 +2,7 @@ package br.com.consigport.domain.authorization;
 
 import br.com.consigport.domain.shared.AgreementId;
 import br.com.consigport.domain.shared.BeneficiaryId;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -21,6 +22,15 @@ public final class InMemoryAuthorizationRepository implements AuthorizationRepos
   public Optional<Authorization> findByBeneficiaryAndAgreement(
       BeneficiaryId beneficiaryId, AgreementId agreementId) {
     return Optional.ofNullable(byPair.get(new Pair(beneficiaryId, agreementId)));
+  }
+
+  @Override
+  public Optional<Authorization> findLatestByBeneficiary(BeneficiaryId beneficiaryId) {
+    return byPair.values().stream()
+        .filter(authorization -> authorization.beneficiaryId().equals(beneficiaryId))
+        .max(
+            Comparator.comparing(Authorization::createdAt)
+                .thenComparing(authorization -> authorization.id().value()));
   }
 
   @Override

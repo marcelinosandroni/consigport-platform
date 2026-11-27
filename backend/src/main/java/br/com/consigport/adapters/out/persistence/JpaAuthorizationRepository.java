@@ -49,10 +49,34 @@ public class JpaAuthorizationRepository implements AuthorizationRepository {
         .map(JpaAuthorizationRepository::toDomain);
   }
 
+  /**
+   * Finds the latest authorization of a beneficiary.
+   *
+   * <p>The order is {@code createdAt, id}: the most recent opt-in wins, and the
+   * identifier breaks the tie of two opt-ins of the same instant.
+   *
+   * @param beneficiaryId the beneficiary that gave the opt-in
+   * @return the most recent authorization of the beneficiary, when there is one
+   */
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<Authorization> findLatestByBeneficiary(BeneficiaryId beneficiaryId) {
+    return entityManager
+        .createQuery(
+            "select authorization from AuthorizationJpaEntity authorization"
+                + " where authorization.beneficiaryId = :beneficiaryId"
+                + " order by authorization.createdAt desc, authorization.id desc",
+            AuthorizationJpaEntity.class)
+        .setParameter("beneficiaryId", beneficiaryId.value())
+        .setMaxResults(1)
+        .getResultStream()
+        .findFirst()
+        .map(JpaAuthorizationRepository::toDomain);
+  }
+
   @Override
   @Transactional
-  public void save(Authorization authorization) {
-    try {
+  public void save(Authorization authorization) {    try {
       entityManager.persist(toEntity(authorization));
       // The flush is inside the guard: the unique constraint of the pair is
       // checked by PostgreSQL, and only the flush reaches the database.

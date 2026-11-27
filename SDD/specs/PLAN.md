@@ -71,7 +71,7 @@
 
 > Objetivo: core DDD/hexagonal na porta `8080`, com PostgreSQL, Flyway, ACL, i18n,
 > polling resiliente e Swagger.
-> Task em voo: **2.15 — Recursos REST e tratamento de erros**.
+> Task em voo: **2.16 — i18n, Swagger e snapshot OpenAPI**.
 
 ### Tasks
 
@@ -124,10 +124,10 @@
 - [x] **2.14 — Consulta de operações e trilha**
       Leitura paginada com filtro por status; eventos em ordem cronológica;
       `404 OPERATION_NOT_FOUND`.
-- [-] **2.15 — Recursos REST e tratamento de erros**
+- [x] **2.15 — Recursos REST e tratamento de erros**
       Rotas do `ARCHITECTURE.md` §8 e erro com `code`, `message`, `locale`,
       `timestamp`, `path` e `details`.
-- [ ] **2.16 — i18n, Swagger e snapshot OpenAPI**
+- [-] **2.16 — i18n, Swagger e snapshot OpenAPI**
       `Accept-Language` com fallback `pt-BR`; `code` nunca traduzido; contrato gerado
       equivalente a `contracts/consigport-api.yaml`.
 - [ ] **2.17 — Fechamento do backend**
