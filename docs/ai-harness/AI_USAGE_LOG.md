@@ -1251,6 +1251,7 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
 - **Data:** 2026-11-27
 - **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
 - **Branch:** `feat/035-backend-rest-resources`
+- **PR:** #47 — https://github.com/marcelinosandroni/consigport-platform/pull/47
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** completar a superfície `/api/v1` com o opt-in, a consulta do opt-in, a
   agenda e a trilha da auditoria, e fechar o tratamento de erros com o formato do
