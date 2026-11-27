@@ -1,5 +1,6 @@
 package br.com.consigport.adapters.out.persistence;
 
+import br.com.consigport.domain.portability.ConcurrentOperationUpdateException;
 import br.com.consigport.domain.portability.IdempotencyKeyAlreadyUsedException;
 import br.com.consigport.domain.portability.InstallmentSnapshot;
 import br.com.consigport.domain.portability.Money;
@@ -13,6 +14,7 @@ import br.com.consigport.domain.shared.BeneficiaryId;
 import br.com.consigport.domain.shared.IdempotencyKey;
 import br.com.consigport.domain.shared.InstallmentId;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.OptimisticLockException;
 import jakarta.persistence.PersistenceException;
 import java.time.Clock;
 import java.time.Instant;
@@ -63,8 +65,32 @@ public class JpaPortabilityOperationRepository implements PortabilityOperationRe
           exception, IDEMPOTENCY_KEY_CONSTRAINT)) {
         throw new IdempotencyKeyAlreadyUsedException(operation.idempotencyKey());
       }
+      if (isOptimisticLockFailure(exception)) {
+        throw new ConcurrentOperationUpdateException(operation.id());
+      }
       throw exception;
     }
+  }
+
+  /**
+   * Tells whether the database refused the write because another transaction changed the
+   * row in the meantime.
+   *
+   * <p>The optimistic lock is the guard of the concurrent updates of the same operation.
+   *
+   * @param exception the failure of the persistence provider
+   * @return {@code true} when the write lost the optimistic lock
+   */
+  private static boolean isOptimisticLockFailure(Throwable exception) {
+    for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+      if (cause instanceof OptimisticLockException) {
+        return true;
+      }
+      if (cause.getCause() == cause) {
+        return false;
+      }
+    }
+    return false;
   }
 
   private void saveRow(PortabilityOperation operation) {

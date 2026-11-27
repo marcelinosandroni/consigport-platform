@@ -19,7 +19,8 @@ public final class InMemoryPortabilityOperationRepository
 
   @Override
   public void save(PortabilityOperation operation) {
-    if (findByIdempotencyKey(operation.idempotencyKey()).isPresent()) {
+    Optional<PortabilityOperation> taken = findByIdempotencyKey(operation.idempotencyKey());
+    if (taken.isPresent() && !taken.get().id().equals(operation.id())) {
       throw new IdempotencyKeyAlreadyUsedException(operation.idempotencyKey());
     }
     operations.removeIf(stored -> stored.id().equals(operation.id()));
