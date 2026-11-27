@@ -2756,7 +2756,7 @@
 
 - **Data de Conclusão:** 2026-11-27
 - **Branch:** `feat/032-backend-typed-central-answers`
-- **PR:** a abrir para `develop`
+- **PR:** #44 — https://github.com/marcelinosandroni/consigport-platform/pull/44
 - **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** alinhar a máquina de estados, a trilha e o fluxo do worker, e distinguir as
