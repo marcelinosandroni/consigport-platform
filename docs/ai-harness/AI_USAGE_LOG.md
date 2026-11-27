@@ -1321,7 +1321,7 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
 - **Data:** 2026-11-27
 - **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
 - **Branch:** `feat/036-backend-i18n-openapi`
-- **PR:** a abrir para `develop`
+- **PR:** #48 — https://github.com/marcelinosandroni/consigport-platform/pull/48
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** localizar as mensagens humanas pela negociação do `Accept-Language` (com
   fallback `pt-BR` e o código do erro nunca traduzido), publicar a documentação viva da

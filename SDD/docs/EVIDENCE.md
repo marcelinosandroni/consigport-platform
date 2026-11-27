@@ -3606,7 +3606,7 @@
 
 - **Data de Conclusão:** 2026-11-27
 - **Branch:** `feat/036-backend-i18n-openapi`
-- **PR:** a abrir para `develop`
+- **PR:** #48 — https://github.com/marcelinosandroni/consigport-platform/pull/48
 - **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** localizar as mensagens humanas pela negociação do `Accept-Language` (com
