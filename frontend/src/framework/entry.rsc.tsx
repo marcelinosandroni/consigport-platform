@@ -8,6 +8,7 @@ import {
 } from '@vitejs/plugin-rsc/rsc/server'
 import type { ReactFormState } from 'react-dom/client'
 import { Root } from '../root.tsx'
+import { readLocaleCookie } from '../shared/i18n/locales.ts'
 import { parseRenderRequest } from './request.tsx'
 
 // The schema of payload which is serialized into RSC stream on rsc environment
@@ -73,12 +74,16 @@ async function handler(request: Request): Promise<Response> {
     }
   }
 
+  // the language the user chose travels in a cookie: the server renders the
+  // page already in that language, and the client leaves only refine it.
+  const locale = readLocaleCookie(request.headers.get('cookie'))
+
   // serialization from React VDOM tree to RSC stream.
   // we render RSC stream after handling server function request
   // so that new render reflects updated state from server function call
   // to achieve single round trip to mutate and fetch from server.
   const rscPayload: RscPayload = {
-    root: <Root url={renderRequest.url} />,
+    root: <Root url={renderRequest.url} locale={locale} />,
     formState,
     returnValue,
   }

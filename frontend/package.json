@@ -13,14 +13,20 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run",
+    "generate:types": "node openapi-ts.config.ts"
   },
   "dependencies": {
     "@fontsource/jetbrains-mono": "^5.3.0",
     "@fontsource/manrope": "^5.3.0",
     "@fontsource/playfair-display": "^5.3.0",
+    "@tanstack/react-query": "^5.108.4",
+    "i18next": "^26.7.2",
+    "openapi-fetch": "^0.13.8",
     "react": "19.2.9",
-    "react-dom": "19.2.9"
+    "react-dom": "19.2.9",
+    "react-i18next": "^16.6.6",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
@@ -28,6 +34,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.13",
+    "@types/node": "^24.19.4",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.2.0",
@@ -36,6 +43,8 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^16.5.0",
     "jsdom": "^31.0.1",
+    "msw": "^2.15.0",
+    "openapi-typescript": "^7.13.0",
     "rsc-html-stream": "^0.0.8",
     "tailwindcss": "^4.3.5",
     "typescript": "^5.9.3",
