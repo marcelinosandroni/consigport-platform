@@ -28,7 +28,12 @@ async function main() {
     const [payload, setPayload_] = React.useState(initialPayload)
 
     React.useEffect(() => {
-      setPayload = (v) => React.startTransition(() => setPayload_(v))
+      // The payload swap is an urgent update, not a transition: the swap
+      // happens after a navigation that React itself scheduled (the effect of
+      // a screen that asks for the next one), and a transition entangled with
+      // that work is dropped — the address points to the new screen while the
+      // old one stays on the display.
+      setPayload = (v) => setPayload_(v)
     }, [setPayload_])
 
     // re-fetch/render on client side navigation

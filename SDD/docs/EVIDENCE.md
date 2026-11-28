@@ -6489,3 +6489,273 @@
 - `SDD/specs/BACKLOG.md`
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+### Task 4.3 — E2E com Playwright no CI
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/043-quality-playwright-e2e`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** provar o fluxo completo no navegador — a interface real, o backend
+  real, o PostgreSQL real e a Central simulada — dentro do CI, com relatório
+  publicado.
+
+#### Comandos de Verificação e Saídas:
+
+1. **A suíte E2E contra a stack real** (PostgreSQL 16 real, Central simulada e
+   backend reais, interface no build de produção servido por `vite preview`):
+   ```text
+   $ npx playwright test --reporter=list
+   Running 5 tests using 1 worker
+
+     ✓  1 [chromium] › e2e/authorization.spec.ts:19:3 › O consentimento do beneficiário › registra o opt-in e abre a agenda do beneficiário (17.7s)
+     ✓  2 [chromium] › e2e/authorization.spec.ts:30:3 › O consentimento do beneficiário › recusa a agenda de quem não deu consentimento (1.5s)
+     ✓  3 [chromium] › e2e/portability.spec.ts:22:3 › A portabilidade › leva a operação até a confirmação da Central (8.3s)
+     ✓  4 [chromium] › e2e/portability.spec.ts:48:3 › A portabilidade › não cria uma segunda operação quando a tentativa se repete (2.1s)
+     ✓  5 [chromium] › e2e/rejection.spec.ts:21:3 › A rejeição da Central › mostra o motivo quando a Central recusa a operação (8.8s)
+
+     5 passed (55.3s)
+   exit: 0
+   ```
+2. **A estabilidade da suíte** — cinco execuções seguidas, cada uma com as cinco
+   provas verdes, depois da correção da troca de payload:
+   ```text
+   $ for run in 1 2 3 4 5; do npx playwright test --reporter=line; done
+   ===== RUN 1 =====
+     5 passed (44.7s)
+   ===== RUN 2 =====
+     5 passed (2.0m)
+   ===== RUN 3 =====
+     5 passed (1.4m)
+   ===== RUN 4 =====
+     5 passed (1.5m)
+   ===== RUN 5 =====
+     5 passed (2.0m)
+   exit: 0
+   ```
+3. **O defeito que a suíte encontrou no backend** — a recusa legítima da Central
+   contava como falha do circuito, que abria por dez segundos e derrubava a agenda
+   de quem tinha consentimento. O teste novo prova que a recusa não abre o
+   circuito:
+   ```text
+   $ ./mvnw -B -pl backend -am test -Dtest=CentralHttpClientTest -DfailIfNoTests=false
+   [INFO] Tests run: 24, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.770 s -- in br.com.consigport.adapters.out.central.CentralHttpClientTest
+   [INFO] Tests run: 24, Failures: 0, Errors: 0, Skipped: 0
+   [INFO] BUILD SUCCESS
+   exit: 0
+   ```
+   O comportamento medido antes da correção — cinco recusas legítimo e a sexta
+   chamada já com o circuito aberto:
+   ```text
+   $ for i in 1 2 3 4 5 6; do curl -sS -o /dev/null -w "%{http_code}\n" http://localhost:8080/api/v1/beneficiaries/BEN-MARGIN/agenda; done
+   1 -> 403
+   2 -> 403
+   3 -> 403
+   4 -> 403
+   5 -> 403
+   6 -> 503
+   ```
+4. **O CORS que faltava** — a `ARCHITECTURE.md` §13 exige o CORS restrito ao front
+   de desenvolvimento e o backend não respondia ao navegador da interface:
+   ```text
+   $ curl -sS -i -X OPTIONS http://localhost:8080/api/v1/portability-operations \
+       -H 'Origin: http://127.0.0.1:5173' \
+       -H 'Access-Control-Request-Method: POST' \
+       -H 'Access-Control-Request-Headers: content-type,idempotency-key'
+   HTTP/1.1 200
+   Vary: Origin
+   Vary: Access-Control-Request-Method
+   Vary: Access-Control-Request-Headers
+   Access-Control-Allow-Origin: http://127.0.0.1:5173
+   Access-Control-Allow-Methods: GET,POST,OPTIONS
+   Access-Control-Allow-Headers: content-type, idempotency-key
+   Access-Control-Max-Age: 3600
+   Allow: GET, HEAD, POST, PUT, DELETE, OPTIONS, PATCH
+   Content-Length: 0
+
+   $ curl -sS -i -X OPTIONS http://localhost:8080/api/v1/portability-operations \
+       -H 'Origin: http://evil.example' \
+       -H 'Access-Control-Request-Method: POST'
+   HTTP/1.1 403
+   Vary: Origin
+   Vary: Access-Control-Request-Method
+   Vary: Access-Control-Request-Headers
+   Transfer-Encoding: chunked
+
+   Invalid CORS request
+   ```
+5. **O backend inteiro, com os testes de integração e o gate de cobertura:**
+   ```text
+   $ ./mvnw -B -pl backend -am verify
+   [INFO] Tests run: 482, Failures: 0, Errors: 0, Skipped: 0
+   [INFO] --- jacoco:0.8.12:check (check) @ consigport-backend ---
+   [INFO] All coverage checks have been met.
+   [INFO] BUILD SUCCESS
+   exit: 0
+   ```
+6. **Os portões do frontend:**
+   ```text
+   $ npm run --prefix frontend lint
+   > eslint .
+   exit: 0
+
+   $ npm run --prefix frontend typecheck
+   > tsc --noEmit
+   exit: 0
+
+   $ npm run --prefix frontend test:unit
+    Test Files  29 passed (29)
+         Tests  159 passed (159)
+      Duration  42.09s
+   exit: 0
+   ```
+7. **Os portões de documentação e especificação:**
+   ```text
+   $ node SDD/SKILLS/check-docs/check-docs.mjs .
+   ✓ 67 documents, every relative link resolves.
+   exit: 0
+   $ node scripts/check-specs.mjs
+   ✓ SDD specifications valid:
+     - Required core documents and ADRs present.
+     - Exactly 1 task in flight in SDD/specs/PLAN.md.
+     - Tasks in PLAN.md are cataloged in BACKLOG.md.
+   exit: 0
+   $ node scripts/check-architecture.mjs
+   🎉 Todos os 22 testes de validação dos desenhos e arquitetura passaram com sucesso!
+   $ node scripts/check-theme-tokens.mjs
+   ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css (line endings normalized).
+   $ node scripts/check-ai-log.mjs
+   ✓ AI usage log: 59 sessions, structure valid.
+   ```
+8. **Os workflows, com o YAML validado:**
+   ```text
+   $ npx --yes js-yaml@4.1.0 .github/workflows/ci.yml > /dev/null
+   .github/workflows/ci.yml: YAML válido
+   .github/workflows/nightly.yml: YAML válido
+   $ jobs do CI
+   detect → Detect the suites available in this commit
+   docs → Docs, Specs, Architecture and AI Log
+   backend → Backend — build, unit tests and coverage report
+   mock → Central Mock — build and unit tests
+   frontend → Frontend — lint, typecheck, unit tests and build
+   contracts → Contracts — Spectral, HMAC vector, breaking changes and dynamic test
+   compose → Docker Compose — configuration
+   smoke → Stack Smoke — backend and mock against PostgreSQL 16
+   e2e → E2E — Playwright
+   k6-smoke → Performance Smoke — k6
+   security → Security — dependency audit and vulnerability scan
+   $ jobs do nightly
+   detect → Detect the suites available in this commit
+   contract-drift → Contracts — breaking changes against main
+   e2e-full → E2E — full suite
+   k6-load → Performance — sustained load
+   schemathesis → Contract — dynamic test
+   security-images → Security — container images
+   ```
+
+#### Conteúdo Entregue:
+- `frontend/e2e/authorization.spec.ts` (novo) — o consentimento do beneficiário
+  leva à agenda, e a agenda de quem não deu consentimento recusa com o caminho da
+  autorização à mão.
+- `frontend/e2e/portability.spec.ts` (novo) — o caminho feliz (seleção, envio,
+  protocolo, acompanhamento até `Concluída` e trilha de auditoria) e a idempotência
+  (a tentativa repetida devolve a mesma operação).
+- `frontend/e2e/rejection.spec.ts` (novo) — a recusa da Central aparece na tela com
+  o motivo público `MARGIN_INSUFFICIENT`.
+- `frontend/e2e/support/journey.ts` (novo) — os passos compartilhados: `authorize`,
+  `selectInstallments`, `submitOperation` e `sendOperation`. As provas leem os
+  rótulos que o leitor lê; nada sabe de classe de CSS.
+- `frontend/playwright.config.ts` (novo) — a configuração da suíte: `testDir` em
+  `./e2e`, um worker só (a Central simulada guarda o estado da operação em
+  memória), `timeout` de 120 s para a JVM fria, trace na primeira repetição,
+  captura e vídeo na falha, e o servidor de pré-visualização do build de produção
+  como `webServer`.
+- `frontend/package.json` — `@playwright/test`, o script `test:e2e` e o gancho
+  `pretest:e2e` (que compila a interface antes da prova).
+- `frontend/src/framework/navigation.ts` (novo) — a navegação da aplicação: a
+  mudança de endereço sai do trabalho do React, em uma microtarefa, porque uma
+  navegação agendada de dentro de um efeito se embaraça com o render que o React
+  está terminando.
+- `frontend/src/framework/entry.browser.tsx` — a troca do payload passou a ser
+  urgente: dentro de uma transição (`startTransition`) reagindo a um efeito do
+  React, a troca era descartada e a tela continuava na anterior.
+- `frontend/src/features/authorization/ui/authorization-form.tsx` — o consentimento
+  registrado leva à agenda pelo helper de navegação.
+- `backend/src/main/java/br/com/consigport/config/CorsConfig.java` (novo) — a
+  allowlist de CORS que a `ARCHITECTURE.md` §13 exige: as origens do front de
+  desenvolvimento, os métodos `GET`, `POST` e `OPTIONS`, e os headers
+  `Accept-Language`, `Content-Type` e `Idempotency-Key`.
+- `backend/src/main/resources/application.yml` — `cors.allowed-origins`, com a
+  variável `CORS_ALLOWED_ORIGINS` por cima.
+- `backend/src/main/java/br/com/consigport/adapters/out/central/CentralHttpClient.java`
+  — a recusa da Central (403) e o beneficiário que ela não conhece (404) contam
+  como resposta, não como falha: o circuito abre para a dependência que não
+  responde, não para a que responde recusando.
+- `backend/src/test/java/br/com/consigport/adapters/out/central/CentralHttpClientTest.java`
+  — o teste que prova que seis recusas seguidas não abrem o circuito.
+- `.github/workflows/ci.yml` — o job `e2e` sobe a stack real (PostgreSQL 16, mock e
+  backend compilados pelo CI), espera as sondas de saúde, aquece as duas JVMs, roda
+  a suíte e publica o relatório HTML, os traces, as capturas e os vídeos.
+- `.github/workflows/nightly.yml` — o job `e2e-full` recebe a mesma stack: antes
+  ele rodava a suíte sem API e reprovaria.
+- `docs/quality/GATES.md` — §3.6 reescrito com a execução, os cinco cenários, os
+  critérios de aceite e os artefatos do portão; a matriz da §2 com o portão E2E
+  corrigido.
+
+#### Descobertas e Decisões:
+- **A interface não tinha CORS.** O navegador da interface pergunta a API
+  diretamente ao acompanhar a operação; a API respondia sem
+  `Access-Control-Allow-Origin` e o navegador bloqueava a resposta. A
+  `ARCHITECTURE.md` §13 já exigia o CORS restrito ao front de desenvolvimento — a
+  exigência existia no papel, não no código.
+- **O circuit breaker contava recusa legítima como falha.** Cinco consultas de
+  agenda de um beneficiário sem consentimento bastavam para abrir o circuito por
+  dez segundos; nesse tempo, a agenda de quem **tinha** consentimento respondia
+  `503 CENTRAL_UNAVAILABLE`. A Central estava disponível: ela respondia
+  recusando. A correção conta 403 e 404 como resposta — o mesmo tratamento que o
+  polling da operação já fazia com o 404.
+- **A troca de payload da navegação perdia a tela.** A agenda era buscada, a
+  resposta chegava (200), o endereço mudava — e a tela continuava no formulário.
+  A causa é a troca estar dentro de uma transição (`startTransition`) reagindo a
+  um efeito do React: uma transição desse tipo é descartada. A correção é a troca
+  urgente do payload, com o motivo escrito no próprio código.
+- **O tempo de leitura da Central (3 s) é curto para o ambiente da suíte.** O
+  limite vem da `ARCHITECTURE.md` §11 e continua valendo para a aplicação; o
+  ambiente da suíte (navegador e duas JVMs no mesmo runner, 2 vCPUs) dá 20 s ao
+  backend por `CENTRAL_TIMEOUT_READ`. É ajuste de ambiente, não de contrato.
+- **A primeira requisição de uma stack é lenta** (a JVM aquece): o opt-in levou
+  8,9 s na primeira chamada. O job do CI e o do nightly aquecem a stack antes da
+  suíte, com tolerância a repetição.
+- **A suíte é sequencial por necessidade.** A Central simulada guarda o estado da
+  operação em memória e o PostgreSQL guarda a operação: dois fluxos ao mesmo
+  tempo competiriam pelo mesmo beneficiário. `workers: 1` é a decisão, não um
+  acidente.
+- **O job E2E do nightly não subia a stack.** Ele instalava o navegador e rodava a
+  suíte contra uma API que não existia: reprovaria em toda execução. O job
+  recebe agora a mesma stack do job do PR.
+
+#### Arquivos Tocados:
+- `.github/workflows/ci.yml`
+- `.github/workflows/nightly.yml`
+- `backend/src/main/java/br/com/consigport/config/CorsConfig.java` (novo)
+- `backend/src/main/java/br/com/consigport/adapters/out/central/CentralHttpClient.java`
+- `backend/src/main/resources/application.yml`
+- `backend/src/test/java/br/com/consigport/adapters/out/central/CentralHttpClientTest.java`
+- `frontend/e2e/authorization.spec.ts` (novo)
+- `frontend/e2e/portability.spec.ts` (novo)
+- `frontend/e2e/rejection.spec.ts` (novo)
+- `frontend/e2e/support/journey.ts` (novo)
+- `frontend/playwright.config.ts` (novo)
+- `frontend/package.json`
+- `frontend/package-lock.json`
+- `frontend/tsconfig.json`
+- `frontend/src/features/authorization/ui/authorization-form.tsx`
+- `frontend/src/framework/entry.browser.tsx`
+- `frontend/src/framework/navigation.ts` (novo)
+- `docs/quality/GATES.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/specs/BACKLOG.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`

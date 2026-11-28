@@ -32,7 +32,7 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
 | **Frontend Checks** | ESLint + TypeScript (`tsc`) + Vitest + Build | `frontend` | ✅ | ✅ | — |
 | **Docker Compose** | Validação sintática e compose config | `compose` | ✅ | ✅ | — |
 | **Stack Smoke** | Backend e mock contra PostgreSQL 16 | `smoke` | ❌ | ✅ | — |
-| **E2E Smoke** | Playwright (fluxo completo em Docker) | `e2e` | ❌ | ✅ (quando a suíte existe) | ✅ |
+| **E2E Smoke** | Playwright (fluxo completo contra o build de produção e a stack real) | `e2e` | ✅ | ✅ (quando a suíte existe) | ✅ |
 | **Performance Smoke** | k6 smoke test (thresholds estritos) | `k6-smoke` | ❌ | ✅ (quando o script existe) | — |
 | **Performance Load** | k6 load test sustentado + relatório HTML | `k6-load` | ❌ | ❌ | ✅ |
 | **Contrato Dinâmico** | Schemathesis (property-based) contra a API em execução | `contracts` e `schemathesis` | ✅ | ✅ | ✅ |
@@ -202,15 +202,44 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
 ---
 
 ### 3.6. Portão de Testes Ponta a Ponta (Playwright — CI Only)
+- **Workflow:** [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml), job `e2e`.
 - **Execução:**
-  - O pipeline do GitHub Actions inicia o ambiente completo via `docker compose up -d --wait` (PostgreSQL, Backend, Mock da Central e Frontend).
-  - Executa a suite de testes Playwright contra `http://localhost:5173`.
-- **Cenários Cobertos:**
-  1. Fluxo de Autorização (Opt-in) do beneficiário com replicação no Mock.
-  2. Consulta de Agenda de Descontos e listagem de parcelas elegíveis (`OPEN`).
-  3. Solicitação de Portabilidade com chave de idempotência e dados de conta.
-  4. Acompanhamento assíncrono do polling (transição de `PENDING` para `COMPLETED` ou `REJECTED`).
-  5. Visualização da linha do tempo e auditoria imutável de eventos.
+  ```bash
+  npm run --prefix frontend test:e2e
+  ```
+  - O job sobe a stack real: PostgreSQL 16 (Docker Compose), a Central simulada e o
+    backend compilados pelo próprio CI; espera as sondas de saúde dos dois serviços e
+    aquece as duas JVMs antes da primeira prova.
+  - A suíte roda contra o **build de produção** servido por `vite preview` — o mesmo
+    artefato que o contêiner da interface publica — com `workers: 1`, porque a Central
+    simulada guarda o estado da operação em memória e dois fluxos ao mesmo tempo
+    competiriam pelo mesmo beneficiário.
+  - O job é condicionado à existência da suíte no commit: ele acende sozinho quando
+    `frontend/e2e/*.spec.ts` chega, em vez de fingir um verde que não existe.
+- **Cenários Cobertos (cinco provas, três arquivos):**
+  1. **Consentimento (opt-in):** o registro do consentimento leva à agenda do
+     beneficiário, com as três parcelas elegíveis.
+  2. **Agenda sem consentimento:** a tela nomeia o estado e oferece o caminho da
+     autorização.
+  3. **Caminho feliz da portabilidade:** seleção das parcelas, envio, protocolo da
+     Central, acompanhamento até `Concluída` e trilha de auditoria com cada estado da
+     operação, na ordem em que os eventos foram escritos.
+  4. **Idempotência:** a tentativa repetida devolve a mesma operação, nunca uma
+     segunda.
+  5. **Rejeição da Central:** a operação recusada mostra o motivo público
+     (`MARGIN_INSUFFICIENT`).
+- **Critérios de Aceite:**
+  - Cinco provas verdes no Chromium, sem `test.only` e sem mock de `fetch`: o
+    PostgreSQL é real, a Central é simulada e a interface é o build de produção.
+  - Nenhum teste conhece classe de CSS: as provas leem rótulos, regiões e botões.
+  - A falha publica evidência: relatório HTML, trace, captura de tela e vídeo.
+- **Artefatos:**
+  - `playwright-report` — relatório HTML do Playwright.
+  - `playwright-traces` — traces, capturas de tela e vídeos de cada prova.
+- **Ambiente:**
+  - O timeout de leitura da Central (3 s, `ARCHITECTURE.md` §11) vale para a
+    aplicação; o ambiente da suíte dá 20 s ao backend por `CENTRAL_TIMEOUT_READ`,
+    porque o navegador e as duas JVMs disputam o mesmo runner.
 
 ---
 

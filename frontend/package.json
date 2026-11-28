@@ -14,6 +14,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test:unit": "vitest run",
+    "pretest:e2e": "npm run build",
+    "test:e2e": "playwright test",
     "generate:types": "node openapi-ts.config.ts"
   },
   "dependencies": {
@@ -30,6 +32,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
+    "@playwright/test": "^1.65.1",
     "@tailwindcss/vite": "^4.3.5",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",

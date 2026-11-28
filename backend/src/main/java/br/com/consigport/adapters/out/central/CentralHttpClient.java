@@ -136,7 +136,17 @@ public final class CentralHttpClient
       circuit.recordSuccess();
       return centralAcl.toAgenda(beneficiaryId, List.of(parcelas == null ? new AgendaResponse[0] : parcelas));
     } catch (RestClientResponseException exception) {
-      circuit.recordFailure();
+      // The Central answered: a beneficiary without consent (403) and a
+      // beneficiary it does not know (404) are answers, not failures. The
+      // circuit counts the call as successful, the same way the poll of the
+      // operation does — a refusal must not break the integration for the
+      // next readers.
+      int status = exception.getStatusCode().value();
+      if (status == 403 || status == 404) {
+        circuit.recordSuccess();
+      } else {
+        circuit.recordFailure();
+      }
       throw agendaFailure(exception, beneficiaryId);
     } catch (RestClientException exception) {
       circuit.recordFailure();

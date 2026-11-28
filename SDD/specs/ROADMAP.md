@@ -14,8 +14,8 @@
 | Fase 0 — Fundação | ✅ concluída e arquivada, tag `v0.1.0` |
 | Fase 1 — Central mock | ✅ concluída e arquivada, tag `v0.2.0` |
 | Fase 2 — Backend core | ✅ concluída e arquivada, tag `v0.3.0` |
-| Fase em andamento | Fase 4 — Qualidade e vitrine (7 tasks; task 4.1 em voo) |
-| Próxima task | 4.1 — Gates de contrato |
+| Fase em andamento | Fase 4 — Qualidade e vitrine (7 tasks; task 4.4 em voo) |
+| Próxima task | 4.4 — Performance com k6 |
 | Versão | `v0.4.0` (a Fase 4 fecha em `v1.0.0`) |
 
 A Fase 0 entregou specs, ADRs, harness, gates, contratos, scaffolds, CI/CD e a
@@ -194,9 +194,8 @@ polling resiliente e Swagger.
 |---|---|---|
 | 4.1 | Gates de contrato | `[x]` |
 | 4.2 | Testes de propriedade com Schemathesis | `[x]` |
-| 4.3 | E2E com Playwright no CI | `[-]` |
-| 4.3 | E2E com Playwright no CI | `[ ]` |
-| 4.4 | Performance com k6 | `[ ]` |
+| 4.3 | E2E com Playwright no CI | `[x]` |
+| 4.4 | Performance com k6 | `[-]` |
 | 4.5 | Segurança e dependências | `[ ]` |
 | 4.6 | Entrega contínua e release | `[ ]` |
 | 4.7 | README e vitrine | `[ ]` |
