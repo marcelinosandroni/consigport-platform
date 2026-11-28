@@ -1682,3 +1682,52 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
 9. **Ajuste de TypeScript:** o `tsconfig` do projeto tem `noUncheckedIndexedAccess`; a
    desestruturação das componentes de cor do teste foi escrita com valores padrão
    para satisfazer o compilador estrito.
+
+## Sessão #49 — Task 3.4 (Fluxo de autorização)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/034-frontend-authorization-flow`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** registrar o opt-in do beneficiário pela interface — Server Component
+  renderiza, a mutação passa pela Server Action, o erro sai localizado e o sucesso
+  leva à agenda.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/stacks/react.md` (Server Action para mutação, Server
+   Component por padrão, `useEffect` não busca dado), `SDD/APP-STACK.md` (a linha do
+   Zod), `contracts/consigport-api.yaml` (o `POST /api/v1/authorizations`, com `201`
+   na criação e `200` na repetição) e `docs/quality/GATES.md` (portão 3.4).
+2. **Dependência:** `zod@^4.6.7` em produção, dentro da faixa `4.x` do `APP-STACK.md`;
+   auditoria com zero vulnerabilidades.
+3. **Server Action** (`features/authorization/actions.ts`): valida o par
+   beneficiário/convênio com Zod, chama a API com o `Accept-Language` da interface e
+   devolve um estado serializável. A API fora do ar é capturada e vira
+   `INTERNAL_ERROR` — a primeira versão deixava a exceção escapar e o servidor
+   respondia `500`; o smoke do formulário sem JavaScript expôs isso.
+4. **Folha cliente** (`features/authorization/ui/authorization-form.tsx`): `useActionState`
+   sobre a ação, estado pendente, erro localizado pelo `code` estável (catálogo da
+   interface, `message` do servidor como fallback) e navegação para
+   `/agenda?beneficiaryId=…` no sucesso.
+5. **Server Component** (`features/authorization/server/page.tsx`): o cabeçalho da
+   jornada e o formulário; a página não busca nada e não guarda estado.
+6. **Rota e navegação:** `/autorizacao` no router e `nav.authorization` nos três
+   catálogos.
+7. **Ajuste no `field.tsx`:** o asterisco de obrigatório passou a ser desenhado pelo
+   CSS (`after:content-['*']`), porque o `textContent` do rótulo quebrava a busca
+   por nome acessível do controle.
+8. **Testes:** `actions.test.ts` (sete casos: criação, replay `200`, validação antes
+   da API, erro por `code`, API fora do ar, `Accept-Language` e fallback de idioma) e
+   `authorization-form.test.tsx` (cinco casos de componente com MSW: campos nomeados,
+   consentimento registrado, ida à agenda, erro localizado e permanência no
+   formulário quando o consentimento falha).
+9. **Validação:**
+   - `npm run --prefix frontend lint` → EXIT=0
+   - `npm run --prefix frontend typecheck` → EXIT=0
+   - `npm run --prefix frontend test:unit` → 15 arquivos, 68 testes verdes
+   - `npm run --prefix frontend build` → os três ambientes (rsc, ssr, client) verdes
+   - 5 gates locais de documentação verdes
+   - smoke no build de produção: a página renderiza em pt-BR e en, e o formulário
+     postado na própria URL (caminho sem JavaScript) devolve a página com o erro
+     localizado

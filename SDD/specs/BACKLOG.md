@@ -479,6 +479,35 @@
 - **Arquivos:** `frontend/src/features/authorization/server/page.tsx`, `ui/authorization-form.tsx`, `actions.ts`.
 - **Aceite:** Server Component renderiza; ilha cliente envia `POST /authorizations`; erro localizado; sucesso leva à agenda.
 - **Verificação:** teste de componente com `msw` e smoke no build de produção.
+- **Realizado:** o opt-in do beneficiário, do começo ao fim. A página
+  (`features/authorization/server/page.tsx`) é um **Server Component**: ela desenha o
+  cabeçalho da jornada e entrega o formulário para a folha cliente — não busca
+  nada e não guarda estado. A **Server Action** (`features/authorization/actions.ts`)
+  é a única porta da mutação: o navegador nunca fala com a API. A ação valida com
+  **Zod** (o par beneficiário/convênio), chama `POST /api/v1/authorizations` com o
+  `Accept-Language` da interface e devolve um estado serializável — nunca uma
+  exceção. A folha (`features/authorization/ui/authorization-form.tsx`) usa
+  `useActionState`, o que mantém o **formulário funcionando sem JavaScript**: o
+  `action` do formulário é a própria ação, e o servidor re-renderiza a página com o
+  resultado. O erro é **localizado** pelo `code` estável — a interface procura a chave
+  no catálogo (`errors.<CODE>`) e usa a `message` do servidor como fallback — e o
+  sucesso leva à **agenda** do beneficiário (`/agenda?beneficiaryId=…`). A API
+  fora do ar não derruba a página: a ação devolve `INTERNAL_ERROR` e a tela explica
+  em português. Arquivos reais:
+  `frontend/src/features/authorization/actions.ts`,
+  `frontend/src/features/authorization/actions.test.ts`,
+  `frontend/src/features/authorization/ui/authorization-form.tsx`,
+  `frontend/src/features/authorization/ui/authorization-form.test.tsx`,
+  `frontend/src/features/authorization/server/page.tsx`,
+  `frontend/src/app/router.tsx`,
+  `frontend/src/app/navigation.tsx`,
+  `frontend/src/shared/ui/field.tsx`,
+  `frontend/src/shared/i18n/pt-BR.json`,
+  `frontend/src/shared/i18n/en.json`,
+  `frontend/src/shared/i18n/es.json`,
+  `frontend/src/test/mocks/handlers.ts`,
+  `frontend/package.json`,
+  `frontend/package-lock.json`.
 
 ### 3.5 — Agenda e seleção de parcelas
 - **Objetivo:** listar parcelas elegíveis e permitir seleção.

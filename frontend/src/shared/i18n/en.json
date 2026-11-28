@@ -13,6 +13,7 @@
   "nav": {
     "label": "Main navigation",
     "home": "Home",
+    "authorization": "Authorize",
     "portability": "Portability",
     "agenda": "Agenda",
     "audit": "Audit"
