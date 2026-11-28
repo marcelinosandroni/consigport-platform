@@ -330,6 +330,28 @@
 - **Arquivos:** testes de integração com Testcontainers em `backend/src/test/java/br/com/consigport/application/portability/`, fixtures do ciclo de vida.
 - **Aceite:** `CREATED` → `PENDING` → `CONFIRMED` → `COMPLETED` com a conta atualizada e a trilha completa; `CREATED` → `PENDING` → `REJECTED` com o motivo e a trilha; rollback quando o registro do evento falha.
 - **Verificação:** teste de integração verde com o PostgreSQL 16 do Testcontainers e E2E real com o mock da Central.
+- **Realizado:** o teste de integração `OperationLifecyclePersistenceTest` dirige os
+  casos de uso — `StartOperation`, `PollOperation` e `CompleteOperation` — contra o
+  PostgreSQL 16 do Testcontainers, com os adaptadores JPA e as transações reais: a
+  Central é a única peça simulada, porque a regra dos testes proíbe chamar uma API de
+  terceiro num teste de integração. O cenário prova `CREATED` → `PENDING` → (204 da
+  Central) → `CONFIRMED` → `COMPLETED` com a conta atualizada e a trilha de seis eventos
+  na ordem, `CREATED` → `PENDING` → `REJECTED` com o motivo
+  `MARGIN_INSUFFICIENT` e o corpo bruto da Central, e o **rollback**: quando a trilha
+  falha entre os passos da confirmação, a transação desfaz o estado da operação e o
+  evento já escrito, e a operação continua `PENDING`. O duplo que falha no enésimo
+  append saiu da classe de teste e virou `FailingOperationEventRepository`, no pacote
+  `support`, compartilhado com o `CompletionPersistenceTest`. As duas provas de vida
+  fecham a confiança no teste: sem a transação do `SpringTransactionRunner` o rollback
+  deixa a operação `COMPLETED` (o teste fica vermelho), e sem o evento `ACCOUNT_UPDATED`
+  a trilha fica com cinco eventos em vez de seis (o teste fica vermelho). O E2E real
+  repetiu os dois caminhos com o backend, o PostgreSQL e o mock da Central de verdade:
+  a operação confirmada levou nove eventos e `account_updated_at` preenchido, e a
+  rejeitada levou seis eventos e `rejection_reason = MARGIN_INSUFFICIENT`.
+  Arquivos reais:
+  `backend/src/test/java/br/com/consigport/application/portability/OperationLifecyclePersistenceTest.java`,
+  `backend/src/test/java/br/com/consigport/support/FailingOperationEventRepository.java`,
+  `backend/src/test/java/br/com/consigport/adapters/out/persistence/CompletionPersistenceTest.java`.
 
 ### Dívidas da Fase 2 (polling e resiliência)
 - **Portão de formatação sem implementação:** o portão 3.2 do `docs/quality/GATES.md` exige `./mvnw -q spotless:check` (Google Java Format), mas nenhum `pom.xml` declara o plugin Spotless: o comando falha com "no such goal". Ativar o Spotless exige formatar o código existente, o que produz um diff largo que deve ficar em task própria, com o `spotless:apply` antes do `spotless:check` no CI.

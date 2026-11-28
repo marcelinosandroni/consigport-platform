@@ -1452,3 +1452,51 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
     - `./mvnw -B verify` → reactor verde (backend 478 testes, mock 39 testes).
     - Cobertura final do núcleo: **99,71% de branches**, 98,12% de linhas, 100% de classes.
     - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).
+
+## Sessão #44 — Task 2.18 (Fluxo completo com o banco real)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/038-backend-lifecycle-integration`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** provar o ciclo de vida inteiro de uma operação de portabilidade contra o
+  PostgreSQL 16 real — `CREATED` → `PENDING` → `CONFIRMED` → `COMPLETED` com a conta
+  atualizada e a trilha completa, `CREATED` → `PENDING` → `REJECTED` com o motivo e a
+  trilha, e o rollback quando o registro do evento falha.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/AGENTS.md`, `SDD/specs/PLAN.md` (task 2.18 em voo),
+   `SDD/stacks/testing.md` (a regra que proíbe chamar uma API de terceiro num teste de
+   integração) e os casos de uso `StartOperation`, `PollOperation` e `CompleteOperation`.
+2. **Mapeamento da lacuna:** o ciclo de vida já estava coberto em partes —
+   `CompletionPersistenceTest` provava a confirmação a partir de `PENDING` e
+   `PollingPersistenceTest` provava o worker — mas nenhum teste percorria o caminho
+   inteiro com a operação criada pelo caso de uso e fechada pela Central.
+3. **Teste de integração:** `OperationLifecyclePersistenceTest`, no pacote
+   `application/portability`, com o `@SpringBootTest` sobre o PostgreSQL 16 do
+   Testcontainers: os adaptadores JPA, as transações Spring e a migração do Flyway são
+   reais; só a Central é simulada. Três cenários: a confirmação (com um 204 antes), a
+   rejeição com o motivo e o rollback.
+4. **Prova de vida do rollback:** o `@Transactional` do `SpringTransactionRunner` foi
+   removido de propósito — o teste ficou vermelho (`expected: PENDING but was:
+   COMPLETED`), provando que o rollback vem da fronteira transacional e que a
+   asserção não é vazia. O código de produção foi restaurado.
+5. **Prova de vida da trilha:** o evento `ACCOUNT_UPDATED` foi removido de propósito do
+   `CompleteOperation` — o teste ficou vermelho (a trilha caiu para cinco eventos). O
+   código de produção foi restaurado.
+6. **Duplo compartilhado:** o repositório de eventos que falha no enésimo append estava
+   duplicado dentro do `CompletionPersistenceTest`; ele virou
+   `br.com.consigport.support.FailingOperationEventRepository`, usado pelos dois testes.
+7. **E2E real:** backend e mock empacotados, PostgreSQL 16 do `compose.yaml` e o mock da
+   Central de verdade. O caminho confirmado levou nove eventos e
+   `account_updated_at` preenchido; o caminho rejeitado levou seis eventos e
+   `rejection_reason = MARGIN_INSUFFICIENT` com o corpo bruto da Central. Zero
+   containers e zero processos no fim.
+8. **Correção de ordem no `EVIDENCE.md`:** as seções estavam fora de ordem cronológica
+   (a 2.17 entre a 2.15 e a 2.16); a ordem foi corrigida nesta task.
+9. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest='OperationLifecyclePersistenceTest'` → 3 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend 481 testes, mock 39 testes).
+   - Cobertura do núcleo inalterada: **99,71% de branches**, 98,12% de linhas, 100% de classes.
+   - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).

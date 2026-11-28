@@ -13,8 +13,8 @@
 | Bootstrap do repositório | ✅ `main` com commit inicial |
 | Fase 0 — Fundação | ✅ concluída e arquivada, tag `v0.1.0` |
 | Fase 1 — Central mock | ✅ concluída e arquivada, tag `v0.2.0` |
-| Fase em andamento | Fase 2 — Backend core (task 2.18 em voo) |
-| Próxima task | 2.18 — Fluxo completo com o banco real |
+| Fase em andamento | Fase 2 — Backend core (18 tasks concluídas; fechamento e tag em andamento) |
+| Próxima task | Fechamento da Fase 2 — promoção `develop` → `staging` → `main`, tag `v0.3.0` e arquivamento |
 | Versão | `v0.2.0` (a Fase 2 fecha em `v0.3.0`) |
 
 A Fase 0 entregou specs, ADRs, harness, gates, contratos, scaffolds, CI/CD e a

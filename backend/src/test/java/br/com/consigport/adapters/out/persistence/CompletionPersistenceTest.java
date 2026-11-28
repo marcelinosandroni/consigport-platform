@@ -20,6 +20,7 @@ import br.com.consigport.domain.shared.BeneficiaryId;
 import br.com.consigport.domain.shared.IdempotencyKey;
 import br.com.consigport.domain.shared.InstallmentId;
 import br.com.consigport.domain.shared.TransactionRunner;
+import br.com.consigport.support.FailingOperationEventRepository;
 import br.com.consigport.support.PostgreSqlTestSupport;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -28,7 +29,6 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -107,7 +107,7 @@ class CompletionPersistenceTest extends PostgreSqlTestSupport {
     operations.save(pending());
     // The first event is written, the second one fails: the transaction must undo the
     // state of the operation and the event that was already written.
-    OperationEventRepository failing = new FailingEventRepository(events, 2);
+    OperationEventRepository failing = new FailingOperationEventRepository(events, 2);
 
     assertThatThrownBy(
             () -> completeOperation(failing).confirm(pending(), "{\"status\":\"CONFIRMADA\"}"))
@@ -144,33 +144,5 @@ class CompletionPersistenceTest extends PostgreSqlTestSupport {
             new ReceivingAccount("001", "1234", "56789-0"),
             NOW)
         .submit(PROTOCOL);
-  }
-
-  /**
-   * Trail that fails on the nth append, to prove the rollback of the transaction.
-   */
-  private static final class FailingEventRepository implements OperationEventRepository {
-
-    private final OperationEventRepository delegate;
-    private final int failingAppend;
-    private final AtomicInteger appends = new AtomicInteger();
-
-    private FailingEventRepository(OperationEventRepository delegate, int failingAppend) {
-      this.delegate = delegate;
-      this.failingAppend = failingAppend;
-    }
-
-    @Override
-    public OperationEvent append(OperationEvent event) {
-      if (appends.incrementAndGet() == failingAppend) {
-        throw new IllegalStateException("the trail failed between the steps");
-      }
-      return delegate.append(event);
-    }
-
-    @Override
-    public List<OperationEvent> findByOperationId(PortabilityOperation.OperationId operationId) {
-      return delegate.findByOperationId(operationId);
-    }
   }
 }
