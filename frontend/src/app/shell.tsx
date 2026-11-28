@@ -4,6 +4,7 @@ import { Navigation } from './navigation.tsx'
 import { LanguageSwitcher } from '../shared/i18n/language-switcher.tsx'
 import { I18nProvider } from '../shared/i18n/provider.tsx'
 import { QueryProvider } from '../shared/api/query-provider.tsx'
+import { createTranslator } from '../shared/i18n/server.ts'
 import type { SupportedLocale } from '../shared/i18n/locales.ts'
 
 /**
@@ -21,15 +22,25 @@ export type ShellProps = {
 }
 
 export function Shell({ pathname, locale, children }: ShellProps) {
+  const t = createTranslator(locale)
+
   return (
     <I18nProvider initialLocale={locale}>
       <QueryProvider>
         <div className='flex min-h-screen flex-col bg-surface-base text-text-primary'>
+          {/* The first stop of the keyboard: straight to the content. */}
+          <a
+            href='#conteudo'
+            className='skip-link focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
+          >
+            {t('nav.skipToContent')}
+          </a>
+
           <header className='sticky top-0 z-50 border-b border-border-subtle bg-surface-base/82 backdrop-blur-[12px]'>
             <div className='mx-auto flex w-full max-w-[1320px] flex-wrap items-center gap-x-space-lg gap-y-space-sm px-gutter py-space-sm md:px-gutter-desktop'>
               <a
                 href='/'
-                className='flex min-h-11 items-center gap-space-sm font-mono text-label-mono uppercase tracking-[0.06em] text-text-primary'
+                className='flex min-h-11 items-center gap-space-sm font-mono text-label-mono uppercase tracking-[0.06em] text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
               >
                 <span aria-hidden='true' className='size-2 rounded-full bg-primary' />
                 ConsigPort
@@ -43,7 +54,14 @@ export function Shell({ pathname, locale, children }: ShellProps) {
             </div>
           </header>
 
-          <main className='mx-auto w-full max-w-[1320px] flex-1 px-gutter py-margin md:px-gutter-desktop md:py-margin-desktop'>
+          {/* The target of the skip link. The `tabIndex` lets the focus land
+              here when the reader jumps: the browser moves the focus to the
+              element the fragment names. */}
+          <main
+            id='conteudo'
+            tabIndex={-1}
+            className='mx-auto w-full max-w-[1320px] flex-1 px-gutter py-margin md:px-gutter-desktop md:py-margin-desktop focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
+          >
             {children}
           </main>
 

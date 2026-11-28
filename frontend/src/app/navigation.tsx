@@ -34,6 +34,9 @@ export function Navigation({ pathname }: { pathname: string }) {
               'inline-flex min-h-11 items-center rounded px-space-sm',
               'font-mono text-label-mono uppercase tracking-[0.06em]',
               'transition-colors duration-150',
+              // The hairline migrates to the accent colour on focus: the keyboard
+              // sees where it is, the pointer does not pay for it.
+              'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
               active ? 'text-primary' : 'text-text-secondary hover:text-text-primary',
             ].join(' ')}
           >

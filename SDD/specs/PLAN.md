@@ -141,7 +141,7 @@
 ## Fase atual: 3 — Frontend RSC
 
 > Objetivo: UI React 19 RSC na porta `5173`, design Matrix, i18n e fluxo completo.
-> Task em voo: **3.9 — Responsividade, acessibilidade e testes finais**.
+> Task em voo: **3.10 — Promoção da release `v0.4.0` e arquivamento da Fase 3**.
 
 ### Tasks
 
@@ -168,9 +168,13 @@
 - [x] **3.8 — Timeline de auditoria**
       Trilha imutável em ordem cronológica: tipo, status anterior e novo, detalhe
       e horário; sem edição nem exclusão.
-- [-] **3.9 — Responsividade, acessibilidade e testes finais**
+- [x] **3.9 — Responsividade, acessibilidade e testes finais**
       Breakpoints do `DESIGN.md` §4b; navegação por teclado;
       `prefers-reduced-motion` respeitado; testes de unidade verdes.
+- [-] **3.10 — Promoção da release `v0.4.0` e arquivamento da Fase 3**
+      `develop` promovido para `staging` e `main` por PR; tag `v0.4.0` criada pelo
+      release-please; release no GitHub com o CHANGELOG; imagens no GHCR com
+      `v0.4.0`; run de staging verde; fase arquivada em `specs/history/phases/`.
 
 ### Como usar este arquivo
 

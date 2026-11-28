@@ -48,3 +48,38 @@
     background-size: 24px 24px;
   }
 }
+
+/* The skip link: invisible until the keyboard asks for it. A reader who
+   navigates by keyboard does not walk through the navigation on every page. */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: var(--spacing-gutter);
+  z-index: 100;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  border-radius: var(--radius-DEFAULT);
+  background-color: var(--color-surface-overlay);
+  padding: var(--spacing-space-sm) var(--spacing-space-md);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-body-md);
+}
+
+.skip-link:focus {
+  top: var(--spacing-space-sm);
+}
+
+/* The motion is a courtesy, not a requirement: when the reader asks for less
+   of it, the platform stops moving. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
