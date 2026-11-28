@@ -1398,7 +1398,7 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
 - **Data:** 2026-11-27
 - **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
 - **Branch:** `feat/037-backend-coverage-gate`
-- **PR:** a abrir para `develop`
+- **PR:** #49 — https://github.com/marcelinosandroni/consigport-platform/pull/49
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** ativar o portão de cobertura do backend sobre o núcleo (domínio e casos de
   uso), cobrar **80% de linhas e de branches** como manda o portão 3.2 do

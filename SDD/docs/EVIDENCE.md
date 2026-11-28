@@ -3606,7 +3606,7 @@
 
 - **Data de Conclusão:** 2026-11-27
 - **Branch:** `feat/037-backend-coverage-gate`
-- **PR:** a abrir para `develop`
+- **PR:** #49 — https://github.com/marcelinosandroni/consigport-platform/pull/49
 - **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** ativar o portão de cobertura do backend sobre o núcleo (domínio e casos de
