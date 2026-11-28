@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { HomePage } from './pages/home.tsx'
 import { NotFoundPage } from './pages/not-found.tsx'
 import { SectionPage } from './pages/section.tsx'
+import { AuthorizationPage } from '../features/authorization/server/page.tsx'
 import { DEFAULT_LOCALE, type SupportedLocale } from '../shared/i18n/locales.ts'
 import { createTranslator, type Translator } from '../shared/i18n/server.ts'
 
@@ -13,6 +14,10 @@ type Route = {
 
 const ROUTES: Route[] = [
   { path: '/', render: (t) => <HomePage t={t} /> },
+  {
+    path: '/autorizacao',
+    render: (t) => <AuthorizationPage t={t} />,
+  },
   {
     path: '/portabilidade',
     render: (t) => (

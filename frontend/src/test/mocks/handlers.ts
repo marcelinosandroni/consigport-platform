@@ -16,6 +16,25 @@ const notFound = (code: string, path: string, message: string) =>
     { status: 404 },
   )
 
+const badRequest = (message: string, details: { field: string; message: string }[] = []) =>
+  HttpResponse.json(
+    {
+      code: 'VALIDATION_ERROR',
+      message,
+      locale: 'pt-BR',
+      timestamp: '2026-11-28T10:00:00Z',
+      path: '/api/v1/authorizations',
+      details,
+    },
+    { status: 400 },
+  )
+
+/**
+ * The consent already registered by the fake, so the replay answers 200 the
+ * way the contract describes.
+ */
+const registered = new Map<string, { authorizationId: string; createdAt: string }>()
+
 /**
  * The fake of the public API.
  *
@@ -41,5 +60,47 @@ export const handlers = [
       agreementId: 'AGR-001',
       createdAt: '2026-11-28T10:00:00Z',
     })
+  }),
+
+  http.post(`${API_BASE_URL}/api/v1/authorizations`, async ({ request }) => {
+    const body = (await request.json()) as { beneficiaryId?: string; agreementId?: string }
+    const beneficiaryId = body.beneficiaryId ?? ''
+    const agreementId = body.agreementId ?? ''
+
+    if (beneficiaryId.length === 0 || agreementId.length === 0) {
+      return badRequest('O corpo da requisição é inválido.')
+    }
+
+    if (beneficiaryId === 'BEN-000') {
+      return badRequest('O beneficiário informado não é válido.', [
+        { field: 'beneficiaryId', message: 'Beneficiário inexistente.' },
+      ])
+    }
+
+    const key = `${beneficiaryId}:${agreementId}`
+    const existing = registered.get(key)
+
+    if (existing !== undefined) {
+      return HttpResponse.json(
+        {
+          authorizationId: existing.authorizationId,
+          beneficiaryId,
+          agreementId,
+          createdAt: existing.createdAt,
+        },
+        { status: 200 },
+      )
+    }
+
+    const authorization = {
+      authorizationId: '7f0f5d5e-2d6a-4f2e-9f4e-1b2c3d4e5f60',
+      createdAt: '2026-11-28T10:00:00Z',
+    }
+    registered.set(key, authorization)
+
+    return HttpResponse.json(
+      { ...authorization, beneficiaryId, agreementId },
+      { status: 201 },
+    )
   }),
 ]

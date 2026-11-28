@@ -141,7 +141,7 @@
 ## Fase atual: 3 — Frontend RSC
 
 > Objetivo: UI React 19 RSC na porta `5173`, design Matrix, i18n e fluxo completo.
-> Task em voo: **3.4 — Fluxo de autorização**.
+> Task em voo: **3.5 — Agenda e seleção de parcelas**.
 
 ### Tasks
 
@@ -154,9 +154,11 @@
 - [x] **3.3 — Primitivas de UI**
       Componentes base fiéis ao design Matrix: tokens de `theme.css`, foco visível,
       contraste AA e variantes sem valores mágicos.
-- [-] **3.4 — Fluxo de autorização**
+- [x] **3.4 — Fluxo de autorização**
       Server Component renderiza; ilha cliente envia `POST /authorizations`; erro
       localizado; sucesso leva à agenda.
+- [-] **3.5 — Agenda e seleção de parcelas**
+      Apenas `OPEN` selecionável; total recalculado; estado vazio e `403` tratados.
 
 ### Como usar este arquivo
 

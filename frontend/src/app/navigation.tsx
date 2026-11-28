@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next'
 
 const NAV_ITEMS = [
   { href: '/', key: 'nav.home' },
+  { href: '/autorizacao', key: 'nav.authorization' },
   { href: '/portabilidade', key: 'nav.portability' },
   { href: '/agenda', key: 'nav.agenda' },
   { href: '/auditoria', key: 'nav.audit' },

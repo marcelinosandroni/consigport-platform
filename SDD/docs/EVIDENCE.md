@@ -4665,3 +4665,150 @@
 - `SDD/specs/ROADMAP.md`
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 3.4 — Fluxo de autorização
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/034-frontend-authorization-flow`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** registrar o opt-in do beneficiário pela interface — Server Component
+  renderiza, a mutação passa pela Server Action, o erro sai localizado e o sucesso
+  leva à agenda.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Portão 3.4 do `GATES.md` (frontend):**
+   ```text
+   $ npm run --prefix frontend lint
+   > eslint .
+   EXIT=0
+
+   $ npm run --prefix frontend typecheck
+   > tsc --noEmit
+   EXIT=0
+
+   $ npm run --prefix frontend test:unit
+   > vitest run
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  15 passed (15)
+         Tests  68 passed (68)
+    Duration  61.50s
+   EXIT=0
+
+   $ npm run --prefix frontend build
+   [5/5] build ssr environment...
+   dist/ssr/assets/entry.rsc-CiAwc4Jn.js     42.95 kB
+   dist/ssr/index.js                      1,582.63 kB
+   ✓ built in 2.89s
+   EXIT=0
+   ```
+2. **Portão 3.1 (documentação e SDD):**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 66 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ Exactly 1 task in flight in SDD/specs/PLAN.md.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos passaram.
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css.
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 48 sessions, structure valid.
+   ```
+3. **Smoke no build de produção — a página renderiza:**
+   ```text
+   $ npm run --prefix frontend preview -- --host 127.0.0.1 --port 5199
+
+   === /autorizacao (pt-BR) ===
+   <h1 class="text-headline-lg">Autorizar o convênio</h1>
+         4 Autorizar
+         1 name="agreementId"
+         1 name="beneficiaryId"
+         1 name="locale"
+   === /autorizacao (en) ===
+   <h1 class="text-headline-lg">Authorize the agreement</h1>
+   === rota inexistente ===
+   <h1 class="text-headline-lg">Página não encontrada</h1>
+   ```
+4. **Smoke do caminho sem JavaScript — o formulário posta na própria página:**
+   ```text
+   $ curl -s -X POST http://127.0.0.1:5199/autorizacao \
+       -F '$ACTION_REF_1=' \
+       -F '$ACTION_1:0={"id":"f1659cc5ed99#registerAuthorization","bound":"$@1"}' \
+       -F '$ACTION_1:1=[{"status":"idle"}]' \
+       -F '$ACTION_KEY=k1271487363' \
+       -F 'locale=pt-BR' -F 'beneficiaryId=BEN-001' -F 'agreementId=AGR-001'
+
+   resposta: 9802 bytes
+   h1: ['<h1 class="text-headline-lg">Autorizar o convênio</h1>']
+   alert: ['Algo quebrou do nosso lado. Tente de novo.']
+   ```
+   A API não estava no ar durante o smoke, e ainda assim a página respondeu: a ação
+   rodou no servidor, capturou a falha de rede e a interface pintou o erro no idioma
+   do usuário. O `action` do formulário é a própria Server Action, então o opt-in
+   funciona **sem JavaScript**.
+
+#### Conteúdo Entregue:
+- `frontend/src/features/authorization/actions.ts` — a Server Action: valida com Zod,
+  chama a API com o `Accept-Language` da interface e devolve um estado
+  serializável. Uma API fora do ar vira `INTERNAL_ERROR`, nunca uma exceção.
+- `frontend/src/features/authorization/ui/authorization-form.tsx` — a folha cliente:
+  formulário com `useActionState`, estado pendente, erro localizado pelo `code` e
+  navegação para a agenda do beneficiário.
+- `frontend/src/features/authorization/server/page.tsx` — o Server Component da
+  página.
+- `frontend/src/app/router.tsx` e `frontend/src/app/navigation.tsx` — a rota
+  `/autorizacao` e o item de navegação, com a chave `nav.authorization` nos três
+  catálogos.
+- `frontend/src/shared/ui/field.tsx` — o asterisco de obrigatório passou a ser
+  desenhado pelo CSS (`after:content-['*']`): o nome acessível do controle continua
+  sendo exatamente o rótulo.
+- `frontend/src/test/mocks/handlers.ts` — a API falsa agora registra o consentimento
+  e responde `201` na primeira vez e `200` na repetição, como o contrato descreve.
+- `frontend/src/features/authorization/actions.test.ts` e
+  `frontend/src/features/authorization/ui/authorization-form.test.tsx` — os testes.
+
+#### Descobertas e Decisões:
+- **A mutação passa pela Server Action, e não pelo navegador.** A regra do
+  `stacks/react.md` é "mutation from a form → Server Action"; o `useActionState`
+  entrega de graça a **melhoria progressiva** — o `action` do formulário é a própria
+  ação, e o servidor re-renderiza a página com o resultado quando não há JavaScript.
+  O smoke acima postou o formulário na própria URL e a página respondeu com o erro
+  localizado.
+- **A API fora do ar não pode derrubar a página.** A primeira versão da ação deixava
+  a exceção do `fetch` escapar, e o servidor respondia `500 Internal Server Error:
+  server action failed`. Agora a ação captura a falha e devolve `INTERNAL_ERROR` — a
+  regra da interface é "zero ações sem resposta".
+- **O idioma chega à ação por um campo oculto.** A ação não tem acesso ao cookie da
+  requisição (o template RSC não expõe um `cookies()`), então o formulário envia o
+  idioma num campo `locale`, e a ação o valida contra a lista de suportados antes de
+  usá-lo como `Accept-Language`.
+- **O asterisco de obrigatório saiu do texto do rótulo.** O `getByLabelText` do
+  Testing Library compara o `textContent` do rótulo, e o ` *` quebrava a busca por
+  nome. O asterisco agora é decoração do CSS e o `required` do controle é a
+  obrigação — o nome acessível fica limpo.
+- **A rota da autorização é `/autorizacao`.** O opt-in é a primeira etapa da
+  jornada e ganhou um item próprio na navegação, com a chave `nav.authorization` nos
+  três catálogos.
+- **O `zod` entrou como dependência de produção** (`4.x`, dentro da faixa do
+  `APP-STACK.md`); a auditoria segue com zero vulnerabilidades.
+
+#### Arquivos Tocados:
+- `frontend/src/features/authorization/actions.ts`
+- `frontend/src/features/authorization/actions.test.ts`
+- `frontend/src/features/authorization/ui/authorization-form.tsx`
+- `frontend/src/features/authorization/ui/authorization-form.test.tsx`
+- `frontend/src/features/authorization/server/page.tsx`
+- `frontend/src/app/router.tsx`
+- `frontend/src/app/navigation.tsx`
+- `frontend/src/shared/ui/field.tsx`
+- `frontend/src/shared/i18n/pt-BR.json`
+- `frontend/src/shared/i18n/en.json`
+- `frontend/src/shared/i18n/es.json`
+- `frontend/src/test/mocks/handlers.ts`
+- `frontend/package.json`
+- `frontend/package-lock.json`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`

@@ -36,9 +36,18 @@ export function Field({ id, label, error, hint, required = false, children }: Fi
 
   return (
     <div className="flex flex-col gap-space-xs">
-      <label htmlFor={id} className="font-mono text-label-mono uppercase tracking-[0.06em] text-text-secondary">
+      <label
+        htmlFor={id}
+        className={[
+          'font-mono text-label-mono uppercase tracking-[0.06em] text-text-secondary',
+          // The asterisk is a decoration drawn by CSS: the name of the control
+          // stays exactly the label, and `required` carries the obligation.
+          required ? "after:content-['*']" : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
         {label}
-        {required ? <span aria-hidden="true"> *</span> : null}
       </label>
 
       {children({
