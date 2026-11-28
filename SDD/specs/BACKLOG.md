@@ -369,6 +369,29 @@
 - **Arquivos:** `frontend/openapi-ts.config.ts`, `frontend/src/shared/api/client.ts`, `frontend/src/shared/api/errors.ts`.
 - **Aceite:** tipos gerados de `contracts/consigport-api.yaml`; `openapi-fetch` com base URL por ambiente; erro mapeado por `code`.
 - **Verificação:** `npm run --prefix frontend typecheck` e teste de unidade do parser de erro.
+- **Realizado:** o frontend agora tem um cliente tipado do contrato público, gerado e
+  versionado. O `openapi-ts.config.ts` é o **gerador** — o `openapi-typescript` v7 não
+  lê arquivo de config, então o módulo carrega o caminho da entrada e da saída e chama
+  a API programática (`openapiTS` + `astToString`); `npm run --prefix frontend
+  generate:types` regenera `src/shared/api/schema.ts` byte a byte a partir de
+  `contracts/consigport-api.yaml`. O `client.ts` monta o `openapi-fetch` sobre esses
+  tipos, resolve a base URL por ambiente (`VITE_API_BASE_URL`, com o fallback local
+  `http://localhost:8080` e sem barra final) e expõe `parseErrorResponse`, que
+  transforma uma resposta de erro em `ApiError`. O `errors.ts` é o mapeador por
+  `code`: os dez códigos estáveis do contrato viram uma união `ApiErrorCode`, o corpo
+  da rede é tratado como `unknown` e um corpo quebrado degrada para `INTERNAL_ERROR`
+  em vez de quebrar a tela; a `message` localizada do servidor é preservada e os
+  `details` por campo são filtrados. A UI passa a ramificar por `code`, nunca pelo
+  status HTTP. Arquivos reais:
+  `frontend/openapi-ts.config.ts`,
+  `frontend/src/shared/api/client.ts`,
+  `frontend/src/shared/api/errors.ts`,
+  `frontend/src/shared/api/schema.ts` (gerado),
+  `frontend/src/shared/api/client.test.ts`,
+  `frontend/src/shared/api/errors.test.ts`,
+  `frontend/package.json`,
+  `frontend/package-lock.json`,
+  `frontend/tsconfig.json`.
 
 ### 3.2 — Catálogos i18n
 - **Objetivo:** UI em pt-BR com en e es.

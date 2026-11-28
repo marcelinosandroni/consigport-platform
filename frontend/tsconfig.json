@@ -11,7 +11,7 @@
     "module": "ESNext",
     "target": "ESNext",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "types": ["vite/client", "@vitejs/plugin-rsc/types", "vitest/globals"],
+    "types": ["vite/client", "@vitejs/plugin-rsc/types", "vitest/globals", "node"],
     "jsx": "react-jsx",
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -21,5 +21,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "vite.config.ts", "vitest.config.ts", "eslint.config.js"]
+  "include": ["src", "vite.config.ts", "vitest.config.ts", "eslint.config.js", "openapi-ts.config.ts"]
 }

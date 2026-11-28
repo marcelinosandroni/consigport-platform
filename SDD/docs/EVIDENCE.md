@@ -4267,3 +4267,123 @@
 - `SDD/specs/ROADMAP.md`
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 3.1 — Cliente OpenAPI tipado
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/031-frontend-openapi-client`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** dar ao frontend um cliente tipado do contrato público, sem duplicar
+  tipos, com a base URL por ambiente e o erro mapeado pelo `code` estável.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Geração dos tipos a partir do contrato:**
+   ```text
+   $ npm run --prefix frontend generate:types
+   generated /home/ec2-user/consigport-platform/frontend/src/shared/api/schema.ts
+
+   $ diff -q /tmp/opencode/schema-before.ts frontend/src/shared/api/schema.ts
+   schema.ts idêntico após regenerar (EXIT=0)
+   ```
+   O `openapi-typescript` v7.13 não lê arquivo de config (`defineConfig` só existe a
+   partir da v8, que não foi publicada), e a entrada por string é interpretada como
+   **conteúdo YAML**, não como caminho — daí o `openapi-ts.config.ts` carregar a URL
+   `file://` e chamar a API programática `openapiTS` + `astToString`.
+2. **Portão 3.4 do `GATES.md` (frontend):**
+   ```text
+   $ npm run --prefix frontend lint
+   > eslint .
+   EXIT=0
+
+   $ npm run --prefix frontend typecheck
+   > tsc --noEmit
+   EXIT=0
+
+   $ npm run --prefix frontend test:unit
+   > vitest run
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  5 passed (5)
+         Tests  20 passed (20)
+    Duration  7.08s
+   EXIT=0
+
+   $ npm run --prefix frontend build
+   ✓ built in 1.22s   (client)
+   ✓ built in 2.16s   (ssr)
+   dist/ssr/index.js  1,581.90 kB
+   EXIT=0
+   ```
+3. **Portão 3.1 (documentação e SDD):**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 66 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ Exactly 1 task in flight in SDD/specs/PLAN.md.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos passaram.
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css.
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 46 sessions, structure valid.
+   ```
+
+#### Conteúdo Entregue:
+- `frontend/openapi-ts.config.ts` — o gerador dos tipos: carrega o contrato público
+  (`../contracts/consigport-api.yaml`) e o destino (`src/shared/api/schema.ts`), e
+  escreve o arquivo com a API programática do `openapi-typescript`.
+- `frontend/src/shared/api/schema.ts` — os tipos gerados (`paths`, `operations`,
+  `components`), versionados: um contrato quebrado quebra o build, não só a próxima
+  geração.
+- `frontend/src/shared/api/client.ts` — o `openapi-fetch` sobre esses tipos, a resolução
+  da base URL por ambiente (`VITE_API_BASE_URL`, fallback `http://localhost:8080`, sem
+  barra final) e o `parseErrorResponse`, que transforma uma resposta de erro em
+  `ApiError`.
+- `frontend/src/shared/api/errors.ts` — o mapeador por `code`: os dez códigos estáveis
+  do contrato viram a união `ApiErrorCode`, o corpo da rede é `unknown` até ser
+  validado, e um corpo quebrado degrada para `INTERNAL_ERROR` em vez de derrubar a
+  tela; a `message` localizada do servidor é preservada e os `details` por campo são
+  filtrados.
+- `frontend/src/shared/api/client.test.ts` e `frontend/src/shared/api/errors.test.ts` —
+  os testes de unidade do parser de erro e da resolução da base URL.
+- `frontend/package.json` — `openapi-fetch` como dependência de produção,
+  `openapi-typescript` e `@types/node` como de desenvolvimento, e o script
+  `generate:types`.
+- `frontend/tsconfig.json` — o gerador entra no `typecheck` e os tipos do Node
+  entram em `types`.
+
+#### Descobertas e Decisões:
+- **O `openapi-typescript` v7 não tem arquivo de config.** A versão mais recente é a
+  7.13.0: `defineConfig` não existe nela (chega na v8, que nunca foi publicada) e a
+  CLI não lê `openapi-ts.config.ts`. Passar o caminho como string faz a biblioteca
+  tratar o caminho como **conteúdo YAML** — o erro é `Can't parse empty schema`. A
+  solução é a URL `file://` e a API programática, com o módulo `.ts` fazendo as duas
+  coisas: configuração e geração. O Node 24 executa o TypeScript direto, sem
+  dependência nova de execução.
+- **O `theme.css` é cópia verbatim do `SDD/themes/matrix/tokens.css`** e o portão
+  `check-theme-tokens` compara os dois arquivos. Nenhum token novo foi necessário
+  nesta task.
+- **A UI deve ramificar por `code`, nunca por status HTTP.** O mesmo status carrega
+  códigos diferentes conforme a rota (`404` é `AUTHORIZATION_NOT_FOUND`,
+  `BENEFICIARY_NOT_FOUND` ou `OPERATION_NOT_FOUND`), então o status não serve de
+  decisão de tela. O `ApiError` expõe `code`, `message`, `locale`, `timestamp`,
+  `path` e `details`.
+- **O contrato público não foi alterado.** `contracts/consigport-api.yaml` é a
+  entrada do gerador e segue igual; a comparação com o snapshot do springdoc
+  continua valendo no CI.
+- `@types/node` entrou como dependência de desenvolvimento porque o gerador é um
+  script de Node — sem ele o `typecheck` não enxerga `node:fs/promises`.
+
+#### Arquivos Tocados:
+- `frontend/openapi-ts.config.ts`
+- `frontend/src/shared/api/schema.ts`
+- `frontend/src/shared/api/client.ts`
+- `frontend/src/shared/api/errors.ts`
+- `frontend/src/shared/api/client.test.ts`
+- `frontend/src/shared/api/errors.test.ts`
+- `frontend/package.json`
+- `frontend/package-lock.json`
+- `frontend/tsconfig.json`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`

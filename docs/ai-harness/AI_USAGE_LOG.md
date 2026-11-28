@@ -1539,3 +1539,47 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
 9. **Validação:**
    - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).
    - `./mvnw -B verify` verde no reactor completo (backend 481 testes, mock 39 testes).
+
+## Sessão #46 — Task 3.1 (Cliente OpenAPI tipado)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/031-frontend-openapi-client`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** dar ao frontend um cliente tipado do contrato público, sem duplicar
+  tipos, com a base URL por ambiente e o erro mapeado pelo `code` estável.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/APP-STACK.md` (bibliotecas aprovadas e versões),
+   `SDD/stacks/react.md`, `SDD/stacks/typescript.md`, `SDD/stacks/testing.md`,
+   `SDD/stacks/tailwind.md`, `SDD/DESIGN.md`, `SDD/ARCHITECTURE.md` §5 e §8, o
+   `ADR-0005` e o `docs/quality/GATES.md`. Dois subagentes em paralelo levantaram as
+   regras do frontend e o estado do scaffold, para não redescobrir o que já existe.
+2. **Dependências dentro da faixa declarada:** `openapi-fetch@^0.13.8` (produção),
+   `openapi-typescript@^7.13.0` e `@types/node@^24` (desenvolvimento). O
+   `APP-STACK.md` fixa `openapi-typescript` em 7.x e `openapi-fetch` em 0.13.x.
+3. **Descoberta:** o `openapi-typescript` v7.13 não lê arquivo de config —
+   `defineConfig` não existe na série 7 e a v8 nunca foi publicada. A CLI ainda
+   interpreta um caminho passado como string como **conteúdo YAML**, o que produz
+   `Can't parse empty schema`. A solução foi fazer do `openapi-ts.config.ts` o
+   próprio gerador, com a URL `file://` e a API programática `openapiTS` +
+   `astToString`.
+4. **Gerador reprodutível:** `npm run --prefix frontend generate:types` reescreve
+   `src/shared/api/schema.ts` byte a byte a partir de `contracts/consigport-api.yaml`
+   — verificado com `diff` antes e depois.
+5. **Cliente tipado:** `client.ts` monta o `openapi-fetch` sobre os tipos gerados,
+   resolve a base URL por ambiente (`VITE_API_BASE_URL`, fallback local, sem barra
+   final) e expõe `parseErrorResponse`.
+6. **Erro mapeado por `code`:** `errors.ts` transforma o corpo da rede — `unknown`
+   até ser validado — em `ApiError` com `code`, `message`, `locale`, `timestamp`,
+   `path` e `details`. Um corpo quebrado degrada para `INTERNAL_ERROR` em vez de
+   derrubar a tela.
+7. **Testes:** `errors.test.ts` (oito casos do parser e do `isApiErrorCode`) e
+   `client.test.ts` (quatro casos da base URL).
+8. **Validação:**
+   - `npm run --prefix frontend lint` → EXIT=0
+   - `npm run --prefix frontend typecheck` → EXIT=0
+   - `npm run --prefix frontend test:unit` → 5 arquivos, 20 testes verdes
+   - `npm run --prefix frontend build` → os três ambientes (rsc, ssr, client) verdes
+   - 5 gates locais de documentação verdes
