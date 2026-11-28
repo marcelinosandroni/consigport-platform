@@ -1583,3 +1583,56 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - `npm run --prefix frontend test:unit` → 5 arquivos, 20 testes verdes
    - `npm run --prefix frontend build` → os três ambientes (rsc, ssr, client) verdes
    - 5 gates locais de documentação verdes
+
+## Sessão #47 — Task 3.2 (Catálogos i18n)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/032-frontend-i18n-catalogs`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** dar à interface três idiomas — pt-BR, en e es — com fallback pt-BR,
+  troca de idioma persistida e `Accept-Language` em toda requisição à API.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/APP-STACK.md` (a linha dos catálogos e da negociação),
+   `SDD/stacks/react.md`, `SDD/stacks/testing.md`, `docs/quality/GATES.md` (portões 3.1
+   e 3.4) e o `ADR-0004`, que fixa o par `code` estável / `message` localizada.
+2. **Dependências dentro da faixa declarada:** `i18next@^26.7.2` e
+   `react-i18next@^16.6.6` em produção, `msw@^2.15.0` em desenvolvimento.
+3. **Descoberta de segurança:** a série 25 do `i18next` carrega o advisory
+   **GHSA-6jcc-5g8w-32mx** (`deepExtend` recursivo sobre objetos embutidos, DoS),
+   corrigido apenas a partir da `26.3.4`. O `npm audit` do CI roda com
+   `--audit-level=high`, então a falha moderada não derrubaria o build — mas a
+   dependência corrigida foi escolhida, e o `APP-STACK.md` foi atualizado com a nota do
+   advisory ao lado da versão.
+4. **Catálogos:** `pt-BR.json`, `en.json` e `es.json` com o mesmo conjunto de chaves e
+   uma entrada para cada um dos dez códigos de erro do contrato. Um teste compara as
+   árvores dos três idiomas e falha se alguma chave divergir.
+5. **Idioma no servidor:** `locales.ts` resolve qualquer tag de idioma para um dos três
+   suportados (pt-BR como padrão) e lê o cookie `consigport-locale`; o `entry.rsc.tsx`
+   resolve o idioma antes de renderizar e o `Root` monta a página com o `<html lang>`
+   certo. As páginas continuam Server Components — o tradutor do servidor
+   (`server.ts`) caminha o catálogo, sem hooks.
+6. **Folhas clientes:** `provider.tsx` guarda a escolha, sincroniza com o idioma que o
+   servidor entregou e persiste o cookie; `language-switcher.tsx` é um `select`
+   nativo que, depois de gravar o cookie, pede ao servidor um novo render (o
+   `entry.browser.tsx` escuta o `replaceState`).
+7. **`Accept-Language`:** middleware do `openapi-fetch` que injeta o cabeçalho em toda
+   requisição; o `MSW` prova o cabeçalho e a leitura do corpo de erro no nível do
+   HTTP, sem mock de `fetch`.
+8. **Correção de estilo:** o scaffold do frontend usa aspas simples e sem ponto e
+   vírgula; os arquivos novos da 3.1 e da 3.2 foram alinhados a esse padrão.
+9. **Validação:**
+   - `npm run --prefix frontend lint` → EXIT=0
+   - `npm run --prefix frontend typecheck` → EXIT=0
+   - `npm run --prefix frontend test:unit` → 8 arquivos, 36 testes verdes
+   - `npm run --prefix frontend build` → os três ambientes (rsc, ssr, client) verdes
+   - `npm audit --prefix frontend` → 0 vulnerabilidades
+   - 5 gates locais de documentação verdes
+   - prova de vida: o servidor de preview respondeu em pt-BR, en e es, com o
+     `<html lang>` de cada idioma
+10. **Armadilha registrada:** o cookie do `curl` de verificação estava escrito com um
+    caractere a mais (`consignport-locale`), o que fez o idioma cair no fallback. O
+    diagnóstico comparou os códigos de caractere dos dois lados e mostrou a diferença;
+    o código do projeto estava correto desde o início.

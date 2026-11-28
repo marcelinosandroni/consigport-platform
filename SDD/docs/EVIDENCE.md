@@ -4387,3 +4387,164 @@
 - `SDD/specs/PLAN.md`
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 3.2 — Catálogos i18n
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/032-frontend-i18n-catalogs`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** dar à interface três idiomas — pt-BR, en e es — com fallback pt-BR,
+  troca de idioma persistida e `Accept-Language` em toda requisição à API.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Portão 3.4 do `GATES.md` (frontend):**
+   ```text
+   $ npm run --prefix frontend lint
+   > eslint .
+   EXIT=0
+
+   $ npm run --prefix frontend typecheck
+   > tsc --noEmit
+   EXIT=0
+
+   $ npm run --prefix frontend test:unit
+   > vitest run
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  8 passed (8)
+         Tests  36 passed (36)
+    Duration  12.48s
+   EXIT=0
+
+   $ npm run --prefix frontend build
+   [5/5] build ssr environment...
+   ✓ 90 modules transformed.
+   dist/ssr/assets/entry.rsc-7L_sN9Di.js     36.56 kB
+   dist/ssr/index.js                      1,582.37 kB
+   ✓ built in 2.40s
+   EXIT=0
+   ```
+2. **Portão 3.1 (documentação e SDD):**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 66 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ Exactly 1 task in flight in SDD/specs/PLAN.md.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos passaram.
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css.
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 46 sessions, structure valid.
+   ```
+3. **Prova de vida — o servidor renderiza nos três idiomas:**
+   ```text
+   $ npm run --prefix frontend preview -- --host 127.0.0.1 --port 5199
+
+   === cookie=pt-BR ===
+   <html lang="pt-BR"
+   Portabilidade de convênios sem fricção
+   === cookie=en ===
+   <html lang="en"
+   Consignment portability without friction
+   === cookie=es ===
+   <html lang="es"
+   Portabilidad de consignas sin fricción
+   === rota /agenda en ===
+   Discount agenda
+   === 404 pt-BR ===
+   <h1 class="text-headline-lg">Página não encontrada</h1>
+   === 404 es ===
+   <h1 class="text-headline-lg">Página no encontrada</h1>
+   ```
+   O `curl` leva o cookie `consigport-locale`; sem ele, a resposta é pt-BR. O
+   `<html lang>` acompanha o idioma pedido.
+4. **Auditoria de dependências:**
+   ```text
+   $ npm audit --prefix frontend --omit=dev --audit-level=high
+   found 0 vulnerabilities
+   EXIT=0
+
+   $ npm audit --prefix frontend
+   found 0 vulnerabilities
+   ```
+
+#### Conteúdo Entregue:
+- `frontend/src/shared/i18n/pt-BR.json`, `en.json`, `es.json` — os três catálogos,
+  com o mesmo conjunto de chaves e uma entrada para cada um dos dez códigos de erro do
+  contrato público.
+- `frontend/src/shared/i18n/locales.ts` — os idiomas suportados, a resolução de
+  qualquer tag (`pt-BR`, `pt`, `es-AR`) e a leitura/escrita do cookie
+  `consigport-locale`.
+- `frontend/src/shared/i18n/i18n.ts` — a instância do `i18next` com fallback pt-BR.
+- `frontend/src/shared/i18n/provider.tsx` — a folha cliente que guarda a escolha,
+  sincroniza com o idioma que o servidor entregou e persiste o cookie.
+- `frontend/src/shared/i18n/language-switcher.tsx` — o `select` nativo da troca de
+  idioma.
+- `frontend/src/shared/i18n/server.ts` — o tradutor dos Server Components, que não
+  podem ler o contexto do navegador.
+- `frontend/src/shared/api/client.ts` — o middleware que injeta `Accept-Language` em
+  toda requisição.
+- `frontend/src/test/mocks/handlers.ts` e `server.ts` — a API falsa com **MSW**, usada
+  pelos testes: nenhuma requisição sai do processo.
+- `frontend/src/app/navigation.tsx`, `shell.tsx`, `router.tsx`, `pages/home.tsx`,
+  `pages/not-found.tsx`, `src/root.tsx`, `src/framework/entry.rsc.tsx` — as páginas e o
+  shell passam a falar o idioma do servidor.
+
+#### Descobertas e Decisões:
+- **O `i18next` foi fixado em `26.x`, e não em `25.x`.** A série 25 carrega o advisory
+  **GHSA-6jcc-5g8w-32mx** (`deepExtend` recursivo sobre objetos embutidos, DoS),
+  corrigido apenas a partir da `26.3.4`. O `react-i18next@16` aceita
+  `i18next >= 25.10.9`, então a combinação segue suportada. A linha do `APP-STACK.md`
+  foi atualizada e a nota do advisory ficou ao lado dela.
+- **O `MSW` entrou como dependência de desenvolvimento.** A regra do projeto proíbe
+  mock de `fetch`: a API dos testes é falsa no nível do HTTP, com os handlers
+  respondendo o formato do contrato público. O postinstall do `msw` é dispensável
+  (imprime apenas uma mensagem de boas-vindas) e segue fora da lista `allowScripts`.
+- **O idioma é resolvido no servidor, não no cliente.** As páginas são Server
+  Components e não podem ler o contexto do navegador; o `entry.rsc.tsx` lê o cookie e
+  o `Root` monta a página no idioma pedido, com o `<html lang>` correto. A troca de
+  idioma no browser grava o cookie e dispara um novo render do servidor — o
+  `entry.browser.tsx` escuta o `replaceState` — para que o servidor e as folhas
+  clientes falem o mesmo idioma.
+- **O `useEffect` do provedor não pode sincronizar estado.** A regra
+  `react-hooks/set-state-in-effect` do ESLint recusa `setState` dentro de efeito: o
+  provedor ajusta o estado durante o render, quando o idioma que o servidor entregou
+  muda, e usa o efeito apenas para o sistema externo (`Accept-Language`).
+- **O `openapi-fetch` consome o corpo da resposta de erro.** Nele, `error` já vem
+  parseado (JSON quando possível); `parseErrorResponse` continua existindo para
+  respostas cruas. O `ApiError` continua sendo a porta de entrada da UI.
+- **O `theme.css` segue cópia verbatim** de `SDD/themes/matrix/tokens.css`; nenhum
+  token novo foi necessário nesta task.
+- **O contrato público não foi alterado.** `contracts/consigport-api.yaml` segue igual.
+
+#### Arquivos Tocados:
+- `frontend/src/shared/i18n/pt-BR.json`
+- `frontend/src/shared/i18n/en.json`
+- `frontend/src/shared/i18n/es.json`
+- `frontend/src/shared/i18n/locales.ts`
+- `frontend/src/shared/i18n/i18n.ts`
+- `frontend/src/shared/i18n/provider.tsx`
+- `frontend/src/shared/i18n/language-switcher.tsx`
+- `frontend/src/shared/i18n/server.ts`
+- `frontend/src/shared/i18n/i18n.test.ts`
+- `frontend/src/shared/i18n/server.test.ts`
+- `frontend/src/shared/api/client.ts`
+- `frontend/src/shared/api/client.msw.test.ts`
+- `frontend/src/test/mocks/handlers.ts`
+- `frontend/src/test/mocks/server.ts`
+- `frontend/src/app/navigation.tsx`
+- `frontend/src/app/shell.tsx`
+- `frontend/src/app/router.tsx`
+- `frontend/src/app/router.test.tsx`
+- `frontend/src/app/pages/home.tsx`
+- `frontend/src/app/pages/not-found.tsx`
+- `frontend/src/root.tsx`
+- `frontend/src/framework/entry.rsc.tsx`
+- `frontend/package.json`
+- `frontend/package-lock.json`
+- `SDD/APP-STACK.md`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`

@@ -1,7 +1,8 @@
-import createClient, { type Client } from "openapi-fetch";
+import createClient, { type Client } from 'openapi-fetch'
 
-import { ApiError, parseApiError } from "./errors.ts";
-import type { paths } from "./schema.ts";
+import { ApiError, parseApiError } from './errors.ts'
+import type { paths } from './schema.ts'
+import { DEFAULT_LOCALE, type SupportedLocale } from '../i18n/locales.ts'
 
 /**
  * The typed client of the public API.
@@ -12,11 +13,26 @@ import type { paths } from "./schema.ts";
  */
 
 /** Used when the environment does not declare `VITE_API_BASE_URL`. */
-export const DEFAULT_API_BASE_URL = "http://localhost:8080";
+export const DEFAULT_API_BASE_URL = 'http://localhost:8080'
 
-export type ApiEnvironment = Record<string, string | undefined>;
+export type ApiEnvironment = Record<string, string | undefined>
 
-export type ApiClient = Client<paths>;
+export type ApiClient = Client<paths>
+
+/**
+ * The language the API is asked to answer in.
+ *
+ * The interface sends `Accept-Language` with every request, so the message of
+ * an error arrives in the language the user chose. The provider of the
+ * interface updates this value when the user switches the language.
+ */
+let currentLocale: SupportedLocale = DEFAULT_LOCALE
+
+export const setApiLocale = (locale: SupportedLocale): void => {
+  currentLocale = locale
+}
+
+export const getApiLocale = (): SupportedLocale => currentLocale
 
 /**
  * Resolves the API root for the current environment.
@@ -26,15 +42,33 @@ export type ApiClient = Client<paths>;
  * gateway. The trailing slash is removed so the paths never double it.
  */
 export const resolveApiBaseUrl = (environment: ApiEnvironment = import.meta.env): string => {
-  const configured = environment.VITE_API_BASE_URL?.trim();
-  const baseUrl = configured !== undefined && configured.length > 0 ? configured : DEFAULT_API_BASE_URL;
-  return baseUrl.replace(/\/+$/, "");
-};
+  const configured = environment.VITE_API_BASE_URL?.trim()
+  const baseUrl = configured !== undefined && configured.length > 0 ? configured : DEFAULT_API_BASE_URL
+  return baseUrl.replace(/\/+$/, '')
+}
 
-export const createApiClient = (baseUrl: string): ApiClient => createClient<paths>({ baseUrl });
+/**
+ * Creates a client for the API.
+ *
+ * The `locale` is fixed when the caller knows it — a server render knows the
+ * language from the cookie. Without it, the client follows the language the
+ * user chose in the browser.
+ */
+export const createApiClient = (baseUrl: string, locale?: SupportedLocale): ApiClient => {
+  const client = createClient<paths>({ baseUrl })
+
+  client.use({
+    onRequest: ({ request }) => {
+      request.headers.set('Accept-Language', locale ?? getApiLocale())
+      return request
+    },
+  })
+
+  return client
+}
 
 /** The client every feature uses. */
-export const api = createApiClient(resolveApiBaseUrl());
+export const api = createApiClient(resolveApiBaseUrl())
 
 /**
  * Turns an error response into an {@link ApiError}.
@@ -43,11 +77,11 @@ export const api = createApiClient(resolveApiBaseUrl());
  * to `INTERNAL_ERROR` instead of breaking the screen that asked for the data.
  */
 export const parseErrorResponse = async (response: Response): Promise<ApiError> => {
-  let payload: unknown = null;
+  let payload: unknown = null
   try {
-    payload = await response.json();
+    payload = await response.json()
   } catch {
-    payload = null;
+    payload = null
   }
-  return parseApiError(payload);
-};
+  return parseApiError(payload)
+}

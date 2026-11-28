@@ -398,6 +398,47 @@
 - **Arquivos:** `frontend/src/shared/i18n/pt-BR.json`, `en.json`, `es.json`, `provider.tsx`.
 - **Aceite:** chaves completas nos três catálogos; fallback pt-BR; troca de idioma persiste; `Accept-Language` enviado.
 - **Verificação:** teste que compara o conjunto de chaves entre catálogos.
+- **Realizado:** a interface fala três idiomas sem sair do RSC. Os catálogos
+  (`pt-BR.json`, `en.json`, `es.json`) têm exatamente o mesmo conjunto de chaves — um
+  teste compara as árvores e falha se um idioma ganhar ou perder uma chave — e cada
+  código de erro do contrato público tem a sua entrada, com a chave estável `code` e a
+  `message` do servidor como fallback. O `locales.ts` resolve qualquer tag de idioma
+  (`pt-BR`, `pt`, `es-AR`) para um dos três suportados, com pt-BR como padrão, e lê a
+  preferência do cookie `consigport-locale`. O servidor resolve o idioma **antes** de
+  renderizar: o `entry.rsc.tsx` lê o cookie e o `Root` monta a página no idioma
+  escolhido, com `<html lang>` correto. O `provider.tsx` é a folha cliente que guarda a
+  escolha, troca o idioma das folhas interativas sem nova ida ao servidor e persiste o
+  cookie por um ano; o `language-switcher.tsx` é um `select` nativo — funciona no
+  teclado, no leitor de tela e sem JavaScript — que, depois de gravar o cookie, pede ao
+  servidor um novo render (o `entry.browser.tsx` escuta o `replaceState`), para que os
+  Server Components também falem o idioma novo. O `Accept-Language` vai em toda
+  requisição: o `client.ts` ganhou um middleware do `openapi-fetch` que injeta o
+  cabeçalho, e um teste com **MSW** prova o cabeçalho e a leitura do corpo de erro.
+  Arquivos reais:
+  `frontend/src/shared/i18n/pt-BR.json`,
+  `frontend/src/shared/i18n/en.json`,
+  `frontend/src/shared/i18n/es.json`,
+  `frontend/src/shared/i18n/locales.ts`,
+  `frontend/src/shared/i18n/i18n.ts`,
+  `frontend/src/shared/i18n/provider.tsx`,
+  `frontend/src/shared/i18n/language-switcher.tsx`,
+  `frontend/src/shared/i18n/server.ts`,
+  `frontend/src/shared/i18n/i18n.test.ts`,
+  `frontend/src/shared/i18n/server.test.ts`,
+  `frontend/src/shared/api/client.ts`,
+  `frontend/src/shared/api/client.msw.test.ts`,
+  `frontend/src/test/mocks/handlers.ts`,
+  `frontend/src/test/mocks/server.ts`,
+  `frontend/src/app/navigation.tsx`,
+  `frontend/src/app/shell.tsx`,
+  `frontend/src/app/router.tsx`,
+  `frontend/src/app/router.test.tsx`,
+  `frontend/src/app/pages/home.tsx`,
+  `frontend/src/app/pages/not-found.tsx`,
+  `frontend/src/root.tsx`,
+  `frontend/src/framework/entry.rsc.tsx`,
+  `frontend/package.json`,
+  `frontend/package-lock.json`.
 
 ### 3.3 — Primitivas de UI
 - **Objetivo:** componentes base fiéis ao design Matrix.

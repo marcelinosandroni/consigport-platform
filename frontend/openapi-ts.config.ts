@@ -1,7 +1,7 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import openapiTS, { astToString } from "openapi-typescript";
+import { mkdir, writeFile } from 'node:fs/promises'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import openapiTS, { astToString } from 'openapi-typescript'
 
 /**
  * Generates the typed client contract from the public OpenAPI file.
@@ -14,15 +14,15 @@ import openapiTS, { astToString } from "openapi-typescript";
  * both the configuration and the generator: `npm run --prefix frontend generate:types`.
  */
 export const openApiTsConfig = {
-  input: pathToFileURL(resolve(dirname(fileURLToPath(import.meta.url)), "../contracts/consigport-api.yaml")),
-  output: resolve(dirname(fileURLToPath(import.meta.url)), "src/shared/api/schema.ts"),
-} as const;
+  input: pathToFileURL(resolve(dirname(fileURLToPath(import.meta.url)), '../contracts/consigport-api.yaml')),
+  output: resolve(dirname(fileURLToPath(import.meta.url)), 'src/shared/api/schema.ts'),
+} as const
 
 async function generateTypes(): Promise<void> {
-  const ast = await openapiTS(openApiTsConfig.input);
-  await mkdir(dirname(openApiTsConfig.output), { recursive: true });
-  await writeFile(openApiTsConfig.output, astToString(ast), "utf8");
-  console.log(`generated ${openApiTsConfig.output}`);
+  const ast = await openapiTS(openApiTsConfig.input)
+  await mkdir(dirname(openApiTsConfig.output), { recursive: true })
+  await writeFile(openApiTsConfig.output, astToString(ast), 'utf8')
+  console.log(`generated ${openApiTsConfig.output}`)
 }
 
-await generateTypes();
+await generateTypes()

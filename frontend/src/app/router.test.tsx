@@ -15,7 +15,7 @@ describe('resolveRoute', () => {
   it('renders a section page for a known path', () => {
     render(resolveRoute('/portabilidade'))
 
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Portabilidade')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Solicitar portabilidade')
   })
 
   it('ignores a trailing slash', () => {
@@ -28,5 +28,19 @@ describe('resolveRoute', () => {
     render(resolveRoute('/rota-inexistente'))
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Página não encontrada')
+  })
+
+  it('renders the page in the requested language', () => {
+    render(resolveRoute('/', 'en'))
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'Consignment portability without friction',
+    )
+  })
+
+  it('renders the page in Spanish', () => {
+    render(resolveRoute('/portabilidade', 'es'))
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Solicitar portabilidad')
   })
 })
