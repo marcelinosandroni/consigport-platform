@@ -4185,3 +4185,85 @@
 - `SDD/specs/ROADMAP.md`
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Fase 2 — Backend core: arquivamento e promoção da `v0.3.0`
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `chore/018-phase-2-archive`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** fechar a Fase 2 (18 tasks), promover a release `v0.3.0` e abrir a Fase 3.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Gates locais antes da promoção:**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 65 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ SDD specifications valid.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos e arquitetura passaram com sucesso!
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css (line endings normalized).
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 44 sessions, structure valid.
+   ```
+2. **Reator completo (última task da fase):**
+   ```text
+   ./mvnw -B verify
+   → ConsigPort Platform ................................ SUCCESS [  0.005 s]
+   → ConsigPort Backend ................................. SUCCESS [01:29 min]
+   → Central de Convênios Mock .......................... SUCCESS [ 29.468 s]
+   → BUILD SUCCESS
+   → EXIT=0
+   Tests run: 481, Failures: 0, Errors: 0, Skipped: 0 (backend)
+   Tests run: 39, Failures: 0, Errors: 0, Skipped: 0  (central-convenios-mock)
+   Cobertura do núcleo: BRANCH 99.71% (342 de 343) | LINE 98.12% (679 de 692) | CLASS 100.00% (59 de 59)
+   ```
+3. **Promoção e release:**
+   ```text
+   PR #50  feat/038-backend-lifecycle-integration → develop → CI verde → merge (793099d)
+   PR #51  develop → staging   → CI verde → merge (e9024dd)
+   PR #52  staging → main      → CI verde → merge (64f23e7)
+   PR #53  chore(main): release 0.3.0 → merge (c472c6a)
+   → tag v0.3.0 e release publicada
+   → CI do main (46094354043): success
+   → Release (46095256699) — Publish backend/frontend/central-convenios-mock to GHCR: success
+   ```
+4. **Imagens e staging:**
+   ```text
+   backend              sha256:9cd162f26c72c90b78744f58fe5c4ab98e925b0da6865a3f7eafe53a0b0e1cf0
+   central-convenios-mock sha256:f651491272db2cebd7c0b4ff435b2a28b1ea39f902e570ef299026e209f18b3a
+   frontend             sha256:fd11ce5fe79d970e977c9ff19928683643f98465d3ce0d4436e15ef4da6336ac
+   CD Staging (46095428615): {"status":"UP","groups":["liveness","readiness"]} em backend e mock; frontend responde 200
+   ```
+5. **Fim da execução:**
+   ```text
+   containers restantes: 0
+   processos restantes: 0
+   ```
+
+#### Conteúdo Entregue:
+- `SDD/specs/history/phases/phase-2-finished.md` — as 18 tasks, os PRs, os critérios de
+  saída, a evidência da release e as dívidas conhecidas.
+- `SDD/specs/PLAN.md` — Fase 2 concluída e Fase 3 aberta com a task 3.1 em voo.
+- `SDD/specs/ROADMAP.md` — Fase 2 fechada com a tag `v0.3.0` e a Fase 3 como fase atual.
+
+#### Descobertas e Decisões:
+- O `release-please` cria a tag pela API do GitHub, o que **não** dispara o evento `push`
+  da tag. As imagens foram publicadas por `workflow_dispatch` em `release.yml` com a tag
+  `v0.3.0`, caminho já documentado em [`../../docs/process/RELEASE.md`](../../docs/process/RELEASE.md) §6.
+- O CI do branch do release-please falha com "This run likely failed because of a workflow
+  file issue" (run `46093781359`), sem jobs registrados e com `pull_requests = []`. O
+  mesmo padrão ocorreu nas releases anteriores (`45658801729`, na Fase 0, e
+  `45816627838`, na Fase 1): é o fechamento do PR antes de o job iniciar, não uma
+  regressão do conteúdo — o código idêntico passou no CI do PR #52 e no CI do `main`
+  (run `46094354043`, `success`).
+- O arquivamento da fase vai para `develop` **depois** da tag, como na Fase 1 (PR #32
+  mergeado em 13:00, `v0.2.0` às 12:08): o arquivo de arquivamento entra na release
+  seguinte, e não na que fecha a fase.
+
+#### Arquivos Tocados:
+- `SDD/specs/history/phases/phase-2-finished.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`
