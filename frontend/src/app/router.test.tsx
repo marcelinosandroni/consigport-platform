@@ -32,6 +32,12 @@ describe('resolveRoute', () => {
     expect(screen.getByText('Informe o beneficiário para ver a agenda.')).toBeInTheDocument()
   })
 
+  it('asks for the operation when the panel has none', () => {
+    render(resolveRoute(route('/operacoes')))
+
+    expect(screen.getByText('Informe a operação para acompanhar o status.')).toBeInTheDocument()
+  })
+
   it('renders the not found page for an unknown path', () => {
     render(resolveRoute(route('/rota-inexistente')))
 

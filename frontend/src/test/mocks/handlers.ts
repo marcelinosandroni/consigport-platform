@@ -67,6 +67,27 @@ const AGENDAS: Record<string, { installments: unknown[] }> = {
 /** The operations the fake already accepted, by idempotency key. */
 const operations = new Map<string, { payload: string; response: Record<string, unknown> }>()
 
+/** The detail of the operation the fake knows. */
+const operationDetail = (operationId: string) => ({
+  operationId,
+  protocol: 'PRT-20261128-0001',
+  beneficiaryId: 'BEN-001',
+  agreementId: 'AGR-001',
+  status: 'PENDING',
+  totalAmount: 750,
+  installments: [
+    { installmentId: 'PAR-001', agreementId: 'AGR-001', amount: 450, discountDate: '2026-12-05' },
+    { installmentId: 'PAR-002', agreementId: 'AGR-001', amount: 300, discountDate: '2027-01-05' },
+  ],
+  assigneeCreditor: 'ConsigPort',
+  receivingAccount: { bank: '001', branch: '1234', account: '56789-0' },
+  rejectionReason: null,
+  retryCount: 0,
+  accountUpdatedAt: null,
+  createdAt: '2026-11-28T10:00:05Z',
+  updatedAt: '2026-11-28T10:00:05Z',
+})
+
 /**
  * The fake of the public API.
  *
@@ -235,5 +256,19 @@ export const handlers = [
       status: 202,
       headers: { 'Idempotent-Replay': 'false' },
     })
+  }),
+
+  http.get(`${API_BASE_URL}/api/v1/portability-operations/:operationId`, ({ params }) => {
+    const operationId = String(params.operationId)
+
+    if (operationId === 'OPERATION-UNKNOWN') {
+      return notFound(
+        'OPERATION_NOT_FOUND',
+        `/api/v1/portability-operations/${operationId}`,
+        'A operação informada não existe.',
+      )
+    }
+
+    return HttpResponse.json(operationDetail(operationId))
   }),
 ]

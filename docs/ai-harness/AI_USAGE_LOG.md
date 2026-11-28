@@ -1848,3 +1848,60 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
     - smoke no build de produção contra uma API falsa local: a página renderiza
       em pt-BR, en e es, o estado sem seleção aparece, e o caminho **sem
       JavaScript** cria a operação e devolve o protocolo e o total
+
+## Sessão #52 — Task 3.7 (Painel de status com polling)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/037-frontend-operations-polling`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** acompanhar a operação até o terminal — TanStack Query com
+  intervalo de 2 s, parada em estado terminal, `nextPollAt` respeitado, sem
+  ISR.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** o contrato público (`GET /api/v1/portability-operations/{operationId}`,
+   o `OperationDetail` e o `OperationStatus` com `COMPLETED` e `REJECTED`
+   terminais), o `ARCHITECTURE.md` §5 (polling em ilha cliente, o resto
+   servidor, sem ISR) e §11 (`Retry-After` honrado no `next_poll_at`), o
+   `ADR-0003` (assincronismo, polling e trilha imutável), o
+   `SDD/stacks/react.md` (Server Component por padrão, folha cliente como
+   exceção) e o `docs/quality/GATES.md` (portão 3.4).
+2. **Dependência:** `@tanstack/react-query@^5` (`5.108.4`), dentro da faixa do
+   `APP-STACK.md`; `npm audit --omit=dev` → 0 vulnerabilidades.
+3. **Provedor do cache** (`shared/api/query-provider.tsx`): o `QueryClient` criado
+   uma vez por sessão, embrulhado pelo Shell.
+4. **Hook do polling** (`features/operations/ui/use-operation-polling.ts`): a
+   aritmética do ritmo isolada em funções puras — `POLL_INTERVAL_MS` (2 s),
+   `isTerminalStatus`, `readNextPollAt` e `pollDelay` — e o `useQuery` que as
+   usa: `refetchInterval` devolve `false` no estado terminal e no
+   `OPERATION_NOT_FOUND`, e o número de milissegundos nos demais casos.
+5. **Ilha do painel** (`features/operations/ui/operation-status.tsx`): o estado,
+   o protocolo, o total, as parcelas, o credor, a última atualização, o motivo
+   da rejeição, a região viva e o botão "Atualizar agora".
+6. **Server Component** (`features/operations/server/page.tsx`): o primeiro
+   estado lido no render, com o `Accept-Language` da cookie; os estados de
+   operação inexistente e de falha com o caminho de saída.
+7. **Integração com a 3.6:** o painel de sucesso da criação da operação passou
+   a oferecer o caminho `/operacoes?operationId=…`; a rota `/operacoes` entrou
+   no roteador e na navegação.
+8. **`formatDateTime`** (`shared/format/date.ts`): a hora da última atualização
+   — um instante é um momento, não um dia de calendário.
+9. **Catálogos e API falsa:** a seção `operations` completada nos três idiomas
+   e a entrada da navegação; a API falsa responde à consulta da operação.
+10. **Testes:** `use-operation-polling.test.ts` (a aritmética do ritmo),
+    `operation-status.test.tsx` (timers falsos: `PENDING` → `COMPLETED` parando
+    depois, `REJECTED` com o motivo e sem novo polling, `nextPollAt` de 10 s
+    adiado, `Accept-Language` e a falha da API) e `server/page.test.tsx` (o
+    estado lido no servidor, o `404`, a falha e o idioma da pergunta).
+11. **Validação:**
+    - `npm run --prefix frontend lint` → EXIT=0
+    - `npm run --prefix frontend typecheck` → EXIT=0
+    - `npm run --prefix frontend test:unit` → 25 arquivos, 131 testes verdes
+    - `npm run --prefix frontend build` → os três ambientes (rsc, ssr, client) verdes
+    - 5 gates locais de documentação verdes
+    - smoke no build de produção contra uma API falsa local: o painel renderiza
+      em pt-BR, en e es, os estados sem operação e de operação inexistente
+      aparecem, e o fluxo da criação leva ao painel com o `operationId` na URL
+    - preview e API falsa encerrados: 0 processos e 0 portas presas
