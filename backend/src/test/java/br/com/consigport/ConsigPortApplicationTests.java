@@ -2,6 +2,7 @@ package br.com.consigport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import br.com.consigport.support.PostgreSqlTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -12,20 +13,12 @@ import org.springframework.http.ResponseEntity;
 /**
  * Boots the whole application and proves the health probe answers UP.
  *
- * <p>H2 keeps the scaffold test free of Docker; the persistence task replaces it
- * with Testcontainers PostgreSQL 16 and enables Flyway again.
+ * <p>The application runs against the real PostgreSQL 16 of the stack, with the
+ * migration applied by Flyway and the schema validated by Hibernate: the context only
+ * starts when the DDL and the entities agree.
  */
-@SpringBootTest(
-    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = {
-      "spring.datasource.url=jdbc:h2:mem:consigport;DB_CLOSE_DELAY=-1;MODE=PostgreSQL",
-      "spring.datasource.driver-class-name=org.h2.Driver",
-      "spring.datasource.username=sa",
-      "spring.datasource.password=",
-      "spring.jpa.hibernate.ddl-auto=none",
-      "spring.flyway.enabled=false"
-    })
-class ConsigPortApplicationTests {
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class ConsigPortApplicationTests extends PostgreSqlTestSupport {
 
   @Autowired private TestRestTemplate rest;
 

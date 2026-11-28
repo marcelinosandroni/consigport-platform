@@ -31,10 +31,10 @@
 
 ---
 
-## Fase atual: 1 — Central mock
+## Fase 1 — Central mock: concluída ✅
 
-> Objetivo: Central determinística na porta `8081`, com contrato PT e Swagger.
-> Task em voo: **1.7 — Caos determinístico e contrato publicado**.
+> Arquivada em [`history/phases/phase-1-finished.md`](./history/phases/phase-1-finished.md).
+> Tag `v0.2.0` publicada com a imagem do mock no GHCR.
 
 ### Tasks
 
@@ -59,11 +59,84 @@
       Assinatura inválida ou timestamp fora de ±300 s → `401 ASSINATURA_INVALIDA`; mesma
       `Idempotency-Key` e payload igual → mesmo protocolo; payload diferente →
       `409 IDEMPOTENCIA_CONFLITO`.
-- [-] **1.7 — Caos determinístico e contrato publicado**
+- [x] **1.7 — Caos determinístico e contrato publicado**
       `-REJ` e soma acima de `5000.00` → `REJEITADA` com
       `MARGEM_CONSIGNADA_INSUFICIENTE`; `-TIMEOUT` atrasa os dois primeiros GETs; headers
       `X-Mock-Delay-Ms` e `X-Mock-Force-Error`; contrato exportado idêntico a
       `contracts/central-api.yaml`.
+
+---
+
+## Fase atual: 2 — Backend core
+
+> Objetivo: core DDD/hexagonal na porta `8080`, com PostgreSQL, Flyway, ACL, i18n,
+> polling resiliente e Swagger.
+> Task em voo: **nenhuma** — a Fase 2 terminou com a 2.18; o arquivamento da fase e a
+> tag `v0.3.0` vêm no fechamento, depois da promoção `develop` → `staging` → `main`.
+
+### Tasks
+
+- [x] **2.1 — Esqueleto hexagonal e regras ArchUnit**
+      `domain` sem Spring, JPA, Jackson ou HTTP; `application` só importa `domain`;
+      `config` é o único composition root; regra verificada por `HexagonalArchitectureTest`.
+- [x] **2.2 — Value objects compartilhados**
+      `BeneficiaryId`, `AgreementId`, `InstallmentId`, `IdempotencyKey`, `Money` e
+      `ReceivingAccount` com validação no construtor e igualdade por valor.
+- [x] **2.3 — Agregado de autorização**
+      `Authorization` com identidade, beneficiário, convênio e `createdAt`;
+      `AuthorizationRepository` com `findByBeneficiaryAndAgreement` e `save`, sem anotação
+      de framework.
+- [x] **2.4 — Agregado de portabilidade e máquina de estados**
+      `PortabilityOperation` com ao menos uma parcela, total igual à soma e snapshot
+      imutável; transições apenas as da tabela de estados do `ARCHITECTURE.md` §7.
+- [x] **2.5 — Evento de auditoria append-only**
+      `OperationEvent` com os campos do `ARCHITECTURE.md` §2, sem mutadores públicos;
+      `eventType` restrito ao enum; porta de repositório apenas com `append` e consultas.
+- [x] **2.6 — Registro e consulta de autorização**
+      `RegisterAuthorization` idempotente: repetir o opt-in devolve o registro existente e
+      replica o consentimento na Central pela porta; `FindAuthorization` consulta o
+      registro; `Clock` injetado.
+- [x] **2.7 — Consulta de agenda com ACL**
+      `AgendaGateway` e `Installment` no domínio; `CentralAcl` traduz o contrato PT da
+      Central para o domínio EN; `403` sem autorização e `404` repassado.
+- [x] **2.8 — Persistência e migração V1**
+      DDL do `ARCHITECTURE.md` §6 com três tabelas, índices, constraints e trigger
+      append-only; status restrito por `CHECK`; snapshot em JSONB não vazio.
+- [x] **2.9 — Início da operação com idempotência**
+      `POST /portability-operations` exige `Idempotency-Key`; o replay devolve `202` com
+      `Idempotent-Replay: true`; payload divergente → `409 IDEMPOTENCY_CONFLICT`; parcela
+      inelegível → `422`.
+- [x] **2.10 — Assinatura HMAC e envio à Central**
+      `HmacSigner` reproduz o vetor de `contracts/hmac-vector.json`; `CentralHttpClient`
+      submete a operação assinada; `CREATED` → `PENDING` com `protocol`; falha após
+      retries → `INTEGRATION_ERROR`.
+- [x] **2.11 — Polling resiliente**
+      `PollOperation` acompanha a Central até o estado terminal; intervalo de 2 s e lote
+      de 20; honora o `Retry-After`; `204` gera `POLL_ATTEMPT`; o reenvio usa a mesma
+      `Idempotency-Key`.
+- [x] **2.12 — Auto-transição de integração e respostas tipadas da Central**
+      Auto-transição `INTEGRATION_ERROR` → `INTEGRATION_ERROR` declarada na §7, com
+      caminho único de falha; `404` da Central vira resposta tipada, fora do circuito e
+      com o corpo bruto na trilha; rejeição com motivo fora do contrato fecha a
+      operação como `REJECTED` com o código `UNMAPPED_REJECTION`.
+- [x] **2.13 — Confirmação e atualização de conta**
+      `CONFIRMADA` → `CONFIRMED` → `COMPLETED` com `account_updated_at`; `REJEITADA` →
+      `REJECTED` com o motivo; os dois eventos gravados na mesma transação.
+- [x] **2.14 — Consulta de operações e trilha**
+      Leitura paginada com filtro por status; eventos em ordem cronológica;
+      `404 OPERATION_NOT_FOUND`.
+- [x] **2.15 — Recursos REST e tratamento de erros**
+      Rotas do `ARCHITECTURE.md` §8 e erro com `code`, `message`, `locale`,
+      `timestamp`, `path` e `details`.
+- [x] **2.16 — i18n, Swagger e snapshot OpenAPI**
+      `Accept-Language` com fallback `pt-BR`; `code` nunca traduzido; contrato gerado
+      equivalente a `contracts/consigport-api.yaml`.
+- [x] **2.17 — Gate de cobertura do núcleo**
+      Domínio e aplicação com ≥ 80% de linhas e de branches; o build falha quando a
+      cobertura cai; relatório anexado no CI.
+- [x] **2.18 — Fluxo completo com o banco real**
+      `CREATED` → `COMPLETED` e `CREATED` → `REJECTED` comprovados com o PostgreSQL real
+      e a trilha completa de eventos.
 
 ### Como usar este arquivo
 

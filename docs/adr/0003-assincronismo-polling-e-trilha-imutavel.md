@@ -24,11 +24,22 @@ falhas de integração.
 2. Um worker agendado (`fixedDelay` 2 s, lote 20) busca operações
    `PENDING` ou `INTEGRATION_ERROR` com `next_poll_at <= now()`.
 3. `GET` de status: `204` com `Retry-After` → evento `POLL_ATTEMPT` e novo
-   `next_poll_at`; `200 CONFIRMADA` → `CONFIRMED`; `200 REJEITADA` → `REJECTED`.
+   `next_poll_at`; `200 CONFIRMADA` → `CONFIRMED` e, na mesma transação, a atualização da
+   conta e o fechamento em `COMPLETED` (eventos `OPERATION_CONFIRMED`, `ACCOUNT_UPDATED`
+   e `OPERATION_COMPLETED`, com `account_updated_at`); `200 REJEITADA` → `REJECTED` com o
+   motivo.
 4. Sem protocolo (falha antes do `202`), o worker reenvia com a mesma `Idempotency-Key`
    em vez de criar outra operação.
 5. Falha persistente → `INTEGRATION_ERROR` com backoff exponencial até 60 s. O estado é
-   retomável, nunca terminal.
+   retomável, nunca terminal. A falha que acontece com a operação já em
+   `INTEGRATION_ERROR` é a auto-transição declarada na §7: o status não muda, o
+   `retry_count` cresce e o backoff é renovado.
+6. O `404` da Central (`OPERACAO_NAO_ENCONTRADA`) é uma resposta tipada, não uma
+   indisponibilidade: a Central respondeu, então não conta como falha no circuito e a
+   operação continua retomável, com o corpo bruto da Central na trilha.
+7. Uma rejeição com um motivo que o contrato da Central não declara fecha a operação
+   como `REJECTED`, com o código `UNMAPPED_REJECTION`: a decisão da Central é terminal
+   e o motivo original fica no `rawPayload` do evento.
 
 ### Resiliência
 
@@ -81,6 +92,13 @@ falhas de integração.
 ## Como é verificado
 
 - Testes com relógio controlado cobrindo `204`, confirmação, rejeição, falha e retomada.
-- Teste de rollback entre a confirmação e a atualização de conta.
+- Teste da auto-transição `INTEGRATION_ERROR` → `INTEGRATION_ERROR` na matriz da máquina
+  de estados e no worker.
+- Teste do `404` da Central: resposta tipada, fora do circuito e com o corpo bruto na
+  trilha.
+- Teste da rejeição com motivo não declarado no contrato: operação fechada como
+  `REJECTED` com o código `UNMAPPED_REJECTION`.
+- Teste de rollback entre a confirmação e a atualização de conta: a falha no segundo
+  evento desfaz o estado da operação e o evento já escrito, sobre PostgreSQL 16.
 - Teste que tenta `UPDATE` e `DELETE` em `operation_events` e espera exceção.
 - Teste de ordem cronológica da timeline.

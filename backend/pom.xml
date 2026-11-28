@@ -16,9 +16,9 @@
   <description>Core de autorização, agenda, portabilidade e auditoria</description>
 
   <!--
-    Scaffold only: web edge, bean validation, persistence (JPA + Flyway over
-    PostgreSQL 16), health probes and the OpenAPI surface. Domain and adapters
-    arrive feature by feature, so no package is created before its task.
+    Web edge, bean validation, persistence (JPA + Flyway over PostgreSQL 16),
+    health probes and the OpenAPI surface. The domain and the adapters arrive
+    feature by feature, each in its own task.
   -->
   <dependencies>
     <dependency>
@@ -59,16 +59,35 @@
       <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
     </dependency>
 
+    <!-- ArchUnit enforces the hexagonal boundary of the backend in every build. -->
+    <dependency>
+      <groupId>com.tngtech.archunit</groupId>
+      <artifactId>archunit-junit5</artifactId>
+      <scope>test</scope>
+    </dependency>
+
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
-    <!-- In-memory database keeps the scaffold test free of Docker; the
-         persistence task replaces it with Testcontainers PostgreSQL 16. -->
+
+    <!-- Springdoc parses the OpenAPI document in YAML, and the contract test reads
+         the snapshot of the public API in the same format. -->
     <dependency>
-      <groupId>com.h2database</groupId>
-      <artifactId>h2</artifactId>
+      <groupId>com.fasterxml.jackson.dataformat</groupId>
+      <artifactId>jackson-dataformat-yaml</artifactId>
+    </dependency>
+
+    <!-- The persistence tests run against the real PostgreSQL 16 of the stack. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-testcontainers</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>postgresql</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -78,6 +97,13 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+
+      <!-- The coverage gate of the backend: 80% of lines and branches in the
+           domain and in the use cases, with the report in the build. -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
       </plugin>
     </plugins>
   </build>

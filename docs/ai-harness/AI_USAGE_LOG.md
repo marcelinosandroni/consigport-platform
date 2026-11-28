@@ -686,3 +686,817 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - `resources/openapi/central-api.yaml` é cópia byte a byte de `contracts/central-api.yaml`, garantida por `ContractTest`.
 4. **Validação:**
    - `./mvnw -B -pl central-convenios-mock -am verify` → 39 testes verdes.
+
+---
+
+## Sessão #26 — Arquivamento da Fase 1 e release v0.2.0
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `chore/017-phase-1-archive`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** fechar a Fase 1, promover a `v0.2.0` e abrir a Fase 2 (backend core).
+
+### Atividades Realizadas:
+1. **Promoção da release:**
+   - PR #29 `develop → staging` e PR #30 `staging → main`, ambos com CI verde.
+   - PR #31 `chore(main): release 0.2.0` mergeado; tag `v0.2.0` e release publicadas.
+2. **Imagens e staging:**
+   - As três imagens foram publicadas no GHCR por `workflow_dispatch` (o `release-please` cria a tag pela API e não dispara o evento `push` da tag).
+   - `CD Staging` verde: backend e mock com `{"status":"UP"}` e frontend respondendo.
+3. **Arquivamento da fase:**
+   - `SDD/specs/history/phases/phase-1-finished.md` com as 7 tasks, PRs, critérios de saída, digests e dívidas.
+   - `PLAN.md` com a Fase 1 concluída e a task 2.1 em voo; `ROADMAP.md` com a `v0.2.0` publicada.
+4. **Validação:**
+   - `./mvnw -B verify` → reactor verde (backend + mock, 39 testes no mock).
+
+---
+
+## Sessão #27 — Task 2.1 (Esqueleto Hexagonal e Regras ArchUnit)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/021-backend-hexagonal-skeleton`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** criar as camadas do backend e travar as dependências proibidas desde o
+  primeiro commit.
+
+### Atividades Realizadas:
+1. **Camadas do backend:**
+   - `domain`, `application`, `adapters` e `config` declaradas com `package-info.java` que
+     documenta a fronteira e as dependências permitidas de cada uma.
+   - `config/CompositionRoot` com o bean `Clock.systemUTC()`: o único lugar que conhece
+     implementações concretas.
+2. **Regras ArchUnit:**
+   - Domínio sem Spring, JPA, Jackson, HTTP ou logger; aplicação importando apenas
+     `domain` e o JDK; domínio e aplicação nunca alcançando adaptadores; adaptadores de
+     entrada nunca alcançando adaptadores de saída; `config` privado; camadas sem ciclos.
+3. **Guard que não pode ficar verde por ausência:**
+   - O engine JUnit 5 do ArchUnit 1.4.2 não descobre campos `@ArchTest` sob o JUnit
+     Platform 1.12.2 (uma regra inválida passou sem rodar). As regras passaram a ser
+     avaliadas em métodos `@Test` comuns.
+   - Fixtures com violações deliberadas provam que cada regra rejeita o defeito que
+     descreve, e uma violação temporária no código de produção quebrou o build.
+4. **Validação:**
+   - `./mvnw -q -pl backend test -Dtest=HexagonalArchitectureTest` → 9 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend + mock).
+
+---
+
+## Sessão #28 — Task 2.2 (Value Objects Compartilhados)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/022-backend-value-objects`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** substituir `String` e `BigDecimal` soltos por tipos fortes com invariante
+  validada na construção.
+
+### Atividades Realizadas:
+1. **Identificadores (`domain/shared/`):**
+   - `BeneficiaryId`, `AgreementId` e `InstallmentId`: não vazios, no máximo 64
+     caracteres, normalizados com `trim`, igualdade por valor.
+   - `IdempotencyKey`: UUID obrigatório (BR-07), com `parse` do texto e forma canônica.
+2. **Valores de portabilidade (`domain/portability/`):**
+   - `Money`: `BigDecimal` com exatamente 2 casas, nunca negativo, escala normalizada.
+   - `ReceivingAccount`: `bank`, `branch` e `account` obrigatórios nos limites do
+     contrato.
+3. **Testes:** `SharedValueObjectsTest` e `PortabilityValueObjectsTest` — 28 testes de
+   unidade cobrindo os casos válidos, inválidos e de igualdade por valor.
+4. **Prova de vida:** remoção temporária do guard de valor negativo em `Money` quebrou o
+   build (`Tests run: 6, Failures: 1`); o guard foi restaurado e a suíte voltou a ficar
+   verde.
+5. **Validação:**
+   - `./mvnw -B -pl backend test` → 39 testes verdes no backend.
+   - `./mvnw -B verify` → reactor verde (backend 39 testes, mock 39 testes).
+
+---
+
+## Sessão #29 — Task 2.3 (Agregado de Autorização)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/023-backend-authorization-aggregate`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** modelar o opt-in único por beneficiário e convênio (BR-02) e declarar a
+  porta de persistência no domínio.
+
+### Atividades Realizadas:
+1. **Agregado:**
+   - `Authorization`: record imutável com `AuthorizationId` (UUID), `BeneficiaryId`,
+     `AgreementId` e `createdAt`; a fábrica `register` cria a identidade e o instante
+     chega pelo relógio.
+   - `AuthorizationAlreadyExistsException`: erro de domínio para o par já autorizado.
+2. **Porta:**
+   - `AuthorizationRepository` com `findByBeneficiaryAndAgreement` e `save`, sem anotação
+     de framework; a unicidade do par é invariante da porta.
+3. **Testes:**
+   - `AuthorizationTest` (12 casos) e `AuthorizationRepositoryContractTest` (6 casos),
+     com o fake em memória `InMemoryAuthorizationRepository` — sem mocks, conforme
+     `stacks/java.md`.
+4. **Prova de vida:** remoção temporária do guard de convênio nulo quebrou o build
+   (`Tests run: 7, Failures: 1`); o guard foi restaurado e a suíte voltou a ficar verde.
+5. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest='AuthorizationTest,AuthorizationRepositoryContractTest'`
+     → 18 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend 57 testes, mock 39 testes).
+
+---
+
+## Sessão #30 — Task 2.4 (Agregado de Portabilidade e Máquina de Estados)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/024-backend-portability-aggregate`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** concentrar no domínio as invariantes da operação e as transições do
+  ciclo de vida.
+
+### Atividades Realizadas:
+1. **Agregado:**
+   - `PortabilityOperation`: record imutável com identidade, chave de idempotência,
+     snapshot, conta de recebimento, total, status, protocolo, motivo, tentativas e
+     instantes; cada transição devolve uma nova instância.
+   - Invariantes no construtor: ao menos uma parcela, total igual à soma, credor
+     cessionário não vazio, protocolo nulo em `CREATED`, motivo obrigatório apenas em
+     `REJECTED`.
+2. **Máquina de estados:**
+   - `submit`, `registerIntegrationFailure`, `pollAttempt`, `confirm`, `reject` e
+     `complete`, com as origens aceitas da tabela do `ARCHITECTURE.md` §7.
+   - `OperationStatus.isTerminal()` garante que `COMPLETED` e `REJECTED` não saiam do
+     estado; a recusa vem de `InvalidTransitionException`.
+3. **Tipos de apoio:**
+   - `InstallmentSnapshot` (retrato congelado da parcela) e `RejectionReason` selado com
+     `MARGIN_INSUFFICIENT`.
+4. **Testes:** 36 casos parametrizados cobrindo 6 estados × 6 gatilhos, mais 27 casos de
+   invariantes — 63 testes na task.
+5. **Prova de vida:** a transição `CREATED → CONFIRMED`, fora da tabela, quebrou o build
+   (`Tests run: 43, Failures: 1`); a máquina foi restaurada e a suíte voltou a ficar
+   verde.
+6. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest='PortabilityOperationTest,InstallmentSnapshotTest,RejectionReasonTest'`
+     → 63 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend 120 testes, mock 39 testes).
+
+---
+
+## Sessão #31 — Task 2.5 (Evento de Auditoria Append-Only)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/025-backend-audit-event`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** registrar cada mudança de estado em uma trilha imutável.
+
+### Atividades Realizadas:
+1. **Evento:**
+   - `OperationEvent` com os campos do `ARCHITECTURE.md` §2: `eventId`, `operationId`,
+     `previousStatus`, `newStatus`, `eventType`, `details`, `rawPayload` e `createdAt`.
+   - `EventType` com os oito tipos estáveis do contrato público.
+2. **Porta:**
+   - `OperationEventRepository` expõe apenas `append` e `findByOperationId` — não existe
+     caminho para alterar ou apagar um evento.
+3. **Testes:** 19 casos, incluindo a prova por reflexão de que o evento não expõe mutador
+   público, de que todo campo de instância é final e de que a porta só expõe `append` e a
+   consulta; fake em memória, sem mocks.
+4. **Prova de vida:** um mutador público temporário em `OperationEvent` quebrou o build
+   (`Tests run: 12, Failures: 1`); o mutador foi removido e a suíte voltou a ficar verde.
+5. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest='OperationEventTest,OperationEventRepositoryContractTest,EventTypeTest'`
+     → 19 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend 139 testes, mock 39 testes).
+
+---
+
+## Sessão #32 — Task 2.6 (Registro e Consulta de Autorização)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/026-backend-register-authorization`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** caso de uso idempotente do opt-in, com replicação na Central e relógio
+  injetado.
+
+### Atividades Realizadas:
+1. **Casos de uso:**
+   - `RegisterAuthorization`: repete o opt-in, devolve o registro existente, replica o
+     consentimento na Central e data o registro com o `Clock` injetado.
+   - `FindAuthorization`: consulta o registro do par e devolve `Optional`.
+2. **Porta:**
+   - `CentralAuthorizationPort` em `domain/authorization/`, seguindo o padrão das outras
+     portas do domínio.
+3. **Ordem das operações:** a replicação na Central vem antes do armazenamento local, para
+   que uma falha nunca deixe autorização local que a Central desconhece.
+4. **Testes:** 9 casos com repositório e porta em memória, incluindo a corrida entre dois
+   registros do mesmo par — o caso de uso devolve o vencedor.
+5. **Prova de vida:** a remoção do retorno do registro existente quebrou o build
+   (`Tests run: 6, Failures: 1`); a guarda foi restaurada e a suíte voltou a ficar verde.
+6. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest='RegisterAuthorizationTest,FindAuthorizationTest'`
+     → 9 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend 148 testes, mock 39 testes).
+
+---
+
+## Sessão #33 — Task 2.7 (Consulta de Agenda com ACL)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/027-backend-agenda-acl`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** traduzir o contrato PT da Central para o domínio EN, sem deixar o DTO
+  externo escapar do adaptador.
+
+### Atividades Realizadas:
+1. **Domínio da agenda:**
+   - `Installment`, `InstallmentStatus` (`OPEN`/`CLOSED`) e `BeneficiaryAgenda` com
+     `openInstallments()` para a elegibilidade (BR-03).
+   - `AgendaGateway` como porta de leitura da agenda na Central.
+   - `DomainError` selado em `domain/shared/`, com os códigos estáveis da API pública.
+2. **Aplicação:**
+   - `QueryAgenda` lê a agenda pela porta e repassa as recusas da Central.
+3. **Anti-corruption layer:**
+   - `AgendaResponse` no adaptador de saída, com os nomes JSON em português.
+   - `CentralAcl` traduz `ABERTA ↔ OPEN`, `FECHADA ↔ CLOSED` e converte `403` e `404` em
+     erros de domínio.
+4. **Guarda de arquitetura:**
+   - Nova regra no `HexagonalArchitectureTest`: nenhum DTO externo fora do adaptador de
+     saída da Central, com fixture que prova que a regra morde.
+5. **Testes:** 26 casos na task — mapeamento nos dois sentidos, recusas e guarda.
+6. **Prova de vida:** o mapeamento `ABERTA → CLOSED` quebrou o build (`Tests run: 7,
+   Failures: 2`); o mapeamento foi restaurado e a suíte voltou a ficar verde.
+7. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest='HexagonalArchitectureTest,CentralAclTest,QueryAgendaTest'`
+     → 26 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend 165 testes, mock 39 testes).
+
+---
+
+## Sessão #34 — Task 2.8 (Persistência e Migração V1)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/028-backend-persistence-v1`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** criar as três tabelas, os índices, as constraints e o trigger append-only
+  do `ARCHITECTURE.md` §6, com as entidades JPA e os repositórios.
+
+### Atividades Realizadas:
+1. **Migração V1:**
+   - `V1__create_schema.sql` com `authorizations`, `portability_operations` e
+     `operation_events`, os dois índices, a `CHECK` de status, a `CHECK` de snapshot não
+     vazio, a `CHECK` de total não negativo e o trigger append-only.
+2. **Domínio e adaptadores:**
+   - Porta `PortabilityOperationRepository` no domínio.
+   - `JpaAuthorizationRepository`, `JpaPortabilityOperationRepository` e
+     `JpaOperationEventRepository` sobre as entidades JPA, com o mapeamento do snapshot
+     em JSONB e o `Clock` injetado para o `updated_at`.
+   - `RawPayloadCodec` guarda o payload bruto da Central como string JSON, byte a byte.
+3. **Infraestrutura de teste:**
+   - `PostgreSqlTestSupport` com um PostgreSQL 16 por JVM, apontado por
+     `@DynamicPropertySource`.
+   - `ConsigPortApplicationTests` passou do H2 para o PostgreSQL real, e o H2 saiu do
+     `backend/pom.xml`.
+4. **Testes:** 21 casos de integração — 11 de constraints (status, snapshot, chaves
+   únicas, trigger) e 10 de round trip dos agregados.
+5. **Prova de vida:** a `CHECK` de status virada em `status IS NOT NULL` quebrou o build
+   (`Tests run: 11, Failures: 1`); a constraint foi restaurada e o reactor voltou a ficar
+   verde (186 testes no backend, 39 no mock).
+6. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest=PersistenceConstraintsTest` → 11 testes verdes.
+   - `./mvnw -B -pl backend test -Dtest=JpaRepositoriesTest` → 10 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend 186 testes, mock 39 testes).
+
+---
+
+## Sessão #35 — Task 2.9 (Início da Operação com Idempotência)
+
+- **Data:** 2026-11-26
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/029-backend-start-operation-idempotency`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** criar a operação, congelar o snapshot das parcelas e responder `202`, com
+  a idempotência da chave e o replay sinalizado no header.
+
+### Atividades Realizadas:
+1. **Domínio:**
+   - `OperationRequest` (o pedido e a regra do "mesmo payload") e `OperationPolicy`
+     (elegibilidade e congelamento do snapshot).
+   - `IdempotencyKeyAlreadyUsedException` e a porta `TransactionRunner`.
+   - `DomainError` selado com `IdempotencyConflict`, `IdempotencyKeyRequired`,
+     `InstallmentNotEligible` e `CentralUnavailable`.
+2. **Aplicação:**
+   - `StartOperation`: replay, conflito, elegibilidade, snapshot, evento de criação e a
+     corrida da chave de idempotência.
+3. **Aresta HTTP:**
+   - `PortabilityOperationResource` com o header `Idempotent-Replay` e
+     `ApiExceptionHandler` com `code`, `message`, `locale`, `timestamp`, `path` e
+     `details`.
+   - DTOs do pedido, da resposta aceita e do erro.
+4. **Persistência:**
+   - `SpringTransactionRunner` (operação + evento na mesma transação) e
+     `UniqueViolations` (SQLSTATE `23505` com o nome da constraint).
+5. **Testes:** 9 unitários do caso de uso e 8 de integração HTTP sobre PostgreSQL 16, com
+   duas chamadas concorrentes e uma divergente.
+6. **Prova de vida:** a comparação de payload das parcelas virando `true` quebrou o
+   build (`Tests run: 9, Failures: 2`); a comparação foi restaurada e a suíte voltou a
+   ficar verde.
+7. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest=StartOperationTest` → 9 testes verdes.
+   - `./mvnw -B -pl backend test -Dtest=PortabilityOperationResourceTest` → 8 testes
+     verdes.
+   - `./mvnw -B verify` → reactor verde (backend 203 testes, mock 39 testes).
+
+## Sessão #36 — Task 2.10 (Assinatura HMAC e Envio à Central)
+
+- **Data:** 2026-11-27
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/030-backend-central-hmac-submission`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** assinar a operação na forma canônica da Central, enviá-la e absorver o
+  protocolo; uma falha depois das tentativas deixa a operação retomável, nunca duplicada.
+
+### Atividades Realizadas:
+1. **Domínio:**
+   - `CentralPortabilityPort` (porta de envio), `CentralSubmissionException` (status e
+     código da Central) e `ConcurrentOperationUpdateException` (bloqueio otimista).
+2. **Adaptador de saída:**
+   - `HmacSigner`, dono da forma canônica (`canonicalJson`, `canonicalBody` sem
+     `assinatura`, `canonicalString`, `sign`), reproduzindo o vetor compartilhado.
+   - `CentralHttpClient`, que implementa `AgendaGateway` e `CentralPortabilityPort`,
+     assina, envia e repete 3 vezes com backoff exponencial, repetindo só 408/429/5xx.
+   - `CentralProperties` (URL, segredo, tentativas, backoff e timeouts) e
+     `PortabilityAcl` com os DTOs do contrato PT da Central.
+3. **Aplicação:**
+   - `StartOperation` grava a criação em uma transação, submete fora dela e grava
+     `PENDING`/`OPERATION_SUBMITTED` ou `INTEGRATION_ERROR`/`INTEGRATION_FAILED` em
+     outra; o replay de uma operação `CREATED` completa a submissão.
+4. **Persistência e wiring:**
+   - `JpaPortabilityOperationRepository` traduz o bloqueio otimista; `CompositionRoot`
+     monta o cliente e o caso de uso; `application.yml` ganha a seção `central`.
+5. **Testes:** 5 do assinante (o vetor de `contracts/hmac-vector.json`), 10 do cliente
+   HTTP com `MockRestServiceServer`, 16 do caso de uso e 11 de integração HTTP sobre
+   PostgreSQL 16.
+6. **Prova de vida:** a ordenação das chaves do corpo canônico virando `false` quebrou o
+   build (`Tests run: 5, Failures: 2`); a forma canônica foi restaurada e a suíte voltou
+   a ficar verde.
+7. **End-to-end com o backend real contra o mock real:** `202` com `PENDING` e protocolo
+   `PRT-20261127-0002`, replay byte a byte igual, payload divergente `409`, dois eventos
+   na trilha e a Central confirmando a operação; uma recusa da Central deixou a
+   operação em `INTEGRATION_ERROR`, com `retry_count` 1 e `next_poll_at` em 60 s.
+8. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest='HmacSignerTest,CentralHttpClientTest,StartOperationTest'` → 31 testes verdes.
+   - `./mvnw -B -pl backend test -Dtest='PortabilityOperationResourceTest'` → 11 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend 228 testes, mock 39 testes).
+
+## Sessão #37 — Task 2.11 (Polling Resiliente)
+
+- **Data:** 2026-11-27
+- **Agente / Modelo:** OpenCode (provider ZEN) — DeepSeek V4.1 Flash Free
+- **Branch:** `feat/031-backend-resilient-polling`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** acompanhar a Central até o estado terminal, com worker de 2 s e lote de
+  20, honrando o `Retry-After`, repetindo com backoff e circuit breaker, e reenviando a
+  operação que falhou com a mesma `Idempotency-Key`.
+
+### Atividades Realizadas:
+1. **Domínio:**
+   - `CentralStatus` (selado: `Pending` com o `Retry-After`, `Confirmed` e `Rejected`,
+     sempre com o corpo bruto da Central) e `CentralStatusPort` (a porta de leitura do
+     status).
+   - `PortabilityOperation.renewIntegrationBackoff`: a falha de uma operação que já
+     está em `INTEGRATION_ERROR` renova o backoff e a contagem sem mudar o status,
+     porque a tabela de estados do `ARCHITECTURE.md` §7 não tem a auto-transição.
+2. **Aplicação:**
+   - `PollOperation` (lote das operações devidas, consulta do status, reenvio sem
+     protocolo com a mesma chave, operação e evento gravados na mesma transação) e
+     `IntegrationBackoff` (2 s dobrando até 60 s).
+3. **Adaptadores:**
+   - `CentralHttpClient.statusOf`: `204` com `Retry-After`, `200` terminal, `404` e
+     corpo fora do contrato como falha, com 3 tentativas e o circuito.
+   - `PortabilityAcl.toCentralStatus` e o DTO `CentralStatusResponse` (tradução PT → EN).
+   - `CircuitBreaker` (janela 10, 50% de falhas, 10 s aberto, 3 chamadas em half-open) e
+     a consulta `findDueForPolling` do repositório.
+4. **Wiring:** `ResilienceConfig`, `SchedulingConfig` (`fixedDelay` de 2 s, lote de 20,
+   desligável com `central.poll.enabled`), `CompositionRoot` e `application.yml`.
+5. **Testes:** 13 do worker, 6 do backoff, 8 do circuito, 17 do cliente HTTP, 7 de
+   integração do polling sobre PostgreSQL 16, 2 do agendamento e 45 do agregado.
+6. **Prova de vida:** ignorar o `Retry-After` no worker quebrou o build
+   (`Tests run: 13, Failures: 2`); o `Retry-After` foi restaurado e a suíte voltou a
+   ficar verde.
+7. **End-to-end com o backend real contra o mock real:** `204` virando `POLL_ATTEMPT`
+   com o intervalo de 2 s honrado, a confirmação terminal, o timeout determinístico da
+   Central sobrevivo pelas 3 tentativas (3 leituras contadas no mock), o reenvio com a
+   mesma `Idempotency-Key` (o mock recusou de novo com `409 IDEMPOTENCIA_CONFLITO`) e a
+   queda da Central deixando a operação em `INTEGRATION_ERROR` com o backoff de 2 s, 4 s
+   e 8 s.
+8. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest='PollOperationTest,IntegrationBackoffTest,CircuitBreakerTest,CentralHttpClientTest'` → 44 testes verdes.
+   - `./mvnw -B -pl backend test -Dtest='PollingPersistenceTest,SchedulingConfigTest,PortabilityOperationTest'` → 64 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend 273 testes, mock 39 testes).
+
+## Sessão #38 — Task 2.12 (Auto-transição de integração e respostas tipadas da Central)
+
+- **Data:** 2026-11-27
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/032-backend-typed-central-answers`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** alinhar a máquina de estados, a trilha e o fluxo do worker, e distinguir as
+  respostas da Central que antes caíam no mesmo balde de falha: o `404` da Central e a
+  rejeição com um motivo que o contrato não declara.
+
+### Atividades Realizadas:
+1. **Decisão com o responsável:** três pontos foram levados à decisão — a auto-transição
+   `INTEGRATION_ERROR` → `INTEGRATION_ERROR`, o tratamento do `404`
+   (`OPERACAO_NAO_ENCONTRADA`) e o motivo de rejeição desconhecido. A escolha foi a
+   auto-transição explícita (opção B), com a linha nova na §7 e a autorização para
+   editar o `ARCHITECTURE.md`; e a tipagem das respostas da Central com o fechamento da
+   rejeição desconhecida (opções 1+2), sem alterar o contrato público.
+2. **Domínio:**
+   - `PortabilityOperation.registerIntegrationFailure` aceita a origem
+     `INTEGRATION_ERROR`; `renewIntegrationBackoff` foi removido e o caminho de falha
+     ficou único.
+   - `CentralStatus.NotFound`: a Central não conhece o protocolo, com o corpo bruto.
+   - `RejectionReason.Unmapped`: o motivo fora do contrato, com o código público
+     `UNMAPPED_REJECTION`.
+3. **Adaptadores:**
+   - `PortabilityAcl.toRejectionReason` traduz o motivo desconhecido para `Unmapped`; a
+     rejeição sem motivo continua violando o contrato.
+   - `CentralHttpClient.statusOf`: o `404` vira `NotFound` e conta como chamada
+     bem-sucedida no circuito — a Central respondeu, ela está disponível.
+4. **Aplicação:** `PollOperation` trata o `NotFound` como falha retomável, grava o corpo
+   bruto da Central no evento e usa `registerIntegrationFailure` em todos os caminhos de
+   falha.
+5. **Regras e specs:** `ARCHITECTURE.md` §7 (linha da auto-transição), §3 (tradução do
+   motivo desconhecido) e §11 (passo do `404` no fluxo do worker); ADR-0003 (protocolo de
+   polling); `BACKLOG.md` (task 2.12, renumeração de 2.12–2.16 para 2.13–2.17 e três
+   dívidas registradas); `PLAN.md` e `ROADMAP.md`.
+6. **Testes:** 45 do agregado (com a auto-transição na matriz), 16 do worker, 19 do
+   cliente HTTP, 8 da nova `PortabilityAclTest` e 6 da razão selada.
+7. **Prova de vida:** sem a linha da §7 na matriz, a suíte quebrou
+   (`Tests run: 45, Failures: 1`); a linha foi restaurada e a suíte voltou a ficar verde.
+8. **End-to-end com o backend real contra o mock real:** o reset administrativo do mock
+   (`POST /_admin/reset → 204`) fez a Central esquecer as operações sem sair do ar; o
+   `404` virou `INTEGRATION_FAILED` com o corpo bruto (`OPERACAO_NAO_ENCONTRADA`), a
+   segunda falha provou a auto-transição (`previous_status = new_status =
+   INTEGRATION_ERROR`) com o backoff dobrando de 2 s para 4 s, uma nova operação foi
+   aceita e confirmada depois de 14 `404`s (o circuito não foi poluído) e uma rejeição
+   com o motivo `LIMITE_DE_PARCELAS` (patch temporário no mock, revertido depois) fechou a
+   operação como `REJECTED` com o código `UNMAPPED_REJECTION`.
+9. **Descoberta fora do escopo:** o end-to-end expôs um defeito pré-existente — a
+   sequência de protocolos do mock reinicia a cada reset e o esquema garante `protocol`
+   único, então a colisão respondia `500` em vez de um erro mapeado. Registrado como
+   dívida no `BACKLOG.md`.
+10. **Validação:**
+    - `./mvnw -B -pl backend test -Dtest='PortabilityOperationTest,RejectionReasonTest,PollOperationTest,CentralHttpClientTest,PortabilityAclTest'` → 104 testes verdes.
+    - `./mvnw -B verify` → reactor verde (backend 289 testes, mock 39 testes).
+    - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).
+
+## Sessão #39 — Task 2.13 (Confirmação e atualização de conta)
+
+- **Data:** 2026-11-27
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/033-backend-complete-operation`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** fechar o ciclo da operação em uma única transação: a confirmação da
+  Central vira `CONFIRMED` e, na mesma transação, a conta recebe a atualização e a
+  operação vira `COMPLETED` com `account_updated_at`; a rejeição fecha a operação como
+  `REJECTED` com o motivo.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/AGENTS.md`, `SDD/specs/PLAN.md` (task 2.13 em voo),
+   `SDD/stacks/java.md` e `SDD/stacks/testing.md`; o `ARCHITECTURE.md` §7 e §11 e o
+   ADR-0003 já declaravam o caminho `CONFIRMED` → `COMPLETED` — nenhuma regra precisou
+   ser alterada.
+2. **Aplicação:**
+   - `CompleteOperation`: a confirmação fecha a operação (`CONFIRMED` → `COMPLETED` com
+     `account_updated_at`) e a rejeição a encerra como `REJECTED` com o motivo.
+   - `TransitionRecorder`: a fronteira de transação e a política do lock otimista em um
+     lugar só, compartilhada pelo worker e pelo fechamento.
+   - `PollOperation`: entrega a resposta terminal da Central ao `CompleteOperation`.
+3. **Domínio:** `PortabilityOperation` ganhou o invariante `account_updated_at` existe
+   apenas quando a operação está `COMPLETED`.
+4. **Wiring:** `CompositionRoot` instancia os dois casos de uso novos.
+5. **Testes:** 7 do `CompleteOperation` (caminho completo, uma transação só, o
+   `rawPayload` só no evento da Central, transições recusadas), 3 de integração da
+   persistência sobre PostgreSQL 16 (fechamento, rejeição e **rollback completo**),
+   7 do polling persistido, 16 do worker, 48 do agregado e 2 do agendamento.
+6. **Prova de vida:** com os eventos gravados fora da transação, o teste de rollback
+   ficou vermelho (`expected: PENDING but was: COMPLETED`); com a trilha dentro da
+   transação, voltou a ficar verde.
+7. **End-to-end com o backend real contra o mock real:** a operação confirmada percorreu
+   `CREATED` → `PENDING` → `CONFIRMED` → `COMPLETED` com `account_updated_at` gravado e
+   a trilha com `OPERATION_CONFIRMED`, `ACCOUNT_UPDATED` e `OPERATION_COMPLETED`; a
+   rejeitada fechou como `REJECTED` com `MARGIN_INSUFFICIENT` e o corpo bruto da Central
+   na trilha. Nenhum processo ou container sobrou.
+8. **Descoberta:** a primeira execução do end-to-end usou o jar anterior à task e a
+   operação parou em `CONFIRMED` — a lacuna real da task, observada antes de existir a
+   correção.
+9. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest='CompleteOperationTest,PollOperationTest,CompletionPersistenceTest,PollingPersistenceTest,PortabilityOperationTest,SchedulingConfigTest'` → 93 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend 301 testes, mock 39 testes).
+   - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).
+
+## Sessão #40 — Task 2.14 (Consulta de operações e trilha)
+
+- **Data:** 2026-11-27
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/034-backend-operation-queries`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** expor a leitura paginada das operações com filtro por status, o detalhe
+  de uma operação e a trilha da auditoria em ordem cronológica; a operação que não
+  existe responde `404 OPERATION_NOT_FOUND`.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/AGENTS.md`, `SDD/specs/PLAN.md` (task 2.14 em voo),
+   `SDD/stacks/java.md` e `SDD/stacks/testing.md`; o `ARCHITECTURE.md` §8 e o contrato
+   público já declaravam as rotas e o formato do erro — nenhuma regra precisou ser
+   alterada.
+2. **Aplicação:**
+   - `ListOperations`: a consulta paginada e filtrada pelo estado, com o total do
+     conjunto na página.
+   - `FindOperation`: o detalhe de uma operação; a inexistente vira
+     `DomainError.OperationNotFound` com o código `OPERATION_NOT_FOUND`.
+   - `ListOperationEvents`: a trilha da auditoria em ordem cronológica.
+3. **Domínio:** `Page` (página imutável com o total), `OperationFilter` (todas ou as de
+   um estado) e os modelos de leitura `OperationSummary` e `OperationDetail`.
+4. **Persistência:** a porta ganhou `list` e `findDetailById`; o adaptador JPA faz a
+   contagem e a página, com a ordem estável `createdAt, id`.
+5. **Borda HTTP:** `GET /api/v1/portability-operations` (com `status`, `page` e `size`) e
+   `GET /api/v1/portability-operations/{id}`, com os DTOs do contrato; o handler passou a
+   traduzir `OPERATION_NOT_FOUND` em `404`.
+6. **Testes:** 2 do `FindOperation`, 6 do `ListOperations`, 3 do `ListOperationEvents`, 6
+   do `Page`, 5 de integração da persistência sobre PostgreSQL 16 (25 operações,
+   paginação conferida) e 9 da borda HTTP sobre HTTP real.
+7. **End-to-end com o backend real contra o mock real:** quatro operações (três
+   confirmadas e uma rejeitada); a lista paginada devolveu `totalElements: 4` e
+   `totalPages: 2`, com as duas páginas sem repetir operação; o filtro por estado
+   devolveu 3 `COMPLETED` e 1 `REJECTED`; o detalhe veio completo; a operação
+   inexistente respondeu `404 OPERATION_NOT_FOUND`; página negativa, tamanho 101 e
+   estado inexistente responderam `400 VALIDATION_ERROR`. Nenhum processo ou container
+   sobrou.
+8. **Descoberta:** `OPERATION_NOT_FOUND` estava no contrato e no `ARCHITECTURE.md` §8,
+   mas não estava mapeado no handler — a consulta de uma operação inexistente
+   respondia `500` em vez de `404`.
+9. **Decisão:** a consulta sai por modelos de leitura, e não pelo agregado: `updated_at`
+   pertence à linha do armazenamento e o contrato público exige `updatedAt` no resumo e
+   no detalhe.
+10. **Validação:**
+    - `./mvnw -B -pl backend test -Dtest='FindOperationTest,ListOperationsTest,ListOperationEventsTest,SharedValueObjectsTest,QueryPersistenceTest,OperationQueryResourceTest'` → 49 testes verdes.
+    - `./mvnw -B verify` → reactor verde (backend 332 testes, mock 39 testes).
+    - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).
+
+## Sessão #41 — Task 2.15 (Recursos REST e tratamento de erros)
+
+- **Data:** 2026-11-27
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/035-backend-rest-resources`
+- **PR:** #47 — https://github.com/marcelinosandroni/consigport-platform/pull/47
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** completar a superfície `/api/v1` com o opt-in, a consulta do opt-in, a
+  agenda e a trilha da auditoria, e fechar o tratamento de erros com o formato do
+  contrato público (`code`, `message`, `locale`, `timestamp`, `path`, `details`) e os
+  códigos EN estáveis.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/AGENTS.md`, `SDD/specs/PLAN.md` (task 2.15 em voo),
+   `SDD/stacks/java.md` e `SDD/stacks/testing.md`; o `ARCHITECTURE.md` §8 e o contrato
+   público já declaravam as rotas, os status e o formato do erro — nenhuma regra precisou
+   ser alterada, e nem `SDD/ARCHITECTURE.md` nem os contratos foram tocados.
+2. **Aplicação:**
+   - `RegisterAuthorization`: devolve o registro e o sinal de criação, para o recurso
+     distinguir `201` do opt-in novo do `200` do opt-in repetido.
+   - `FindAuthorization`: a consulta do opt-in mais recente do beneficiário.
+   - `QueryAgenda`: o caso de uso da agenda, que exige o opt-in registrado.
+3. **Domínio:** `DomainError.AuthorizationNotFound` (código estável
+   `AUTHORIZATION_NOT_FOUND`) e a porta `AuthorizationRepository.findLatestByBeneficiary`,
+   com a ordem estável `createdAt desc, id desc`.
+4. **Persistência:** o adaptador JPA implementa a porta nova; o fake em memória dos testes
+   também, para a porta ter um único contrato.
+5. **Borda HTTP:** `POST /api/v1/authorizations` (`201`/`200`),
+   `GET /api/v1/authorizations/{beneficiaryId}` (`200`/`404`),
+   `GET /api/v1/beneficiaries/{beneficiaryId}/agenda` (`200`/`403`/`404`) e
+   `GET /api/v1/portability-operations/{id}/events` (`200`/`404`), com os DTOs do contrato.
+6. **Tratamento de erros:** o handler traduz `AUTHORIZATION_NOT_FOUND` em `404` e ganhou um
+   tratador genérico para `500 INTERNAL_ERROR`, no formato do contrato, com a causa real
+   apenas no log do servidor.
+7. **Adaptador da Central:** `CentralHttpClient` passou a implementar também a
+   `CentralAuthorizationPort` — a porta existia no domínio, mas só tinha fake em memória.
+   O consentimento é replicado em `POST /autorizacoes`, assinado em HMAC como as outras
+   chamadas; a falha da Central vira `DomainError.CentralUnavailable` (`503`).
+8. **Testes:** 5 do recurso de autorização, 3 do recurso de agenda, 3 do recurso de
+   trilha, 10 do handler (um caso por código estável), 4 novos do cliente da Central e o
+   fake do repositório de autorizações com a porta nova.
+9. **End-to-end com o backend real contra o mock real:** o opt-in novo respondeu `201`, o
+   repetido `200` sem duplicar no banco; a consulta do opt-in devolveu `200` e `404`; o
+   opt-in sem beneficiário devolveu `400 VALIDATION_ERROR` com o campo no detalhe; a
+   agenda devolveu `200` com as parcelas, `403 AUTHORIZATION_REQUIRED` sem opt-in e
+   `404 BENEFICIARY_NOT_FOUND` para um beneficiário que a Central não conhece; a trilha
+   saiu em ordem cronológica, do `CREATED` ao `COMPLETED`, com o payload bruto da Central
+   como objeto; a trilha de uma operação inexistente devolveu
+   `404 OPERATION_NOT_FOUND`; o erro público exibiu os seis campos do contrato; e a
+   Central recebeu a réplica do opt-in. Nenhum processo ou container sobrou.
+10. **Descoberta:** a primeira chamada do mock da Central leva ~8 s numa JVM fria (o
+    `Mac.init` carrega as classes do JCE e a validação do corpo carrega o MVC), acima do
+    timeout de leitura de 3 s do backend — o `POST /api/v1/authorizations` respondia
+    `503 CENTRAL_UNAVAILABLE` sem que a Central tivesse recusado a requisição. Diagnóstico
+    com proxy TCP e `jstack` do mock durante a chamada. O E2E passa a aquecer o mock e a
+    zerar o estado com `POST /_admin/reset` antes das asserções.
+11. **Descoberta:** `AUTHORIZATION_NOT_FOUND` não era mapeado no handler — a consulta de um
+    beneficiário sem opt-in respondia `500` em vez de `404`.
+12. **Decisão:** `GET /authorizations/{beneficiaryId}` devolve **um** registro, como manda o
+    contrato, e o backend pode ter um opt-in por convênio: a resposta é o mais recente
+    (`createdAt`, depois `id` como desempate), nunca um registro arbitrário.
+13. **Dívida registrada:** `POST /api/v1/authorizations` responde `503 CENTRAL_UNAVAILABLE`
+    quando a Central não registra o consentimento, mas o contrato público lista apenas
+    `400` e `500` para essa rota. A dívida está no `BACKLOG.md`, para alinhar contrato e
+    mapeamento com a autorização do responsável; o contrato não foi alterado.
+14. **Validação:**
+    - `./mvnw -B -pl backend test -Dtest='ApiExceptionHandlerTest,AuthorizationResourceTest,AgendaResourceTest,OperationEventResourceTest,RegisterAuthorizationTest,FindAuthorizationTest,AuthorizationRepositoryContractTest,CentralHttpClientTest'` → 59 testes verdes.
+    - `./mvnw -B verify` → reactor verde (backend 357 testes, mock 39 testes).
+    - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).
+
+## Sessão #42 — Task 2.16 (i18n, Swagger e snapshot OpenAPI)
+
+- **Data:** 2026-11-27
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/036-backend-i18n-openapi`
+- **PR:** #48 — https://github.com/marcelinosandroni/consigport-platform/pull/48
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** localizar as mensagens humanas pela negociação do `Accept-Language` (com
+  fallback `pt-BR` e o código do erro nunca traduzido), publicar a documentação viva da
+  API em `/v3/api-docs` e no Swagger UI, e provar que o contrato gerado é equivalente ao
+  snapshot público `contracts/consigport-api.yaml`.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/AGENTS.md`, `SDD/specs/PLAN.md` (task 2.16 em voo), o
+   `ARCHITECTURE.md` §8 e §12 e o ADR-0004 (regras de i18n e OpenAPI). Nenhuma regra
+   precisou ser alterada: nem o `SDD/ARCHITECTURE.md` nem os contratos públicos foram
+   tocados.
+2. **Catálogos das mensagens:** três bundles — `messages_pt_BR.properties`,
+   `messages_en.properties` e `messages_es.properties` — com a chave de cada entrada
+   sendo o próprio código estável do erro. O código nunca é traduzido; só a mensagem
+   humana. As chaves da Bean Validation (`jakarta.validation.constraints.*.message`)
+   também estão nos três catálogos.
+3. **Negociação do locale:** `config/MessageSourceConfig.java` publica o `MessageSource`
+   (basename `i18n/messages`, UTF-8, `fallbackToSystemLocale=false`), o
+   `AcceptHeaderLocaleResolver` (padrão `pt-BR`, idiomas `pt-BR`/`en`/`es`) e o
+   `LocalValidatorFactoryBean` ligado aos mesmos catálogos.
+4. **Handler de erros:** o mapa fixo de mensagens pt-BR do `ApiExceptionHandler` foi
+   removido; a mensagem vem do catálogo, resolvida pelo código e pelo locale negociado
+   (`LocaleContextHolder.getLocale()`).
+5. **Documentação viva:** `config/OpenApiConfig.java` publica a informação da API
+   (título `ConsigPort API`, versão `1.0.0`, contato, licença MIT, servidor local, quatro
+   tags) e um `OpenApiCustomizer` que injeta o header `Accept-Language` em todas as
+   operações.
+6. **Borda HTTP:** os quatro recursos receberam `@Tag`, `@Operation` com o `operationId`
+   do contrato público (`registerAuthorization`, `findAuthorization`,
+   `getBeneficiaryAgenda`, `startPortabilityOperation`, `listPortabilityOperations`,
+   `findPortabilityOperation`, `listOperationEvents`), `@ApiResponse` por status, o
+   `Idempotency-Key` publicado como obrigatório e o header `Idempotent-Replay` no `202`.
+7. **DTOs:** todos receberam `@Schema(name=..., requiredProperties=...)`; os dois DTOs da
+   conta de recebimento (`ReceivingAccountRequest` e `ReceivingAccountResponse`) foram
+   colapsados em um só (`ReceivingAccount`), como manda o contrato, que publica um
+   único schema.
+8. **Teste de contrato:** `GeneratedContractTest` sobe o backend real (Testcontainers) e
+   compara o `/v3/api-docs` com o snapshot `contracts/consigport-api.yaml`, por meio do
+   `ContractComparator`: rotas, métodos, `operationId`, parâmetros (nome, lugar,
+   obrigatoriedade), status, corpo obrigatório e o shape dos schemas (propriedades,
+   tipos, enums e obrigatoriedade), resolvendo `$ref`/`allOf`/`oneOf`.
+9. **Prova de vida:** a anotação do `404` de uma rota foi removida do recurso e o teste
+   de contrato ficou vermelho, apontando a diferença; com a anotação restaurada, o
+   teste voltou ao verde.
+10. **Descoberta:** `@Schema(requiredMode=REQUIRED)` no nível do tipo **não** propaga
+    para as propriedades; `@Schema(requiredProperties={...})` no tipo **gera** o array
+    `required` do componente. Verificado empiricamente antes de ser aplicado.
+11. **Descoberta:** o springdoc não sobe sem `jackson-dataformat-yaml` no classpath — o
+    bean `OpenAPI` declara a dependência do YAML e o backend falhava ao subir. A
+    dependência foi declarada explicitamente no `backend/pom.xml`.
+12. **Descoberta:** o comparador precisa resolver as referências **de cada documento no
+    seu próprio `components`**. Resolver a referência de um documento no `components` do
+    outro produzia diferenças falsas (o `beneficiaryId` do contrato era lido como um
+    parâmetro vazio).
+13. **Decisão:** a comparação canônica ignora o que não muda o contrato do consumidor
+    (descrições, exemplos, `format`, limites numéricos, nome dos componentes) e compara
+    o que muda (rota, método, `operationId`, parâmetros, status, corpo obrigatório e
+    shape do schema). O contrato público é a fonte de verdade e não foi alterado.
+14. **End-to-end com o backend real:** a mensagem seguiu o `Accept-Language` em `en`,
+    `es` e `pt-BR`, com o código `AUTHORIZATION_NOT_FOUND` intacto; um idioma não
+    suportado (`fr`) e a ausência de header caíram no fallback `pt-BR`; o detalhe da
+    falha de validação também veio no idioma do chamador (`must not be blank` em en,
+    `no debe estar en blanco` em es); o `/v3/api-docs` publicado traz os sete
+    `operationId` do contrato, o header `Accept-Language` em todas as operações e os
+    status esperados; o Swagger UI respondeu `302` e `200`. Nenhum processo ou container
+    sobrou no final.
+15. **Validação:**
+    - `./mvnw -B -pl backend test -Dtest='ApiExceptionHandlerTest,LocaleNegotiationTest,GeneratedContractTest,AuthorizationResourceTest,AgendaResourceTest,OperationEventResourceTest'` → 43 testes verdes.
+    - `./mvnw -B verify` → reactor verde (backend 379 testes, mock 39 testes).
+    - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).
+
+## Sessão #43 — Task 2.17 (Gate de cobertura do núcleo)
+
+- **Data:** 2026-11-27
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/037-backend-coverage-gate`
+- **PR:** #49 — https://github.com/marcelinosandroni/consigport-platform/pull/49
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** ativar o portão de cobertura do backend sobre o núcleo (domínio e casos de
+  uso), cobrar **80% de linhas e de branches** como manda o portão 3.2 do
+  `docs/quality/GATES.md`, fechar as lacunas de branch e publicar o relatório no CI.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/AGENTS.md`, `SDD/specs/PLAN.md` (task 2.17 em voo) e o
+   portão 3.2 do `docs/quality/GATES.md`, que exige 80% de linhas e de branches no
+   domínio e nos casos de uso. Nenhuma regra precisou ser alterada.
+2. **Divisão da task:** a 2.17 original ("Fechamento do backend") reunia o portão de
+   cobertura, os testes do núcleo e a prova do ciclo de vida com o banco real — mais de
+   uma hora de trabalho. Foi dividida antes de começar: a **2.17** virou o portão de
+   cobertura com os testes do núcleo, e a **2.18** ficou com a prova do ciclo de vida
+   completo com o PostgreSQL real. O `PLAN.md`, o `BACKLOG.md` e o `ROADMAP.md` foram
+   atualizados (a Fase 2 passa de 17 para 18 tasks; o total do projeto, de 52 para 53).
+3. **Medição da baseline:** o JaCoCo foi ativado no módulo `backend` e o portão foi
+   medido pela primeira vez: **74,64% de branches** (linhas em 89,74%), abaixo dos 80%
+   exigidos, com o build vermelho e a regra apontada.
+4. **Mapeamento das lacunas:** as branches perdidas estavam concentradas nos invariantes
+   recusados pelo domínio e nunca exercitados — `OperationDetail` (23 perdidas),
+   `PortabilityOperation` (20), `OperationRequest` (15), `OperationSummary` (6),
+   `Installment` (5), `Page`, `OperationId`, `CentralSubmissionException`, os três status
+   tipados da Central, `BeneficiaryAgenda`, `IntegrationBackoff`, `RejectionReason`, o
+   filtro e o evento de auditoria.
+5. **Portão:** `pom.xml` ganhou a propriedade `jacoco.branch.coverage` (0,80), os
+   `includes` que restringem a medição ao núcleo (`br/com/consigport/domain/**` e
+   `br/com/consigport/application/**`) e o segundo limite da regra (`BRANCH` com
+   `COVEREDRATIO`); `backend/pom.xml` passou a declarar o plugin.
+6. **Testes novos:** `OperationReadModelsTest` (25 casos), `OperationRequestTest`
+   (18 casos), `AgendaReadModelsTest` (10 casos) e `CentralStatusTest` (13 casos), mais as
+   ampliações em `PortabilityOperationTest`, `SharedValueObjectsTest`, `OperationEventTest`,
+   `RejectionReasonTest` e `IntegrationBackoffTest`.
+7. **Descoberta — defeito no domínio:** a recusa da parcela nula em `OperationRequest` era
+   código morto. `List.copyOf` recusa um elemento nulo com `NullPointerException`, e a
+   cópia vinha **antes** da checagem: o invariante declarado pelo domínio
+   (`installmentIds must not contain null`) nunca podia ser disparado, e o chamador
+   recebia uma `NullPointerException` em vez da `IllegalArgumentException` do contrato.
+   A recusa agora vem antes da cópia.
+8. **Descoberta — portão sem implementação:** o `GATES.md` §3.2 exige
+   `./mvnw -q spotless:check`, mas nenhum `pom.xml` declara o plugin Spotless: o comando
+   falha com "no such goal". Ativar o Spotless exige formatar o código existente, o que
+   produz um diff largo que deve ficar em task própria. A dívida está registrada no
+   `BACKLOG.md`, nas dívidas da Fase 2.
+9. **CI:** o job `backend` publica o relatório de cobertura como o artefato
+   `backend-coverage`.
+10. **Prova de vida:** o limiar de branches foi elevado artificialmente para `1,00` e o
+    build ficou vermelho, com a regra apontada; com o limiar restaurado em `0,80`, o
+    build voltou ao verde.
+11. **Validação:**
+    - `./mvnw -B -pl backend test -Dtest='OperationReadModelsTest,OperationRequestTest,AgendaReadModelsTest,CentralStatusTest,PortabilityOperationTest,SharedValueObjectsTest,OperationEventTest'` → 179 testes verdes.
+    - `./mvnw -B verify` → reactor verde (backend 478 testes, mock 39 testes).
+    - Cobertura final do núcleo: **99,71% de branches**, 98,12% de linhas, 100% de classes.
+    - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).
+
+## Sessão #44 — Task 2.18 (Fluxo completo com o banco real)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/038-backend-lifecycle-integration`
+- **PR:** #50 — https://github.com/marcelinosandroni/consigport-platform/pull/50
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** provar o ciclo de vida inteiro de uma operação de portabilidade contra o
+  PostgreSQL 16 real — `CREATED` → `PENDING` → `CONFIRMED` → `COMPLETED` com a conta
+  atualizada e a trilha completa, `CREATED` → `PENDING` → `REJECTED` com o motivo e a
+  trilha, e o rollback quando o registro do evento falha.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/AGENTS.md`, `SDD/specs/PLAN.md` (task 2.18 em voo),
+   `SDD/stacks/testing.md` (a regra que proíbe chamar uma API de terceiro num teste de
+   integração) e os casos de uso `StartOperation`, `PollOperation` e `CompleteOperation`.
+2. **Mapeamento da lacuna:** o ciclo de vida já estava coberto em partes —
+   `CompletionPersistenceTest` provava a confirmação a partir de `PENDING` e
+   `PollingPersistenceTest` provava o worker — mas nenhum teste percorria o caminho
+   inteiro com a operação criada pelo caso de uso e fechada pela Central.
+3. **Teste de integração:** `OperationLifecyclePersistenceTest`, no pacote
+   `application/portability`, com o `@SpringBootTest` sobre o PostgreSQL 16 do
+   Testcontainers: os adaptadores JPA, as transações Spring e a migração do Flyway são
+   reais; só a Central é simulada. Três cenários: a confirmação (com um 204 antes), a
+   rejeição com o motivo e o rollback.
+4. **Prova de vida do rollback:** o `@Transactional` do `SpringTransactionRunner` foi
+   removido de propósito — o teste ficou vermelho (`expected: PENDING but was:
+   COMPLETED`), provando que o rollback vem da fronteira transacional e que a
+   asserção não é vazia. O código de produção foi restaurado.
+5. **Prova de vida da trilha:** o evento `ACCOUNT_UPDATED` foi removido de propósito do
+   `CompleteOperation` — o teste ficou vermelho (a trilha caiu para cinco eventos). O
+   código de produção foi restaurado.
+6. **Duplo compartilhado:** o repositório de eventos que falha no enésimo append estava
+   duplicado dentro do `CompletionPersistenceTest`; ele virou
+   `br.com.consigport.support.FailingOperationEventRepository`, usado pelos dois testes.
+7. **E2E real:** backend e mock empacotados, PostgreSQL 16 do `compose.yaml` e o mock da
+   Central de verdade. O caminho confirmado levou nove eventos e
+   `account_updated_at` preenchido; o caminho rejeitado levou seis eventos e
+   `rejection_reason = MARGIN_INSUFFICIENT` com o corpo bruto da Central. Zero
+   containers e zero processos no fim.
+8. **Correção de ordem no `EVIDENCE.md`:** as seções estavam fora de ordem cronológica
+   (a 2.17 entre a 2.15 e a 2.16); a ordem foi corrigida nesta task.
+9. **Validação:**
+   - `./mvnw -B -pl backend test -Dtest='OperationLifecyclePersistenceTest'` → 3 testes verdes.
+   - `./mvnw -B verify` → reactor verde (backend 481 testes, mock 39 testes).
+   - Cobertura do núcleo inalterada: **99,71% de branches**, 98,12% de linhas, 100% de classes.
+   - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).

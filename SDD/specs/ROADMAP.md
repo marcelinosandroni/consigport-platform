@@ -12,13 +12,15 @@
 |---|---|
 | Bootstrap do repositório | ✅ `main` com commit inicial |
 | Fase 0 — Fundação | ✅ concluída e arquivada, tag `v0.1.0` |
-| Fase em andamento | Fase 1 — Central mock (task 1.7 em voo) |
-| Próxima task | 2.1 — Esqueleto hexagonal e regras ArchUnit |
-| Versão | `v0.1.0` (a Fase 1 fecha em `v0.2.0`) |
+| Fase 1 — Central mock | ✅ concluída e arquivada, tag `v0.2.0` |
+| Fase em andamento | Fase 2 — Backend core (18 tasks concluídas; fechamento e tag em andamento) |
+| Próxima task | Fechamento da Fase 2 — promoção `develop` → `staging` → `main`, tag `v0.3.0` e arquivamento |
+| Versão | `v0.2.0` (a Fase 2 fecha em `v0.3.0`) |
 
 A Fase 0 entregou specs, ADRs, harness, gates, contratos, scaffolds, CI/CD e a
-release `v0.1.0`. O código de aplicação começa na Fase 1, sempre em branch própria e
-via PR.
+release `v0.1.0`. A Fase 1 entregou a Central de Convênios simulada, com HMAC,
+idempotência, caos determinístico e contrato publicado. O código de aplicação do
+backend começa na Fase 2, sempre em branch própria e via PR.
 
 ---
 
@@ -27,12 +29,12 @@ via PR.
 | Fase | Objetivo | Tasks | Branch | Tag |
 |---|---|---|---|---|
 | 0 — Fundação | Specs, contratos, CI/CD, Docker base, scaffolds | 12 | `docs/000-sdd-foundation`, `feat/00x-*` | `v0.1.0` ✅ |
-| 1 — Central mock | Simular a Central com HMAC, idempotência, caos e admin | 7 | `feat/01x-central-mock` | `v0.2.0` |
-| 2 — Backend core | DDD + hexagonal + ACL + Flyway + i18n + polling + Swagger | 16 | `feat/02x-backend-*` | `v0.3.0` |
+| 1 — Central mock | Simular a Central com HMAC, idempotência, caos e admin | 7 | `feat/01x-central-mock` | `v0.2.0` ✅ |
+| 2 — Backend core | DDD + hexagonal + ACL + Flyway + i18n + polling + Swagger | 18 | `feat/02x-backend-*` | `v0.3.0` |
 | 3 — Frontend RSC | React 19 RSC, design Matrix, i18n, fluxo completo | 9 | `feat/03x-frontend-*` | `v0.4.0` |
 | 4 — Qualidade | Contratos, E2E, k6, Docker full, CD, release, README | 7 | `feat/04x-quality-*` | `v1.0.0` |
 
-Total: **51 tasks**, cada uma com 2–4 arquivos e um commit.
+Total: **53 tasks**, cada uma com 2–4 arquivos e um commit.
 
 ---
 
@@ -72,14 +74,26 @@ CI/CD real e governança de branch.
 
 ---
 
-## 4. Fase 1 — Central mock
+## 4. Fase 1 — Central mock (concluída)
 
 **Objetivo:** Central determinística na porta `8081`, com contrato PT e Swagger.
 
+**Tasks**
+
+| ID | Entrega | Estado |
+|---|---|---|
+| 1.1 | Store em memória, fixtures e administração | `[x]` |
+| 1.2 | Consulta de agenda | `[x]` |
+| 1.3 | Opt-in de autorização | `[x]` |
+| 1.4 | Submissão de portabilidade | `[x]` |
+| 1.5 | Consulta de status com `Retry-After` | `[x]` |
+| 1.6 | HMAC e idempotência | `[x]` |
+| 1.7 | Caos determinístico e contrato publicado | `[x]` |
+
 **Saída**
 - Opt-in, agenda, portabilidade `202`, status `204/200`, HMAC, idempotência, caos e admin.
-- Testes de contrato e MockMvc verdes.
-- Tag `v0.2.0`.
+- Testes de contrato e MockMvc verdes (39 testes no mock).
+- Tag `v0.2.0` com as três imagens no GHCR e staging validado.
 
 **Riscos**
 - Assinatura canônica divergente entre mock e backend; o vetor compartilhado é a defesa.

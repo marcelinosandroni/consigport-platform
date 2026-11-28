@@ -1,0 +1,122 @@
+package br.com.consigport.adapters.out.persistence;
+
+import br.com.consigport.domain.authorization.Authorization;
+import br.com.consigport.domain.authorization.AuthorizationAlreadyExistsException;
+import br.com.consigport.domain.authorization.AuthorizationRepository;
+import br.com.consigport.domain.shared.AgreementId;
+import br.com.consigport.domain.shared.BeneficiaryId;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceException;
+import java.util.Optional;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Adapter of the {@link AuthorizationRepository} port over PostgreSQL.
+ *
+ * <p>The adapter translates the unique constraint of the pair
+ * {@code (beneficiaryId, agreementId)} into the domain error, so the application layer
+ * never sees a storage specific failure.
+ */
+@Repository
+public class JpaAuthorizationRepository implements AuthorizationRepository {
+
+  private final EntityManager entityManager;
+
+  /**
+   * Builds the adapter.
+   *
+   * @param entityManager the entity manager of the persistence context
+   */
+  public JpaAuthorizationRepository(EntityManager entityManager) {
+    this.entityManager = entityManager;
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<Authorization> findByBeneficiaryAndAgreement(
+      BeneficiaryId beneficiaryId, AgreementId agreementId) {
+    return entityManager
+        .createQuery(
+            "select authorization from AuthorizationJpaEntity authorization"
+                + " where authorization.beneficiaryId = :beneficiaryId"
+                + " and authorization.agreementId = :agreementId",
+            AuthorizationJpaEntity.class)
+        .setParameter("beneficiaryId", beneficiaryId.value())
+        .setParameter("agreementId", agreementId.value())
+        .getResultStream()
+        .findFirst()
+        .map(JpaAuthorizationRepository::toDomain);
+  }
+
+  /**
+   * Finds the latest authorization of a beneficiary.
+   *
+   * <p>The order is {@code createdAt, id}: the most recent opt-in wins, and the
+   * identifier breaks the tie of two opt-ins of the same instant.
+   *
+   * @param beneficiaryId the beneficiary that gave the opt-in
+   * @return the most recent authorization of the beneficiary, when there is one
+   */
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<Authorization> findLatestByBeneficiary(BeneficiaryId beneficiaryId) {
+    return entityManager
+        .createQuery(
+            "select authorization from AuthorizationJpaEntity authorization"
+                + " where authorization.beneficiaryId = :beneficiaryId"
+                + " order by authorization.createdAt desc, authorization.id desc",
+            AuthorizationJpaEntity.class)
+        .setParameter("beneficiaryId", beneficiaryId.value())
+        .setMaxResults(1)
+        .getResultStream()
+        .findFirst()
+        .map(JpaAuthorizationRepository::toDomain);
+  }
+
+  @Override
+  @Transactional
+  public void save(Authorization authorization) {    try {
+      entityManager.persist(toEntity(authorization));
+      // The flush is inside the guard: the unique constraint of the pair is
+      // checked by PostgreSQL, and only the flush reaches the database.
+      entityManager.flush();
+    } catch (PersistenceException exception) {
+      if (isUniqueViolation(exception)) {
+        throw new AuthorizationAlreadyExistsException(
+            authorization.beneficiaryId(), authorization.agreementId());
+      }
+      throw exception;
+    }
+  }
+
+  /**
+   * Tells whether the database refused the write because of a unique constraint.
+   *
+   * <p>The SQLSTATE {@code 23505} is the unique violation of PostgreSQL. The check
+   * walks the causes, because the driver wraps the failure in the exception of the
+   * persistence provider.
+   *
+   * @param exception the failure of the persistence provider
+   * @return {@code true} when the write broke a unique constraint
+   */
+  private static boolean isUniqueViolation(Throwable exception) {
+    return UniqueViolations.isUniqueViolation(exception);
+  }
+
+  private static Authorization toDomain(AuthorizationJpaEntity entity) {
+    return new Authorization(
+        new Authorization.AuthorizationId(entity.getId()),
+        new BeneficiaryId(entity.getBeneficiaryId()),
+        new AgreementId(entity.getAgreementId()),
+        entity.getCreatedAt());
+  }
+
+  private static AuthorizationJpaEntity toEntity(Authorization authorization) {
+    return new AuthorizationJpaEntity(
+        authorization.id().value(),
+        authorization.beneficiaryId().value(),
+        authorization.agreementId().value(),
+        authorization.createdAt());
+  }
+}
