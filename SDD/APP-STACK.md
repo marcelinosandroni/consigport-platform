@@ -38,7 +38,7 @@ Ele simula a Central externa, não é produto.
 | React / React DOM | 19.2.x | Server Components |
 | Vite | 7.x + `@vitejs/plugin-rsc` | Template oficial `rsc`, sem Next.js |
 | Tailwind CSS | 4.x | Tokens do `DESIGN.md` |
-| i18next / react-i18next | 25.x / 16.x | pt-BR, en, es |
+| i18next / react-i18next | 26.x / 16.x | pt-BR, en, es |
 | TanStack Query | 5.x | Polling de status no cliente |
 | React Hook Form + Zod | 7.x / 4.x | Formulários e validação |
 | openapi-typescript + openapi-fetch | 7.x / 0.13.x | Cliente tipado gerado do contrato |
@@ -125,6 +125,11 @@ Segredos reais vêm de GitHub Secrets em CI/CD. Nunca em workflow, log ou commit
 
 Negociação: `Accept-Language` com fallback `pt-BR`. Códigos de erro são em inglês e
 estáveis; `message` é localizada. A ACL traduz o contrato PT da Central para o domínio EN.
+
+> **Nota de versão:** o `i18next` foi fixado em `26.x` (e não `25.x`) porque a série 25
+> carrega o advisory **GHSA-6jcc-5g8w-32mx** (`deepExtend` recursivo sobre objetos
+> embutidos, DoS), corrigido apenas a partir da `26.3.4`. O `react-i18next@16` aceita
+> `i18next >= 25.10.9`, então a combinação segue suportada.
 
 Documentação do projeto (specs, ADRs, README) é em pt-BR por decisão explícita do
 responsável. Código, identificadores, commits e regras do template `SDD/` permanecem em

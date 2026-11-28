@@ -141,16 +141,19 @@
 ## Fase atual: 3 — Frontend RSC
 
 > Objetivo: UI React 19 RSC na porta `5173`, design Matrix, i18n e fluxo completo.
-> Task em voo: **3.1 — Cliente OpenAPI tipado**.
+> Task em voo: **3.3 — Primitivas de UI**.
 
 ### Tasks
 
 - [x] **3.1 — Cliente OpenAPI tipado**
       Tipos gerados de `contracts/consigport-api.yaml`; `openapi-fetch` com base URL por
       ambiente; erro mapeado por `code`.
-- [-] **3.2 — Catálogos i18n**
+- [x] **3.2 — Catálogos i18n**
       Catálogos pt-BR/en/es com o mesmo conjunto de chaves; fallback pt-BR; troca de
       idioma persistida; `Accept-Language` enviado à API.
+- [-] **3.3 — Primitivas de UI**
+      Componentes base fiéis ao design Matrix: tokens de `theme.css`, foco visível,
+      contraste AA e variantes sem valores mágicos.
 
 ### Como usar este arquivo
 
