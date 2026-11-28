@@ -5,6 +5,7 @@ import { NotFoundPage } from './pages/not-found.tsx'
 import { SectionPage } from './pages/section.tsx'
 import { AgendaPage, AgendaWithoutBeneficiary } from '../features/agenda/server/page.tsx'
 import { AuthorizationPage } from '../features/authorization/server/page.tsx'
+import { OperationPage, OperationWithoutId } from '../features/operations/server/page.tsx'
 import { PortabilityPage, PortabilityWithoutSelection } from '../features/portability/server/page.tsx'
 import { DEFAULT_LOCALE, type SupportedLocale } from '../shared/i18n/locales.ts'
 import { createTranslator, type Translator } from '../shared/i18n/server.ts'
@@ -55,6 +56,18 @@ const ROUTES: Route[] = [
           installmentIds={installmentIds}
           t={t}
         />
+      )
+    },
+  },
+  {
+    path: '/operacoes',
+    render: ({ t, locale, searchParams }) => {
+      const operationId = searchParams.get('operationId')?.trim() ?? ''
+
+      return operationId.length > 0 ? (
+        <OperationPage operationId={operationId} locale={locale} t={t} />
+      ) : (
+        <OperationWithoutId t={t} />
       )
     },
   },

@@ -5169,3 +5169,221 @@
 - `SDD/specs/ROADMAP.md`
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 3.7 — Painel de status com polling
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/037-frontend-operations-polling`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** acompanhar a operação até o terminal — TanStack Query com
+  intervalo de 2 s, parada em estado terminal, `nextPollAt` respeitado, sem
+  ISR.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Portão 3.4 do `GATES.md` (frontend):**
+   ```text
+   $ npm run --prefix frontend lint
+   > eslint .
+   EXIT=0
+
+   $ npm run --prefix frontend typecheck
+   > tsc --noEmit
+   EXIT=0
+
+   $ npm run --prefix frontend test:unit
+   > vitest run
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  25 passed (25)
+         Tests  131 passed (131)
+    Duration  35.01s
+   EXIT=0
+
+   $ npm run --prefix frontend build
+   [5/5] build ssr environment...
+   ✓ 131 modules transformed.
+   dist/ssr/assets/entry.rsc-ClVSkLbq.js     78.10 kB
+   dist/ssr/index.js                      1,583.16 kB
+   ✓ built in 2.50s
+   EXIT=0
+   ```
+2. **Portão 3.1 (documentação e SDD):**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 66 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ Exactly 1 task in flight in SDD/specs/PLAN.md.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos passaram.
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css.
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 51 sessions, structure valid.
+   ```
+3. **Testes da task — timers falsos cobrindo `PENDING`, `COMPLETED` e `REJECTED`:**
+   ```text
+   $ npx --prefix frontend vitest run --root frontend src/features/operations
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  3 passed (3)
+         Tests  21 passed (21)
+    Duration  7.53s
+   EXIT=0
+   ```
+   Os casos da ilha (`features/operations/ui/operation-status.test.tsx`):
+   - `follows the operation until it ends and stops there` — a operação começa
+     `PENDING` (`calls = 1`), depois de **2 s** vem `COMPLETED` (`calls = 2`),
+     e **30 s** depois ainda são `calls = 2`: o estado terminal parou o
+     polling.
+   - `shows the reason of a rejection and stops polling` — `REJECTED` mostra o
+     motivo (`MARGIN_INSUFFICIENT`) e **30 s** depois ainda são `calls = 1`.
+   - `waits for the instant the server declares before asking again` — com
+     `nextPollAt` **10 s** à frente, **2 s** não bastam (`calls = 1`) e a
+     pergunta sai aos **10 s** (`calls = 2`).
+   - `asks the API in the language of the reader` — `Accept-Language: pt-BR`.
+   - `says when the API cannot answer` — a falha vira a tela com o botão
+     "Tentar de novo".
+   E o hook (`features/operations/ui/use-operation-polling.test.ts`) prova a
+   aritmética do ritmo: `2 s` entre duas perguntas, `false` no estado terminal,
+   `false` no `OPERATION_NOT_FOUND`, `10 s` quando o servidor declara
+   `nextPollAt`, e nunca menos que a base de `2 s`.
+4. **Smoke no build de produção — o painel renderiza no servidor:**
+   ```text
+   $ npm run --prefix frontend preview -- --host 127.0.0.1 --port 5199
+
+   === /operacoes com a operação ===
+   h1: ['Status da operação']
+   'Em andamento'                       -> 1
+   'PRT-20261128-0001'                  -> 2
+   'R$\xa0750,00'                       -> 1
+   '2 parcelas'                         -> 1
+   'ConsigPort'                         -> 8
+   'Atualizar agora'                    -> 1
+   'Aguardando a próxima consulta'      -> 1
+   'Última atualização'                 -> 1
+
+   === /operacoes sem a operação ===
+   h1: ['Status da operação']
+   mensagem: ['Informe a operação para acompanhar o status.']
+   link: ['Portabilidade']
+
+   === /operacoes com operação inexistente ===
+   mensagem: ['A operação não existe.']
+   link: ['Portabilidade']
+
+   === /operacoes (en) ===
+   h1: ['Operation status']
+   'In progress'            -> 1
+   'PRT-20261128-0001'      -> 2
+   'Refresh now'            -> 1
+   '2 installments'         -> 1
+   'Last update'            -> 1
+
+   === /operacoes (es) ===
+   h1: ['Estado de la operación']
+   'Actualizar ahora'       -> 1
+   '2 cuotas'               -> 1
+
+   === navegação ===
+   itens: [('autorizacao', 'Autorizar'), ('portabilidade', 'Portabilidade'),
+           ('operacoes', 'Operações'), ('agenda', 'Agenda'), ('auditoria', 'Auditoria')]
+   ```
+5. **Smoke do fluxo completo — a operação criada leva ao painel:**
+   ```text
+   $ curl -s -X POST 'http://127.0.0.1:5199/portabilidade?beneficiaryId=BEN-001&agreementId=AGR-001&installments=PAR-001,PAR-002' \
+       -F '$ACTION_REF_1=' -F '$ACTION_1:0=…' -F '$ACTION_1:1=…' -F '$ACTION_KEY=…' \
+       -F 'beneficiaryId=BEN-001' -F 'agreementId=AGR-001' -F 'installmentIds=PAR-001,PAR-002' \
+       -F 'locale=pt-BR' -F 'idempotencyKey=' \
+       -F 'bank=001' -F 'branch=1234' -F 'account=56789-0' -F 'assigneeCreditor=ConsigPort'
+
+   len: 13896
+   protocolo: ['PRT-20261128-0001']
+   badge: ['Operação criada']
+   link do painel: [('/operacoes?operationId=c1a2b3c4-d5e6-4f70-8a91-b2c3d4e5f601', 'Acompanhar operação')]
+   moeda: ['R$\xa0750,00']
+
+   === fake-api.log ===
+   [fake-api] GET /api/v1/portability-operations/c1a2b3c4-d5e6-4f70-8a91-b2c3d4e5f601 accept-language=pt-BR
+   [fake-api] POST /api/v1/portability-operations idempotency-key=41cb6739-2e1f-412b-95bf-4384df05ef45 accept-language=pt-BR
+   ```
+6. **Processos encerrados:** depois do smoke, as portas 8080 e 5199 ficaram
+   livres e nenhum processo de `vite preview` ou da API falsa restou:
+   ```text
+   portas 8080 e 5199 livres (preview e fake-api encerrados)
+   0
+   ```
+
+#### Conteúdo Entregue:
+- `frontend/src/features/operations/ui/use-operation-polling.ts` — o hook: o
+  ritmo do polling (2 s), a parada no estado terminal, o `nextPollAt` respeitado
+  e a leitura defensiva do `OPERATION_NOT_FOUND`.
+- `frontend/src/features/operations/ui/operation-status.tsx` — a ilha cliente: o
+  estado, o protocolo, o total, as parcelas, o credor, a última atualização, o
+  motivo da rejeição e o botão "Atualizar agora".
+- `frontend/src/features/operations/server/page.tsx` — o Server Component: o
+  primeiro estado lido no render, os estados de operação inexistente e de
+  falha.
+- `frontend/src/shared/api/query-provider.tsx` — o `QueryClient` criado uma vez
+  por sessão e embrulhado pelo Shell.
+- `frontend/src/shared/format/date.ts` — o `formatDateTime`, para a hora da
+  última atualização.
+- `frontend/src/features/portability/ui/submit-operation.tsx` — o caminho da
+  operação criada para o painel.
+- `frontend/src/app/router.tsx`, `navigation.tsx`, `shell.tsx` — a rota
+  `/operacoes`, a entrada na navegação e o provedor do cache.
+- `frontend/src/shared/i18n/pt-BR.json`, `en.json`, `es.json` — a seção
+  `operations` completada e a entrada da navegação.
+- `frontend/src/test/mocks/handlers.ts` — a API falsa responde à consulta da
+  operação.
+
+#### Descobertas e Decisões:
+- **O `nextPollAt` existe no domínio e ainda não no contrato público.** O
+  agregado `PortabilityOperation` tem `nextPollAt` (`ARCHITECTURE.md` §4) e o
+  backend o honra no `Retry-After` (`ARCHITECTURE.md` §11), mas o
+  `OperationDetail` do contrato público não o publica. Como o contrato público
+  só muda com autorização do responsável, a leitura é **defensiva**: o hook
+  usa o campo quando o servidor o envia e segue no intervalo base quando não
+  vem. Publicar `nextPollAt` no contrato é uma tarefa da API, não do frontend.
+- **Terminal não é "deixou de mudar".** Só `COMPLETED` e `REJECTED` encerram o
+  polling; `INTEGRATION_ERROR` é retomável e continua sendo perguntado — é o
+  que a §7 do `ARCHITECTURE.md` diz.
+- **O `OPERATION_NOT_FOUND` também para o polling.** Repetir a cada 2 s uma
+  pergunta que a API já respondeu "não existe" é desperdício: a falha vira
+  tela, com o botão de tentar de novo.
+- **O primeiro estado vem do servidor, o resto da ilha.** A página entrega o
+  estado já lido no render (a tela aparece pronta, e funciona sem JavaScript);
+  a ilha assume o polling dali em diante. É a fronteira do `react.md`: Server
+  Component por padrão, folha cliente só onde há interação.
+- **Timer falso e rede real não falam a mesma língua.** Nos testes, o relógio
+  do polling é falso, mas a resposta da API chega em tempo real: o teste dá
+  um tick real (a resposta chega) e um tick do relógio falso (o render que o
+  React agendou acontece). Sem esse par, o painel atrasaria uma pergunta
+  inteira — foi exatamente o que o primeiro teste mostrou.
+- **O `formatDateTime` é um instante, não um dia.** A data do calendário é
+  montada pelas partes, sem UTC; a hora da operação é um momento e sai com a
+  hora ao lado da data, no fuso do leitor.
+
+#### Arquivos Tocados:
+- `frontend/src/features/operations/ui/use-operation-polling.ts`
+- `frontend/src/features/operations/ui/use-operation-polling.test.ts`
+- `frontend/src/features/operations/ui/operation-status.tsx`
+- `frontend/src/features/operations/ui/operation-status.test.tsx`
+- `frontend/src/features/operations/server/page.tsx`
+- `frontend/src/features/operations/server/page.test.tsx`
+- `frontend/src/shared/api/query-provider.tsx`
+- `frontend/src/shared/format/date.ts`
+- `frontend/src/shared/format/date.test.ts`
+- `frontend/src/features/portability/ui/submit-operation.tsx`
+- `frontend/src/app/router.tsx`
+- `frontend/src/app/router.test.tsx`
+- `frontend/src/app/navigation.tsx`
+- `frontend/src/app/shell.tsx`
+- `frontend/src/shared/i18n/pt-BR.json`
+- `frontend/src/shared/i18n/en.json`
+- `frontend/src/shared/i18n/es.json`
+- `frontend/src/test/mocks/handlers.ts`
+- `frontend/package.json`
+- `frontend/package-lock.json`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`

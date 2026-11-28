@@ -33,3 +33,21 @@ export const formatDate = (value: string, locale: SupportedLocale): string => {
     new Date(year, month - 1, day),
   )
 }
+
+/**
+ * Formats an instant for the reader.
+ *
+ * The API sends a full instant — `2026-11-23T12:00:09Z`. An instant is a
+ * moment, not a calendar day: it is read in the zone and the language of the
+ * reader, with the hour beside the date. A value that is not an instant is
+ * returned untouched, like the calendar date.
+ */
+export const formatDateTime = (value: string, locale: SupportedLocale): string => {
+  const parsed = new Date(value)
+
+  if (Number.isNaN(parsed.getTime())) {
+    return value
+  }
+
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(parsed)
+}

@@ -16,7 +16,8 @@
     "authorization": "Authorize",
     "portability": "Portability",
     "agenda": "Agenda",
-    "audit": "Audit"
+    "audit": "Audit",
+    "operations": "Operations"
   },
   "home": {
     "eyebrow": "Portability platform",
@@ -108,7 +109,8 @@
     "created": "Operation created",
     "failed": "Submission refused",
     "protocol": "Protocol",
-    "total": "Total"
+    "total": "Total",
+    "track": "Track operation"
   },
   "operations": {
     "eyebrow": "Tracking",
@@ -126,7 +128,21 @@
     "accountUpdatedAt": "Account updated at",
     "retryCount": "Attempts",
     "protocol": "Protocol",
-    "totalAmount": "Total"
+    "totalAmount": "Total",
+    "stateUnknown": "Operation",
+    "stateError": "Query",
+    "missingOperation": "Tell us which operation to follow.",
+    "create": "Request portability",
+    "installments": "Installments",
+    "installmentCount_one": "{{count}} installment",
+    "installmentCount_other": "{{count}} installments",
+    "creditor": "Creditor",
+    "updatedAt": "Last update",
+    "refresh": "Refresh now",
+    "terminal": "The operation has ended.",
+    "waiting": "Waiting for the next query…",
+    "loading": "Loading the operation…",
+    "unavailable": "The operation could not be queried."
   },
   "audit": {
     "eyebrow": "Audit",

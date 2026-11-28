@@ -6,6 +6,7 @@ import type { PortabilityState } from '../actions.ts'
 import { formatMoney } from '../../../shared/format/money.ts'
 import { statusTone } from '../../../shared/format/status.ts'
 import { useLocale } from '../../../shared/i18n/provider.tsx'
+import { buttonClasses } from '../../../shared/ui/button.tsx'
 import { Card } from '../../../shared/ui/card.tsx'
 import { StatusBadge } from '../../../shared/ui/status-badge.tsx'
 
@@ -44,6 +45,15 @@ export function SubmitOperation({ state }: SubmitOperationProps) {
             {formatMoney(state.totalAmount ?? 0, locale)}
           </span>
         </p>
+        {/* The panel of the operation follows the status of the operation. */}
+        {state.operationId !== undefined ? (
+          <a
+            href={`/operacoes?operationId=${encodeURIComponent(state.operationId)}`}
+            className={buttonClasses({ variant: 'primary' })}
+          >
+            {t('portability.track')}
+          </a>
+        ) : null}
       </Card>
     )
   }

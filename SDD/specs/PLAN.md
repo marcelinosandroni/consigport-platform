@@ -141,7 +141,7 @@
 ## Fase atual: 3 — Frontend RSC
 
 > Objetivo: UI React 19 RSC na porta `5173`, design Matrix, i18n e fluxo completo.
-> Task em voo: **3.7 — Painel de status com polling**.
+> Task em voo: **3.8 — Timeline de auditoria**.
 
 ### Tasks
 
@@ -162,9 +162,12 @@
 - [x] **3.6 — Conta de recebimento e envio**
       Validação com Zod; `Idempotency-Key` gerada uma vez por tentativa; `409` e `422`
       exibidos com mensagem do servidor.
-- [-] **3.7 — Painel de status com polling**
+- [x] **3.7 — Painel de status com polling**
       TanStack Query com intervalo de 2 s; para em estado terminal; `nextPollAt`
       respeitado; sem ISR.
+- [-] **3.8 — Timeline de auditoria**
+      Trilha imutável em ordem cronológica: tipo, status anterior e novo, detalhe
+      e horário; sem edição nem exclusão.
 
 ### Como usar este arquivo
 

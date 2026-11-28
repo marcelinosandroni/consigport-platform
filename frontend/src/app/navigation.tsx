@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: '/', key: 'nav.home' },
   { href: '/autorizacao', key: 'nav.authorization' },
   { href: '/portabilidade', key: 'nav.portability' },
+  { href: '/operacoes', key: 'nav.operations' },
   { href: '/agenda', key: 'nav.agenda' },
   { href: '/auditoria', key: 'nav.audit' },
 ] as const

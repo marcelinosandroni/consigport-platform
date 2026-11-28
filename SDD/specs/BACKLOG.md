@@ -612,6 +612,46 @@
 - **Arquivos:** `frontend/src/features/operations/server/page.tsx`, `ui/operation-status.tsx`, `ui/use-operation-polling.ts`.
 - **Aceite:** TanStack Query com intervalo de 2 s; para em estado terminal; `nextPollAt` respeitado; sem ISR.
 - **Verificação:** teste com timers falsos cobrindo `PENDING`, `COMPLETED` e `REJECTED`.
+- **Realizado:** o painel que acompanha a operação até o estado terminal.
+  A **ilha cliente** (`features/operations/ui/operation-status.tsx`) é a única
+  dona do polling; o resto da tela é **Server Component**: o primeiro estado
+  da operação é lido **durante o render**, com o `Accept-Language` da cookie, e
+  a ilha assume dali em diante — **sem ISR** em lugar nenhum. O **hook**
+  (`features/operations/ui/use-operation-polling.ts`) é o único lugar onde o
+  **ritmo** mora: `TanStack Query` pergunta a cada **2 s** pelo
+  `GET /api/v1/portability-operations/{operationId}`, **para no estado
+  terminal** (`COMPLETED` e `REJECTED` — `INTEGRATION_ERROR` é retomável e
+  continua sendo perguntado) e **respeita o `nextPollAt`** quando o servidor o
+  declara: a espera nunca é menor que a base de 2 s nem menor que o instante
+  pedido. O `nextPollAt` pertence ao domínio, mas o contrato público ainda
+  não o publica — a leitura é defensiva e o contrato não foi tocado; o mesmo
+  vale para o `OPERATION_NOT_FOUND`, que **encerra** o polling em vez de
+  repetir uma pergunta sem resposta. O **provedor do cache**
+  (`shared/api/query-provider.tsx`) cria o `QueryClient` uma vez por sessão, e
+  o **Shell** o embrulha: o navegador guarda o estado do servidor só ali. O
+  **`formatDateTime`** (`shared/format/date.ts`) entrou para a hora da última
+  atualização — um instante é um momento, não um dia de calendário, então sai
+  com a hora ao lado da data. A **operação criada** na 3.6 agora oferece o
+  caminho para o painel (`/operacoes?operationId=…`), e a rota `/operacoes`
+  entrou no roteador e na navegação. Arquivos reais:
+  `frontend/src/shared/api/query-provider.tsx`,
+  `frontend/src/features/operations/ui/use-operation-polling.ts`,
+  `frontend/src/features/operations/ui/use-operation-polling.test.ts`,
+  `frontend/src/features/operations/ui/operation-status.tsx`,
+  `frontend/src/features/operations/ui/operation-status.test.tsx`,
+  `frontend/src/features/operations/server/page.tsx`,
+  `frontend/src/features/operations/server/page.test.tsx`,
+  `frontend/src/shared/format/date.ts`,
+  `frontend/src/shared/format/date.test.ts`,
+  `frontend/src/features/portability/ui/submit-operation.tsx`,
+  `frontend/src/app/router.tsx`,
+  `frontend/src/app/router.test.tsx`,
+  `frontend/src/app/navigation.tsx`,
+  `frontend/src/app/shell.tsx`,
+  `frontend/src/shared/i18n/pt-BR.json`,
+  `frontend/src/shared/i18n/en.json`,
+  `frontend/src/shared/i18n/es.json`,
+  `frontend/src/test/mocks/handlers.ts`.
 
 ### 3.8 — Timeline de auditoria
 - **Objetivo:** exibir a trilha imutável de eventos.

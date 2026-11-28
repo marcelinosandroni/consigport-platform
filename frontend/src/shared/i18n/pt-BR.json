@@ -16,7 +16,8 @@
     "authorization": "Autorizar",
     "portability": "Portabilidade",
     "agenda": "Agenda",
-    "audit": "Auditoria"
+    "audit": "Auditoria",
+    "operations": "Operações"
   },
   "home": {
     "eyebrow": "Plataforma de portabilidade",
@@ -108,7 +109,8 @@
     "created": "Operação criada",
     "failed": "Envio recusado",
     "protocol": "Protocolo",
-    "total": "Total"
+    "total": "Total",
+    "track": "Acompanhar operação"
   },
   "operations": {
     "eyebrow": "Acompanhamento",
@@ -126,7 +128,21 @@
     "accountUpdatedAt": "Conta atualizada em",
     "retryCount": "Tentativas",
     "protocol": "Protocolo",
-    "totalAmount": "Total"
+    "totalAmount": "Total",
+    "stateUnknown": "Operação",
+    "stateError": "Consulta",
+    "missingOperation": "Informe a operação para acompanhar o status.",
+    "create": "Solicitar portabilidade",
+    "installments": "Parcelas",
+    "installmentCount_one": "{{count}} parcela",
+    "installmentCount_other": "{{count}} parcelas",
+    "creditor": "Credor",
+    "updatedAt": "Última atualização",
+    "refresh": "Atualizar agora",
+    "terminal": "Operação encerrada.",
+    "waiting": "Aguardando a próxima consulta…",
+    "loading": "Carregando a operação…",
+    "unavailable": "A operação não pôde ser consultada."
   },
   "audit": {
     "eyebrow": "Auditoria",
