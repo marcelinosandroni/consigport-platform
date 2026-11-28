@@ -28,12 +28,15 @@ const lookup = (catalog: unknown, key: string): string | undefined => {
  *
  * The fallback is pt-BR — the default of the platform — and the key itself
  * when even the fallback does not know it, so a missing translation shows up
- * in the screen instead of rendering an empty hole.
+ * in the screen instead of rendering an empty hole. The caller may offer a
+ * last resort: the message that came with the error, already localized by the
+ * backend.
  */
-export const translate = (locale: SupportedLocale, key: string): string =>
-  lookup(catalogs[locale], key) ?? lookup(catalogs[DEFAULT_LOCALE], key) ?? key
+export const translate = (locale: SupportedLocale, key: string, fallback?: string): string =>
+  lookup(catalogs[locale], key) ?? lookup(catalogs[DEFAULT_LOCALE], key) ?? fallback ?? key
 
-export type Translator = (key: string) => string
+export type Translator = (key: string, fallback?: string) => string
 
 /** Binds a locale to the translator, the shape the pages receive. */
-export const createTranslator = (locale: SupportedLocale): Translator => (key) => translate(locale, key)
+export const createTranslator = (locale: SupportedLocale): Translator =>
+  (key, fallback) => translate(locale, key, fallback)

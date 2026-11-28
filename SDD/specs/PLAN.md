@@ -141,7 +141,7 @@
 ## Fase atual: 3 — Frontend RSC
 
 > Objetivo: UI React 19 RSC na porta `5173`, design Matrix, i18n e fluxo completo.
-> Task em voo: **3.5 — Agenda e seleção de parcelas**.
+> Task em voo: **3.6 — Conta de recebimento e envio**.
 
 ### Tasks
 
@@ -157,8 +157,11 @@
 - [x] **3.4 — Fluxo de autorização**
       Server Component renderiza; ilha cliente envia `POST /authorizations`; erro
       localizado; sucesso leva à agenda.
-- [-] **3.5 — Agenda e seleção de parcelas**
+- [x] **3.5 — Agenda e seleção de parcelas**
       Apenas `OPEN` selecionável; total recalculado; estado vazio e `403` tratados.
+- [-] **3.6 — Conta de recebimento e envio**
+      Validação com Zod; `Idempotency-Key` gerada uma vez por tentativa; `409` e `422`
+      exibidos com mensagem do servidor.
 
 ### Como usar este arquivo
 

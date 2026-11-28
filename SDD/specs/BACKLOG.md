@@ -514,6 +514,54 @@
 - **Arquivos:** `frontend/src/features/agenda/server/page.tsx`, `ui/installment-table.tsx`, `ui/selection-summary.tsx`.
 - **Aceite:** apenas `OPEN` selecionável; total recalculado; estado vazio e `403` tratados.
 - **Verificação:** testes de componente para seleção, total e estado vazio.
+- **Realizado:** a agenda do beneficiário, lida no servidor e escolhida no
+  navegador. A página (`features/agenda/server/page.tsx`) é um **Server Component
+  assíncrono**: durante o render ela pergunta
+  `GET /api/v1/beneficiaries/{beneficiaryId}/agenda` com o `Accept-Language` da
+  interface, e decide o estado pelo **`code` do erro**, não pelo status HTTP. Os
+  estados são honestos e todos nomeados: **vazio** ("Nenhuma parcela elegível na
+  agenda."), **sem consentimento** (o `403` vira `AUTHORIZATION_REQUIRED`, com o
+  atalho para autorizar), **beneficiário desconhecido** (o `404` vira
+  `BENEFICIARY_NOT_FOUND`) e **falha da consulta** (com o link de "Tentar de
+  novo"). A mensagem é sempre a do catálogo da interface, indexada pelo código
+  estável, com a `message` do servidor como fallback — a regra do ADR-0004.
+  A **folha cliente** (`features/agenda/ui/installment-table.tsx`) é a dona da
+  seleção: só uma parcela **`OPEN`** pode ser escolhida — a fechada está
+  desabilitada, porque oferecer uma parcela que a API recusa seria oferecer uma
+  operação impossível —, o total é **recalculado a cada mudança** a partir da
+  seleção (em centavos, para o ponto flutuante não mentir), e a seleção viaja
+  para a portabilidade pela URL (`/portabilidade?beneficiaryId=…&installments=…`).
+  O resumo (`features/agenda/ui/selection-summary.tsx`) anuncia o total com
+  `aria-live="polite"`: quem navega pelo teclado ouve o número se mover. O
+  **`shared/format/`** — a pasta que o `ARCHITECTURE.md` §5 reserva para
+  "moeda, data, status" — nasceu aqui: `money.ts` (reais no formato do leitor e
+  soma sem deriva), `date.ts` (a data do calendário no dia que a Central
+  queria, montada pelas partes, nunca por `new Date('2026-12-05')`, que seria
+  meia-noite UTC) e `status.ts` (o tom da Plataforma: elegível é sucesso,
+  concluída é sucesso, recusada é erro). O cabeçalho das páginas virou a
+  primitiva `shared/ui/page-header.tsx`, usada pelas três páginas que já existem.
+  Arquivos reais:
+  `frontend/src/features/agenda/server/page.tsx`,
+  `frontend/src/features/agenda/server/page.test.tsx`,
+  `frontend/src/features/agenda/ui/installment-table.tsx`,
+  `frontend/src/features/agenda/ui/installment-table.test.tsx`,
+  `frontend/src/features/agenda/ui/selection-summary.tsx`,
+  `frontend/src/shared/format/money.ts`,
+  `frontend/src/shared/format/money.test.ts`,
+  `frontend/src/shared/format/date.ts`,
+  `frontend/src/shared/format/date.test.ts`,
+  `frontend/src/shared/format/status.ts`,
+  `frontend/src/shared/ui/page-header.tsx`,
+  `frontend/src/shared/i18n/server.ts`,
+  `frontend/src/app/router.tsx`,
+  `frontend/src/app/router.test.tsx`,
+  `frontend/src/app/pages/section.tsx`,
+  `frontend/src/root.tsx`,
+  `frontend/src/features/authorization/server/page.tsx`,
+  `frontend/src/shared/i18n/pt-BR.json`,
+  `frontend/src/shared/i18n/en.json`,
+  `frontend/src/shared/i18n/es.json`,
+  `frontend/src/test/mocks/handlers.ts`.
 
 ### 3.6 — Conta de recebimento e envio
 - **Objetivo:** validar a conta e criar a operação.

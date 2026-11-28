@@ -15,7 +15,7 @@ export function Root(props: { url: URL; locale?: SupportedLocale }) {
       </head>
       <body>
         <Shell pathname={props.url.pathname} locale={locale}>
-          {resolveRoute(props.url.pathname, locale)}
+          {resolveRoute(props.url, locale)}
         </Shell>
       </body>
     </html>

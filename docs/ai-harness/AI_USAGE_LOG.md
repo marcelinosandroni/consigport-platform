@@ -1731,3 +1731,62 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - smoke no build de produção: a página renderiza em pt-BR e en, e o formulário
      postado na própria URL (caminho sem JavaScript) devolve a página com o erro
      localizado
+
+## Sessão #50 — Task 3.5 (Agenda e seleção de parcelas)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/035-frontend-agenda-selection`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** ler a agenda do beneficiário no servidor e escolher as parcelas
+  no navegador — apenas `OPEN` selecionável, total recalculado, estado vazio e
+  `403` tratados.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/specs/PLAN.md` (a task em voo), `SDD/ARCHITECTURE.md`
+   §5 (a árvore do frontend e a pasta `shared/format/`), `SDD/DESIGN.md` §4b e §6
+   (as quatro regras duras e as regras de interação), o contrato público
+   (`GET /api/v1/beneficiaries/{beneficiaryId}/agenda`, com `403` e `404`),
+   `SDD/stacks/react.md` (Server Component por padrão) e `docs/quality/GATES.md`
+   (portão 3.4).
+2. **`shared/format/`** — a pasta que o `ARCHITECTURE.md` §5 reserva para
+   "moeda, data, status" nasceu aqui: `money.ts` (reais no formato do leitor e
+   soma em centavos, sem a deriva do ponto flutuante), `date.ts` (a data do
+   calendário montada pelas partes, para o dia não andar com o fuso) e
+   `status.ts` (o tom da Plataforma por status).
+3. **Server Component assíncrono** (`features/agenda/server/page.tsx`): a agenda
+   é lida durante o render, com o `Accept-Language` da interface; os estados
+   (vazio, sem consentimento, beneficiário desconhecido, falha) são decididos
+   pelo `code` do erro.
+4. **Folha cliente** (`features/agenda/ui/installment-table.tsx`): a seleção
+   pertence à ilha; a parcela `CLOSED` aparece mas não pode ser escolhida; o
+   total é recalculado a cada mudança; a seleção viaja para a portabilidade pela
+   URL.
+5. **Resumo** (`features/agenda/ui/selection-summary.tsx`): o total numa região
+   `aria-live="polite"`, para quem navega pelo teclado ouvir o número se mover.
+6. **`shared/ui/page-header.tsx`** — o cabeçalho das páginas deixou de ser uma
+   cópia em três lugares e virou primitiva.
+7. **Roteador** (`app/router.tsx` e `root.tsx`): a rota recebe a URL inteira — o
+   caminho escolhe a tela, a query carrega o beneficiário — e o tradutor do
+   servidor ganhou o fallback da mensagem do servidor.
+8. **Catálogos** (`pt-BR.json`, `en.json`, `es.json`): a seção `agenda` foi
+   reescrita, com o mesmo conjunto de chaves nos três idiomas (as chaves do
+   esqueleto que não tinham uso foram removidas).
+9. **API falsa** (`test/mocks/handlers.ts`): a agenda de `BEN-001` (duas abertas
+   e uma fechada), `BEN-EMPTY`, `BEN-FORBIDDEN` e o `404` para o resto.
+10. **Testes:** `installment-table.test.tsx` (sete casos: a lista, a parcela
+    fechada desabilitada, o total recalculado, a contagem, a limpeza, a viagem
+    para a portabilidade e a impossibilidade de continuar sem seleção),
+    `page.test.tsx` (seis casos: a agenda, o estado vazio, o `403`, o `404`, a
+    falha com "Tentar de novo" e o `Accept-Language`), `money.test.ts` e
+    `date.test.ts`.
+11. **Validação:**
+    - `npm run --prefix frontend lint` → EXIT=0
+    - `npm run --prefix frontend typecheck` → EXIT=0
+    - `npm run --prefix frontend test:unit` → 19 arquivos, 89 testes verdes
+    - `npm run --prefix frontend build` → os três ambientes (rsc, ssr, client) verdes
+    - 5 gates locais de documentação verdes
+    - smoke no build de produção contra uma API falsa local: a agenda renderiza
+      em pt-BR e en, os quatro estados aparecem, a parcela fechada está
+      desabilitada e o `Accept-Language` chega à API no idioma do leitor
