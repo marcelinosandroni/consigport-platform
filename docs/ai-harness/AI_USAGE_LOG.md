@@ -1458,7 +1458,7 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
 - **Data:** 2026-11-28
 - **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
 - **Branch:** `feat/038-backend-lifecycle-integration`
-- **PR:** a abrir para `develop`
+- **PR:** #50 — https://github.com/marcelinosandroni/consigport-platform/pull/50
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** provar o ciclo de vida inteiro de uma operação de portabilidade contra o
   PostgreSQL 16 real — `CREATED` → `PENDING` → `CONFIRMED` → `COMPLETED` com a conta

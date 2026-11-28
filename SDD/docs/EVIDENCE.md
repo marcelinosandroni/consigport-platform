@@ -4009,7 +4009,7 @@
 
 - **Data de Conclusão:** 2026-11-28
 - **Branch:** `feat/038-backend-lifecycle-integration`
-- **PR:** a abrir para `develop`
+- **PR:** #50 — https://github.com/marcelinosandroni/consigport-platform/pull/50
 - **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** provar o ciclo de vida inteiro de uma operação de portabilidade contra o
