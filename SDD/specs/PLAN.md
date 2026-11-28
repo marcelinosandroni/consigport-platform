@@ -138,10 +138,11 @@
 
 ---
 
-## Fase atual: 3 — Frontend RSC
+## Fase 3 — Frontend RSC: concluída ✅
 
-> Objetivo: UI React 19 RSC na porta `5173`, design Matrix, i18n e fluxo completo.
-> Task em voo: **3.10 — Promoção da release `v0.4.0` e arquivamento da Fase 3**.
+> Arquivada em [`history/phases/phase-3-finished.md`](./history/phases/phase-3-finished.md).
+> Tag [`v0.4.0`](https://github.com/marcelinosandroni/consigport-platform/releases/tag/v0.4.0)
+> publicada com as três imagens no GHCR e o staging validado.
 
 ### Tasks
 
@@ -171,10 +172,24 @@
 - [x] **3.9 — Responsividade, acessibilidade e testes finais**
       Breakpoints do `DESIGN.md` §4b; navegação por teclado;
       `prefers-reduced-motion` respeitado; testes de unidade verdes.
-- [-] **3.10 — Promoção da release `v0.4.0` e arquivamento da Fase 3**
+- [x] **3.10 — Promoção da release `v0.4.0` e arquivamento da Fase 3**
       `develop` promovido para `staging` e `main` por PR; tag `v0.4.0` criada pelo
       release-please; release no GitHub com o CHANGELOG; imagens no GHCR com
       `v0.4.0`; run de staging verde; fase arquivada em `specs/history/phases/`.
+
+---
+
+## Fase atual: 4 — Qualidade e vitrine
+
+> Objetivo: provar o sistema no CI/CD — contratos, E2E no navegador, performance,
+> segurança, entrega contínua e a vitrine do repositório.
+> Task em voo: **4.1 — Gates de contrato**.
+
+### Tasks
+
+- [-] **4.1 — Gates de contrato**
+      Spectral sem erro; `oasdiff` compara com a versão de `main` e falha em breaking
+      change; snapshot do springdoc comparado ao contrato.
 
 ### Como usar este arquivo
 

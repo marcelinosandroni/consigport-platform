@@ -362,7 +362,7 @@
 
 ---
 
-## Fase 3 — Frontend RSC (9 tasks)
+## Fase 3 — Frontend RSC (10 tasks)
 
 ### 3.1 — Cliente OpenAPI tipado
 - **Objetivo:** consumir a API sem duplicar tipos.
@@ -750,6 +750,35 @@
 - **Arquivos:** `SDD/specs/history/phases/phase-3-finished.md`, `SDD/specs/PLAN.md`, `SDD/specs/ROADMAP.md`, `SDD/docs/EVIDENCE.md`, `docs/ai-harness/AI_USAGE_LOG.md`.
 - **Aceite:** `develop` promovido para `staging` e `main` por PR; tag `v0.4.0` criada pelo release-please; release no GitHub com o CHANGELOG; imagens no GHCR com `v0.4.0`; run de staging verde; fase arquivada.
 - **Verificação:** `git tag --list "v*"` mostra `v0.4.0`; `gh release view v0.4.0`; run do `cd-staging` verde; `node scripts/check-specs.mjs` com exit 0.
+
+### Dívidas da Fase 3 (frontend e entrega)
+- **Base da API presa no build:** a URL da API é resolvida no build (`VITE_API_BASE_URL`,
+  com o fallback `http://localhost:8080`), porque o Vite substitui `import.meta.env` na
+  hora do bundle. A imagem do frontend publicada no GHCR leva, portanto, o valor do
+  build — e o `compose.staging.yaml` só expõe a porta do frontend, sem a variável de
+  ambiente que a tornaria configurável. O `compose.staging.yaml` já registra o problema
+  ("the typed OpenAPI client arrives with task 3.1"), e a task 3.1 chegou: a dívida
+  agora é real. **Consequência:** o stack de staging sobe e as três imagens ficam
+  *healthy*, mas as telas que falam com a API (agenda, portabilidade, operações e
+  auditoria) não alcançam o backend no ambiente implantado — o navegador do visitante
+  resolveria `localhost:8080` na própria máquina. **Caminho:** tornar a URL da API
+  configurável em tempo de execução (variável de ambiente do container lida pelo
+  servidor, exposta ao navegador por `<meta>` ou por um proxy de `/api` no preview do
+  Vite) e provar o fluxo implantado de ponta a ponta. Tarefa própria, na Fase 4, junto
+  do E2E no compose (4.3) e da entrega contínua (4.6).
+- **Prova geométrica da responsividade:** as quatro regras do `DESIGN.md` §4b.2 têm
+  prova estrutural (breakpoints do `DESIGN.md` §4, nome acessível de todo controle,
+  alvo de toque de 44px, anel de foco visível) e prova estática (nenhum conteúdo
+  escondido, nenhuma largura fixa). A prova **geométrica** — `scrollWidth` real de
+  390px, caixa real de cada alvo, tamanho real do texto renderizado — exige um
+  navegador e chega com o Playwright da task 4.3.
+- **`nextPollAt` fora do contrato publicado:** o domínio e o `ARCHITECTURE.md` §11
+  definem o campo, mas o `OperationDetail` do contrato público ainda não o publica. O
+  frontend o lê de forma defensiva (`readNextPollAt`), sem tocar no contrato. Alinhar o
+  contrato exige autorização do responsável.
+- **Fase 3 sem E2E próprio:** a fase entregou 159 testes de unidade e smoke manual
+  contra uma API falsa local; nenhum teste de navegador. É a task 4.3 que fecha essa
+  lacuna, com o Playwright rodando contra o build de produção e o compose.
 
 ---
 
