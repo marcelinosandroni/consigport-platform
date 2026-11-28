@@ -2047,3 +2047,51 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    volta e o `release-please` não publique a `v0.4.0` de novo.
 9. **Validação:** os cinco gates locais de documentação verdes na promoção, no
    arquivamento e na sincronização.
+
+## Sessão #56 — Task 4.1 (Gates de contrato)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/041-quality-contract-gates`
+- **PR:** #70 (a abrir para develop)
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** impedir drift e quebra de compatibilidade — o job `contracts` passa a
+  comparar o contrato com a versão de `main`, a provar que o portão está armado e a
+  comparar o documento publicado pelo springdoc com o contrato versionado.
+
+### Atividades Realizadas:
+1. **Leitura do estado atual dos portões:** o job `contracts` comparava o contrato
+   com a branch base (`github.base_ref`), o springdoc era comparado com o contrato
+   apenas pelo teste Java `GeneratedContractTest` (job `backend`) e o script
+   `scripts/check-contract-drift.mjs` não existia.
+2. **`scripts/check-contract-drift.mjs`:** um portão com quatro modos — `--base`
+   (breaking change contra a ref de baseline), `--self-test` (prova de que o portão
+   está armado), `--document` (documento armazenado contra o contrato) e `--live`
+   (documento publicado por um backend em execução contra o contrato e o snapshot).
+   O binário do `oasdiff` sai do `PATH`, de `--oasdiff`, de `OASDIFF_BIN` ou é
+   baixado para o cache do usuário; nenhum arquivo temporário sobra no final.
+3. **A comparação estrutural:** portada para Node a semântica do
+   `ContractComparator` do backend — rotas, métodos, `operationId`, parâmetros,
+   corpo da requisição e status das respostas, com resolução de `$ref`, `allOf` e
+   `oneOf` nulo. As duas implementações concordam: o backend continua verde e o
+   script também.
+4. **As fixtures que armam o portão:** `tests/contracts/breaking-change-base.yaml` e
+   `tests/contracts/breaking-change.yaml` — a revisão sem a resposta `200` tem de
+   falhar, e o fixture comparado com ele mesmo tem de passar. As duas expectativas
+   são verificadas a cada execução.
+5. **O snapshot do documento publicado:** `tests/contracts/springdoc-consigport.json`,
+   gerado do `/v3/api-docs` do backend real (PostgreSQL 16, Central fake) e
+   verificado como determinístico em duas leituras.
+6. **O `.spectral.yaml`:** as regras da casa ficaram explícitas — `operationId`
+   único, tag definida, descrição da operação e servidores declarados — e o lint
+   continua sem nenhum aviso.
+7. **O CI:** o job `contracts` compara com `main`, prova que o portão está armado e
+   compara o snapshot com o contrato; o job `smoke` compara o documento publicado
+   pelo backend em execução com o contrato e com o snapshot, e publica o documento
+   lido como artefato `springdoc-document`. O nightly usa o mesmo script.
+8. **Provas vermelhas:** o contrato com a resposta `202` removido derruba o portão
+   (`response-success-status-removed`, exit 1) e o mesmo contrato quebra a
+   comparação de documentos (exit 1). O contrato público foi restaurado e o portão
+   voltou ao verde.
+9. **Validação:** os cinco portões de documentação verdes, os três YAML validados e
+   o snapshot conferido como determinístico.

@@ -1,0 +1,1119 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ConsigPort API",
+    "description": "API pública do ConsigPort para portabilidade de convênios de desconto em folha.\n\nIdentificadores, status e códigos de erro são estáveis e em inglês. Mensagens\nhumanas são localizadas por `Accept-Language` (padrão `pt-BR`). A criação de\noperação exige `Idempotency-Key`; o replay devolve a operação existente com o\nheader `Idempotent-Replay: true`.\n",
+    "contact": {
+      "name": "ConsigPort",
+      "url": "https://github.com/marcelinosandroni/consigport-platform"
+    },
+    "license": {
+      "name": "MIT",
+      "identifier": "MIT"
+    },
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Desenvolvimento local"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Audit",
+      "description": "Trilha imutável de eventos de uma operação."
+    },
+    {
+      "name": "Agenda",
+      "description": "Agenda de descontos futuros de um beneficiário autorizado."
+    },
+    {
+      "name": "Authorizations",
+      "description": "Opt-in do beneficiário para consulta da agenda."
+    },
+    {
+      "name": "Portability Operations",
+      "description": "Criação, consulta e acompanhamento de operações de portabilidade."
+    }
+  ],
+  "paths": {
+    "/api/v1/portability-operations": {
+      "get": {
+        "tags": [
+          "Portability Operations"
+        ],
+        "summary": "Lista operações de portabilidade",
+        "description": "Lista paginada, opcionalmente filtrada por status.",
+        "operationId": "listPortabilityOperations",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CREATED",
+                "PENDING",
+                "CONFIRMED",
+                "COMPLETED",
+                "REJECTED",
+                "INTEGRATION_ERROR"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Idioma das mensagens humanas. Códigos de erro nunca são traduzidos.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "pt-BR",
+              "enum": [
+                "pt-BR",
+                "en",
+                "es"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de operações.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requisição inválida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno inesperado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Portability Operations"
+        ],
+        "summary": "Cria uma operação de portabilidade",
+        "description": "Cria a operação com snapshot das parcelas e envia a solicitação assinada à\nCentral. A resposta é `202` porque a confirmação é assíncrona. A mesma\n`Idempotency-Key` com o mesmo payload devolve a operação existente e o\nheader `Idempotent-Replay: true`; com payload diferente devolve `409`.\n",
+        "operationId": "startPortabilityOperation",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID que identifica a tentativa de criação da operação.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Idioma das mensagens humanas. Códigos de erro nunca são traduzidos.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "pt-BR",
+              "enum": [
+                "pt-BR",
+                "en",
+                "es"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortabilityOperationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Operação aceita e enviada à Central.",
+            "headers": {
+              "Idempotent-Replay": {
+                "description": "`true` quando a operação devolvida já existia para a chave enviada.",
+                "style": "simple",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationAcceptedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requisição inválida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A chave de idempotência já foi usada com outro conteúdo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Parcela inelegível para portabilidade.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno inesperado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Central de Convênios indisponível.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/authorizations": {
+      "post": {
+        "tags": [
+          "Authorizations"
+        ],
+        "summary": "Registra a autorização (opt-in) do beneficiário",
+        "description": "Registra o consentimento do beneficiário para um convênio. O par\n`(beneficiaryId, agreementId)` é único: repetir a chamada devolve `200` com\na autorização existente em vez de criar outra.\n",
+        "operationId": "registerAuthorization",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Idioma das mensagens humanas. Códigos de erro nunca são traduzidos.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "pt-BR",
+              "enum": [
+                "pt-BR",
+                "en",
+                "es"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthorizationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Autorização já existente para o par beneficiário/convênio.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Authorization"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Autorização criada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Authorization"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requisição inválida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno inesperado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/portability-operations/{operationId}": {
+      "get": {
+        "tags": [
+          "Portability Operations"
+        ],
+        "summary": "Consulta uma operação de portabilidade",
+        "description": "Devolve o detalhe completo, incluindo snapshot, conta e motivo de rejeição.",
+        "operationId": "findPortabilityOperation",
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Idioma das mensagens humanas. Códigos de erro nunca são traduzidos.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "pt-BR",
+              "enum": [
+                "pt-BR",
+                "en",
+                "es"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operação encontrada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno inesperado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/portability-operations/{operationId}/events": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Lista a trilha de eventos da operação",
+        "description": "Devolve os eventos em ordem cronológica. A trilha é append-only.",
+        "operationId": "listOperationEvents",
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Idioma das mensagens humanas. Códigos de erro nunca são traduzidos.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "pt-BR",
+              "enum": [
+                "pt-BR",
+                "en",
+                "es"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Eventos da operação.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationEventsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno inesperado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/beneficiaries/{beneficiaryId}/agenda": {
+      "get": {
+        "tags": [
+          "Agenda"
+        ],
+        "summary": "Consulta a agenda de descontos futuros",
+        "description": "Devolve as parcelas futuras do beneficiário na Central. Exige autorização\nregistrada; apenas parcelas `OPEN` são elegíveis para portabilidade.\n",
+        "operationId": "getBeneficiaryAgenda",
+        "parameters": [
+          {
+            "name": "beneficiaryId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Idioma das mensagens humanas. Códigos de erro nunca são traduzidos.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "pt-BR",
+              "enum": [
+                "pt-BR",
+                "en",
+                "es"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agenda do beneficiário.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgendaResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Beneficiário sem autorização registrada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno inesperado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/authorizations/{beneficiaryId}": {
+      "get": {
+        "tags": [
+          "Authorizations"
+        ],
+        "summary": "Consulta a autorização de um beneficiário",
+        "description": "Devolve a autorização registrada para o beneficiário.",
+        "operationId": "findAuthorization",
+        "parameters": [
+          {
+            "name": "beneficiaryId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Idioma das mensagens humanas. Códigos de erro nunca são traduzidos.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "pt-BR",
+              "enum": [
+                "pt-BR",
+                "en",
+                "es"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Autorização encontrada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Authorization"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno inesperado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PortabilityOperationRequest": {
+        "type": "object",
+        "properties": {
+          "beneficiaryId": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "agreementId": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "installmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 64,
+              "minLength": 0
+            },
+            "minItems": 1
+          },
+          "assigneeCreditor": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 0
+          },
+          "receivingAccount": {
+            "$ref": "#/components/schemas/ReceivingAccount"
+          }
+        },
+        "required": [
+          "agreementId",
+          "assigneeCreditor",
+          "beneficiaryId",
+          "installmentIds",
+          "receivingAccount"
+        ]
+      },
+      "ReceivingAccount": {
+        "type": "object",
+        "properties": {
+          "bank": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "branch": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 0
+          },
+          "account": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "account",
+          "bank",
+          "branch"
+        ]
+      },
+      "OperationAcceptedResponse": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "CREATED",
+              "PENDING",
+              "CONFIRMED",
+              "COMPLETED",
+              "REJECTED",
+              "INTEGRATION_ERROR"
+            ]
+          },
+          "totalAmount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "createdAt",
+          "operationId",
+          "protocol",
+          "status",
+          "totalAmount"
+        ]
+      },
+      "ErrorDetail": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "message"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "path": {
+            "type": "string"
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErrorDetail"
+            }
+          }
+        },
+        "required": [
+          "code",
+          "details",
+          "locale",
+          "message",
+          "path",
+          "timestamp"
+        ]
+      },
+      "AuthorizationRequest": {
+        "type": "object",
+        "properties": {
+          "beneficiaryId": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "agreementId": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "agreementId",
+          "beneficiaryId"
+        ]
+      },
+      "Authorization": {
+        "type": "object",
+        "properties": {
+          "authorizationId": {
+            "type": "string"
+          },
+          "beneficiaryId": {
+            "type": "string"
+          },
+          "agreementId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "agreementId",
+          "authorizationId",
+          "beneficiaryId",
+          "createdAt"
+        ]
+      },
+      "OperationPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperationSummary"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "size",
+          "totalElements",
+          "totalPages"
+        ]
+      },
+      "OperationSummary": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "beneficiaryId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "CREATED",
+              "PENDING",
+              "CONFIRMED",
+              "COMPLETED",
+              "REJECTED",
+              "INTEGRATION_ERROR"
+            ]
+          },
+          "totalAmount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "beneficiaryId",
+          "createdAt",
+          "operationId",
+          "protocol",
+          "status",
+          "totalAmount",
+          "updatedAt"
+        ]
+      },
+      "InstallmentSnapshot": {
+        "type": "object",
+        "properties": {
+          "installmentId": {
+            "type": "string"
+          },
+          "agreementId": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "discountDate": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "required": [
+          "agreementId",
+          "amount",
+          "discountDate",
+          "installmentId"
+        ]
+      },
+      "OperationDetail": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "beneficiaryId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "CREATED",
+              "PENDING",
+              "CONFIRMED",
+              "COMPLETED",
+              "REJECTED",
+              "INTEGRATION_ERROR"
+            ]
+          },
+          "totalAmount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "agreementId": {
+            "type": "string"
+          },
+          "installments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InstallmentSnapshot"
+            }
+          },
+          "assigneeCreditor": {
+            "type": "string"
+          },
+          "receivingAccount": {
+            "$ref": "#/components/schemas/ReceivingAccount"
+          },
+          "rejectionReason": {
+            "type": "string"
+          },
+          "retryCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "accountUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "accountUpdatedAt",
+          "agreementId",
+          "assigneeCreditor",
+          "beneficiaryId",
+          "createdAt",
+          "installments",
+          "operationId",
+          "protocol",
+          "receivingAccount",
+          "rejectionReason",
+          "retryCount",
+          "status",
+          "totalAmount",
+          "updatedAt"
+        ]
+      },
+      "OperationEvent": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "previousStatus": {
+            "type": "string",
+            "enum": [
+              "CREATED",
+              "PENDING",
+              "CONFIRMED",
+              "COMPLETED",
+              "REJECTED",
+              "INTEGRATION_ERROR"
+            ]
+          },
+          "newStatus": {
+            "type": "string",
+            "enum": [
+              "CREATED",
+              "PENDING",
+              "CONFIRMED",
+              "COMPLETED",
+              "REJECTED",
+              "INTEGRATION_ERROR"
+            ]
+          },
+          "eventType": {
+            "type": "string",
+            "enum": [
+              "OPERATION_CREATED",
+              "OPERATION_SUBMITTED",
+              "POLL_ATTEMPT",
+              "OPERATION_CONFIRMED",
+              "OPERATION_REJECTED",
+              "ACCOUNT_UPDATED",
+              "OPERATION_COMPLETED",
+              "INTEGRATION_FAILED"
+            ]
+          },
+          "details": {
+            "type": "string"
+          },
+          "rawPayload": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "createdAt",
+          "details",
+          "eventId",
+          "eventType",
+          "newStatus",
+          "previousStatus",
+          "rawPayload"
+        ]
+      },
+      "OperationEventsResponse": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperationEvent"
+            }
+          }
+        },
+        "required": [
+          "events",
+          "operationId"
+        ]
+      },
+      "AgendaResponse": {
+        "type": "object",
+        "properties": {
+          "beneficiaryId": {
+            "type": "string"
+          },
+          "installments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Installment"
+            }
+          }
+        },
+        "required": [
+          "beneficiaryId",
+          "installments"
+        ]
+      },
+      "Installment": {
+        "type": "object",
+        "properties": {
+          "installmentId": {
+            "type": "string"
+          },
+          "agreementId": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "discountDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "CLOSED"
+            ]
+          }
+        },
+        "required": [
+          "agreementId",
+          "amount",
+          "discountDate",
+          "installmentId",
+          "status"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+openapi: 3.1.0
+info:
+  title: ConsigPort contract fixture
+  version: 1.0.0
+  description: >-
+    The baseline of the self-test of the contract gate. It is not the public
+    contract: it exists to prove that the gate is armed.
+paths:
+  /api/v1/fixtures:
+    get:
+      operationId: listFixtures
+      summary: Lists the fixtures.
+      responses:
+        '200':
+          description: The list of fixtures.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: string

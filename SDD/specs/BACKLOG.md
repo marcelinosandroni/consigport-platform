@@ -784,11 +784,45 @@
 
 ## Fase 4 — Qualidade e vitrine (7 tasks)
 
-### 4.1 — Gates de contrato
+### 4.1 — Gates de contrato — Realizado
 - **Objetivo:** impedir drift e quebra de compatibilidade.
-- **Arquivos:** `.spectral.yaml`, `.github/workflows/ci.yml`, `scripts/check-contract-drift.mjs`.
+- **Arquivos:** `.spectral.yaml`, `.github/workflows/ci.yml`,
+  `.github/workflows/nightly.yml`, `scripts/check-contract-drift.mjs`,
+  `tests/contracts/breaking-change-base.yaml`, `tests/contracts/breaking-change.yaml`,
+  `tests/contracts/springdoc-consigport.json`, `docs/quality/GATES.md`,
+  `SDD/specs/PLAN.md`, `SDD/specs/ROADMAP.md`, `SDD/specs/BACKLOG.md`,
+  `SDD/docs/EVIDENCE.md`, `docs/ai-harness/AI_USAGE_LOG.md`.
 - **Aceite:** Spectral sem erro; `oasdiff` compara com a versão de `main` e falha em breaking change; snapshot do springdoc comparado ao contrato.
 - **Verificação:** job `contracts` verde e PR proposital com breaking change vermelho.
+- **Realizado:** o job `contracts` agora compara o contrato com a versão de `main`
+  (antes comparava com a branch base), prova que o portão está armado com um par de
+  fixtures e compara o documento publicado pelo springdoc com o contrato versionado.
+  O job `smoke` compara o documento publicado pelo backend em execução com o
+  contrato e com o snapshot armazenado. O `nightly` usa o mesmo script.
+- **Dívidas da Fase 4 (contratos):**
+  - **O `oasdiff` não serve para comparar o contrato com o documento publicado:**
+    ele acusa diferenças de representação (`format: uuid` que o springdoc não
+    publica, `minimum` e `maxLength` dos limites que só o contrato declara) e não
+    de contrato. A comparação do documento publicado com o contrato é, portanto,
+    estrutural — rotas, métodos, `operationId`, parâmetros, corpo da requisição e
+    status das respostas — como no `ContractComparator` do backend, portado para
+    Node em `scripts/check-contract-drift.mjs`.
+  - **O snapshot do springdoc é um artefato versionado:** `tests/contracts/springdoc-consigport.json`
+    é o documento publicado pelo backend. Quando o contrato muda, o snapshot tem de
+    ser regerado (`node scripts/check-contract-drift.mjs --live <url> --write-snapshot
+    tests/contracts/springdoc-consigport.json`); o job `smoke` publica o documento
+    que ele leu como artefato `springdoc-document`, e é esse arquivo que vai para o
+    commit.
+  - **O contrato da Central não é comparado com o springdoc do mock:** o mock
+    publica uma cópia byte a byte de `contracts/central-api.yaml` como recurso
+    estático, e o documento gerado a partir das anotações do mock é uma visão
+    diferente (o `x-signature`, o `x-timestamp` e os limites são do contrato, não
+    do código). A garantia do mock é o teste `ContractTest`, que compara os dois
+    bytes.
+  - **O trabalho da fase 4 é commit `ci(...)`, e o `release-please` não publica a
+    seção `ci` por padrão:** a task 4.6, que já tem no aceite o changelog em
+    pt-BR, precisa cadastrar a seção no `release-please-config.json` para que os
+    portões de qualidade apareçam na release `v1.0.0`.
 
 ### 4.2 — Testes de propriedade com Schemathesis
 - **Objetivo:** exercitar a API real contra o contrato.
