@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.0](https://github.com/marcelinosandroni/consigport-platform/compare/v0.3.0...v0.4.0) (2026-11-28)
+
+
+### Features
+
+* **frontend:** build the UI primitives on the Matrix tokens. (Agent: OpenCode - MiniMax-M3.1-Flash) ([01cfa0a](https://github.com/marcelinosandroni/consigport-platform/commit/01cfa0a3493d6f9872f0c9b03f9ba4ad94632aa2))
+* **frontend:** close the experience on mobile and keyboard. (Agent: OpenCode - MiniMax-M3.1-Flash) ([66d9f23](https://github.com/marcelinosandroni/consigport-platform/commit/66d9f239ebd06919336b676521b9ea996661f08d))
+* **frontend:** create the portability operation from the receiving account. (Agent: OpenCode - MiniMax-M3.1-Flash) ([59b45a4](https://github.com/marcelinosandroni/consigport-platform/commit/59b45a46ad7b8c2353874f45bdbd022d75315be1))
+* **frontend:** follow the portability operation with a polling panel. (Agent: OpenCode - MiniMax-M3.1-Flash) ([5000805](https://github.com/marcelinosandroni/consigport-platform/commit/50008055e262f814e71635cfbbc6098ae2185f32))
+* **frontend:** generate the typed client from the public contract. (Agent: OpenCode - MiniMax-M3.1-Flash) ([80f337b](https://github.com/marcelinosandroni/consigport-platform/commit/80f337bb2322ece0216ac66544f65564f8182d49))
+* **frontend:** read the agenda on the server and choose the installments. (Agent: OpenCode - MiniMax-M3.1-Flash) ([877a3ee](https://github.com/marcelinosandroni/consigport-platform/commit/877a3ee6d8de6ff7535de7d3fe7fbf968d6fca6e))
+* **frontend:** register the consent through a server action. (Agent: OpenCode - MiniMax-M3.1-Flash) ([f2774f2](https://github.com/marcelinosandroni/consigport-platform/commit/f2774f22c0f97cf9e9873a7386cacec61d51c56b))
+* **frontend:** show the immutable audit trail of the operation. (Agent: OpenCode - MiniMax-M3.1-Flash) ([e293f64](https://github.com/marcelinosandroni/consigport-platform/commit/e293f643ef46a79f95118fe3b24c72b43f69c066))
+* **frontend:** speak three languages with the API. (Agent: OpenCode - MiniMax-M3.1-Flash) ([d2107e9](https://github.com/marcelinosandroni/consigport-platform/commit/d2107e9ba3918eb751f397b0b520943584bf1be6))
+
 ## [0.3.0](https://github.com/marcelinosandroni/consigport-platform/compare/v0.2.0...v0.3.0) (2026-11-28)
 
 
