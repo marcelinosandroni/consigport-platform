@@ -92,6 +92,10 @@
     "eyebrow": "Operações",
     "title": "Solicitar portabilidade",
     "description": "Informe a conta de recebimento e envie a operação.",
+    "selection": "Parcelas selecionadas",
+    "stateEmpty": "Seleção",
+    "noSelection": "Nenhuma parcela selecionada. Escolha as parcelas na agenda.",
+    "choose": "Escolher parcelas",
     "bank": "Banco",
     "branch": "Agência",
     "account": "Conta",
@@ -101,11 +105,10 @@
     "assigneeCreditor": "Credor",
     "submit": "Enviar operação",
     "submitting": "Enviando…",
-    "invalidAccount": "A conta de recebimento não é válida.",
-    "conflict": "Esta operação já foi enviada com outro conteúdo.",
-    "ineligible": "Uma das parcelas não é elegível.",
-    "success": "Operação criada.",
-    "protocol": "Protocolo"
+    "created": "Operação criada",
+    "failed": "Envio recusado",
+    "protocol": "Protocolo",
+    "total": "Total"
   },
   "operations": {
     "eyebrow": "Acompanhamento",

@@ -4995,3 +4995,177 @@
 - `SDD/specs/ROADMAP.md`
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 3.6 — Conta de recebimento e envio
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/036-frontend-portability-submit`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** validar a conta de recebimento e criar a operação — validação com
+  Zod, `Idempotency-Key` gerada uma vez por tentativa, `409` e `422` exibidos com
+  a mensagem do servidor.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Portão 3.4 do `GATES.md` (frontend):**
+   ```text
+   $ npm run --prefix frontend lint
+   > eslint .
+   EXIT=0
+
+   $ npm run --prefix frontend typecheck
+   > tsc --noEmit
+   EXIT=0
+
+   $ npm run --prefix frontend test:unit
+   > vitest run
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  22 passed (22)
+         Tests  107 passed (107)
+    Duration  32.47s
+   EXIT=0
+
+   $ npm run --prefix frontend build
+   [5/5] build ssr environment...
+   ✓ 106 modules transformed.
+   dist/ssr/assets/entry.rsc-C3xHimkj.js     60.84 kB
+   dist/ssr/index.js                      1,582.89 kB
+   ✓ built in 2.44s
+   EXIT=0
+   ```
+2. **Portão 3.1 (documentação e SDD):**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 66 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ Exactly 1 task in flight in SDD/specs/PLAN.md.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos passaram.
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css.
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 50 sessions, structure valid.
+   ```
+3. **Smoke no build de produção — a página renderiza:**
+   ```text
+   $ npm run --prefix frontend preview -- --host 127.0.0.1 --port 5199
+
+   === /portabilidade com a seleção ===
+   h1: ['Solicitar portabilidade']
+   'PAR-001'                    -> 5
+   'PAR-002'                    -> 5
+   'name="bank"'                -> 1
+   'name="branch"'              -> 1
+   'name="account"'             -> 1
+   'name="assigneeCreditor"'    -> 1
+   'name="installmentIds"'      -> 1
+   'name="idempotencyKey"'      -> 1
+   'Enviar operação'            -> 1
+   'Parcelas selecionadas'      -> 2
+
+   === /portabilidade sem seleção ===
+   mensagem: ['Nenhuma parcela selecionada. Escolha as parcelas na agenda.']
+   link: ['Agenda']
+
+   === /portabilidade (en) ===
+   h1: ['Request portability']
+   'Selected installments'  -> 2
+   'Bank'                   -> 1
+   'Branch'                 -> 1
+   'Account'                -> 2
+   'Creditor'               -> 4
+   'Send operation'         -> 1
+
+   === /portabilidade (es, cookie correto) ===
+   h1: ['Solicitar portabilidad']
+   mensagem: ['Ninguna cuota seleccionada. Elija las cuotas en la agenda.']
+   ```
+4. **Smoke do caminho sem JavaScript — a operação nasce e o protocolo aparece:**
+   ```text
+   $ curl -s -X POST 'http://127.0.0.1:5199/portabilidade?beneficiaryId=BEN-001&agreementId=AGR-001&installments=PAR-001,PAR-002' \
+       -F '$ACTION_REF_1=' -F '$ACTION_1:0=…' -F '$ACTION_1:1=…' -F '$ACTION_KEY=…' \
+       -F 'beneficiaryId=BEN-001' -F 'agreementId=AGR-001' -F 'installmentIds=PAR-001,PAR-002' \
+       -F 'locale=pt-BR' -F 'idempotencyKey=' \
+       -F 'bank=001' -F 'branch=1234' -F 'account=56789-0' -F 'assigneeCreditor=ConsigPort'
+
+   resposta: 13044 bytes
+   h1: ['Solicitar portabilidade']
+   protocolo: ['PRT-20261128-0001', 'PRT-20261128-0001']
+   badge: ['Operação criada']
+   moeda: ['R$ 750,00']
+
+   === fake-api.log ===
+   [fake-api] POST /api/v1/portability-operations idempotency-key=6704d891-0271-4940-b0e3-a92f6f9f0964 accept-language=pt-BR
+   ```
+   Sem JavaScript não há chave para enviar: a ação gerou uma (`6704d891-…`) e a
+   operação foi criada **uma vez só** — o `202` voltou com o protocolo, e a página
+   re-renderizou com o painel de sucesso.
+
+#### Conteúdo Entregue:
+- `frontend/src/features/portability/actions.ts` — a Server Action: valida a conta
+  com Zod, envia a `Idempotency-Key` e devolve o estado da operação.
+- `frontend/src/features/portability/idempotency.ts` — a chave da tentativa
+  (`createIdempotencyKey`) e o reconhecimento de um UUID (`isUuid`).
+- `frontend/src/features/portability/ui/receiving-account-form.tsx` — a folha
+  cliente: os campos da conta, o credor e a chave da tentativa.
+- `frontend/src/features/portability/ui/submit-operation.tsx` — o resultado: o
+  protocolo e o total quando a operação nasce, o erro com a mensagem do servidor
+  quando não.
+- `frontend/src/features/portability/server/page.tsx` — o Server Component da
+  página, com o estado sem seleção.
+- `frontend/src/features/agenda/ui/installment-table.tsx` — a seleção agora leva
+  também o convênio, que o pedido do contrato exige.
+- `frontend/src/app/router.tsx` — a rota `/portabilidade` lê a seleção da URL.
+- `frontend/src/shared/i18n/pt-BR.json`, `en.json`, `es.json` — a seção
+  `portability` reescrita.
+- `frontend/src/test/mocks/handlers.ts` — a API falsa cria operações, repete com
+  a mesma chave e recusa a mesma chave com outro corpo.
+
+#### Descobertas e Decisões:
+- **A chave nomeia a tentativa, não o render.** A primeira versão gerava a chave
+  a cada submissão — e uma repetição de um envio falho criaria uma segunda
+  operação, que é exatamente o que a idempotência existe para impedir. Agora a
+  folha guarda a chave junto com a **impressão digital do conteúdo**: o mesmo
+  conteúdo mantém a chave, outro conteúdo recebe uma nova.
+- **O `409` é uma defesa, não o caminho normal.** Como a chave gira com o
+  conteúdo, a interface raramente chega ao conflito — o `409` aparece quando a
+  mesma chave chega com outro corpo (tentativa adulterada, ou falha do cliente).
+  O painel mostra as duas vozes: o catálogo da interface e a mensagem do
+  servidor.
+- **A mensagem do servidor entra como detalhe, não como substituta.** O ADR-0004
+  diz que a interface usa o `code` como chave estável e a `message` do servidor
+  como fallback; aqui a `message` é a informação **mais específica** ("a parcela
+  PAR-003 não está aberta"), então ela aparece ao lado do texto do catálogo
+  quando acrescenta alguma coisa — e some quando repete.
+- **O formulário funciona sem JavaScript.** O `action` do formulário é a própria
+  Server Action; sem chave no formulário, a ação cria uma e a operação nasce
+  uma vez só. O smoke postou o formulário na própria URL e o painel de sucesso
+  apareceu no HTML de volta.
+- **A conta validada é a conta do contrato.** Banco, agência, conta e credor
+  têm os mesmos limites do `ReceivingAccount` do domínio Java (64, 32, 64 e
+  255) e não podem ser vazios — a regra do Zod é a regra do backend, escrita em
+  um só lugar do lado do navegador.
+- **O convênio passou a viajar na URL.** O pedido do contrato exige
+  `agreementId`, e a tabela da agenda conhece o convênio de cada parcela; a
+  seleção agora carrega o beneficiário, o convênio e as parcelas.
+
+#### Arquivos Tocados:
+- `frontend/src/features/portability/actions.ts`
+- `frontend/src/features/portability/actions.test.ts`
+- `frontend/src/features/portability/idempotency.ts`
+- `frontend/src/features/portability/idempotency.test.ts`
+- `frontend/src/features/portability/ui/receiving-account-form.tsx`
+- `frontend/src/features/portability/ui/receiving-account-form.test.tsx`
+- `frontend/src/features/portability/ui/submit-operation.tsx`
+- `frontend/src/features/portability/server/page.tsx`
+- `frontend/src/features/agenda/ui/installment-table.tsx`
+- `frontend/src/features/agenda/ui/installment-table.test.tsx`
+- `frontend/src/app/router.tsx`
+- `frontend/src/shared/i18n/pt-BR.json`
+- `frontend/src/shared/i18n/en.json`
+- `frontend/src/shared/i18n/es.json`
+- `frontend/src/test/mocks/handlers.ts`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`

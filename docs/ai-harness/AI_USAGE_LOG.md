@@ -1790,3 +1790,61 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
     - smoke no build de produção contra uma API falsa local: a agenda renderiza
       em pt-BR e en, os quatro estados aparecem, a parcela fechada está
       desabilitada e o `Accept-Language` chega à API no idioma do leitor
+
+## Sessão #51 — Task 3.6 (Conta de recebimento e envio)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/036-frontend-portability-submit`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** validar a conta de recebimento e criar a operação — validação com
+  Zod, `Idempotency-Key` gerada uma vez por tentativa, `409` e `422` exibidos com
+  a mensagem do servidor.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** o contrato público (`POST /api/v1/portability-operations`,
+   com o header `Idempotency-Key` no formato UUID, o `409` de conflito e o `422`
+   de parcela inelegível), o `ReceivingAccount` do domínio Java (64/32/64 e não
+   vazio), o ADR-0004 (a interface usa o `code` como chave estável e a `message`
+   do servidor como fallback), o `SDD/stacks/react.md` (mutação por Server
+   Action) e `docs/quality/GATES.md` (portão 3.4).
+2. **`idempotency.ts`** — a chave da tentativa: `createIdempotencyKey` (UUID v4,
+   com reserva para o `crypto.randomUUID` de contexto seguro) e `isUuid`.
+3. **Server Action** (`features/portability/actions.ts`): valida a conta e a
+   seleção com **Zod** (os mesmos limites do contrato e do domínio Java), envia
+   a `Idempotency-Key` e devolve o estado serializável — inclusive quando a API
+   está fora do ar (`INTERNAL_ERROR`, nunca uma exceção).
+4. **Folha cliente** (`features/portability/ui/receiving-account-form.tsx`): os
+   campos da conta e do credor, o estado pendente e a chave da tentativa. A
+   chave é calculada a partir da **impressão digital do conteúdo** e escrita no
+   campo oculto no `onSubmit` — o mesmo conteúdo mantém a chave, outro conteúdo
+   recebe uma nova.
+5. **Resultado** (`features/portability/ui/submit-operation.tsx`): o protocolo e
+   o total quando a operação nasce; o erro com duas vozes — o texto do catálogo
+   indexado pelo `code` e a mensagem do servidor como detalhe, quando acrescenta
+   alguma coisa.
+6. **Página** (`features/portability/server/page.tsx`): Server Component com as
+   parcelas selecionadas e o formulário; o estado sem seleção aponta de volta
+   para a agenda.
+7. **Ajuste da 3.5:** a seleção agora viaja com o **convênio**, que o pedido do
+   contrato exige — a tabela da agenda conhece o convênio de cada parcela.
+8. **Catálogos e API falsa:** a seção `portability` reescrita nos três idiomas;
+   a API falsa cria operações, repete com a mesma chave (`Idempotent-Replay`)
+   e recusa a mesma chave com outro corpo (`409`).
+9. **Testes:** `actions.test.ts` (oito casos: criação, repetição, conflito,
+   parcela fechada, validação da conta antes da API, chave criada quando o
+   navegador não manda, `Accept-Language` e API fora do ar),
+   `receiving-account-form.test.tsx` (seis casos de componente: os campos
+   nomeados, a criação com o protocolo, a chave estável para o mesmo conteúdo, a
+   chave nova para outro conteúdo, o `409` e o `422` com a mensagem do servidor)
+   e `idempotency.test.ts`.
+10. **Validação:**
+    - `npm run --prefix frontend lint` → EXIT=0
+    - `npm run --prefix frontend typecheck` → EXIT=0
+    - `npm run --prefix frontend test:unit` → 22 arquivos, 107 testes verdes
+    - `npm run --prefix frontend build` → os três ambientes (rsc, ssr, client) verdes
+    - 5 gates locais de documentação verdes
+    - smoke no build de produção contra uma API falsa local: a página renderiza
+      em pt-BR, en e es, o estado sem seleção aparece, e o caminho **sem
+      JavaScript** cria a operação e devolve o protocolo e o total

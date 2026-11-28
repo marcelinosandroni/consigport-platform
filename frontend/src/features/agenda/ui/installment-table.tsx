@@ -61,10 +61,12 @@ export function InstallmentTable({ installments, beneficiaryId }: InstallmentTab
   const clear = () => setSelectedIds(new Set())
 
   // The selection travels to the next step in the URL: the portability screen
-  // reads the same installments the user chose here.
+  // reads the same installments the user chose here, and the agreement they
+  // belong to.
   const continueToPortability = () => {
     const query = new URLSearchParams({
       beneficiaryId,
+      agreementId: selected[0]?.agreementId ?? '',
       installments: selected.map((installment) => installment.installmentId).join(','),
     })
     window.history.pushState(null, '', `/portabilidade?${query.toString()}`)

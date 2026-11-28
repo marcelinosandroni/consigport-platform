@@ -92,6 +92,10 @@
     "eyebrow": "Operations",
     "title": "Request portability",
     "description": "Enter the receiving account and send the operation.",
+    "selection": "Selected installments",
+    "stateEmpty": "Selection",
+    "noSelection": "No installment selected. Choose the installments in the agenda.",
+    "choose": "Choose installments",
     "bank": "Bank",
     "branch": "Branch",
     "account": "Account",
@@ -101,11 +105,10 @@
     "assigneeCreditor": "Creditor",
     "submit": "Send operation",
     "submitting": "Sending…",
-    "invalidAccount": "The receiving account is not valid.",
-    "conflict": "This operation was already sent with a different content.",
-    "ineligible": "One of the installments is not eligible.",
-    "success": "Operation created.",
-    "protocol": "Protocol"
+    "created": "Operation created",
+    "failed": "Submission refused",
+    "protocol": "Protocol",
+    "total": "Total"
   },
   "operations": {
     "eyebrow": "Tracking",
