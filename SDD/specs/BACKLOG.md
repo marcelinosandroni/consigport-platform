@@ -132,7 +132,7 @@
 
 ---
 
-## Fase 2 — Backend core (16 tasks)
+## Fase 2 — Backend core (18 tasks)
 
 ### 2.1 — Esqueleto hexagonal e regras ArchUnit
 - **Objetivo:** criar as camadas e impedir dependências proibidas desde o primeiro commit.
@@ -200,35 +200,165 @@
 - **Aceite:** intervalo 2 s e lote 20; honra `Retry-After`; retry 3× com backoff e circuit breaker; `204` gera `POLL_ATTEMPT`; reenvio usa a mesma `Idempotency-Key`.
 - **Verificação:** testes com relógio controlado cobrindo `204`, sucesso, falha e retomada.
 
-### 2.12 — Confirmação e atualização de conta
+### 2.12 — Auto-transição de integração e respostas tipadas da Central
+- **Objetivo:** alinhar a máquina de estados, a trilha e o fluxo do worker, e distinguir as respostas da Central que hoje caem no mesmo balde de falha.
+- **Arquivos:** `domain/portability/PortabilityOperation.java`, `domain/portability/RejectionReason.java`, `domain/portability/CentralStatus.java`, `adapters/out/central/acl/PortabilityAcl.java`, `adapters/out/central/CentralHttpClient.java`, `application/portability/PollOperation.java`.
+- **Aceite:** auto-transição `INTEGRATION_ERROR` → `INTEGRATION_ERROR` declarada na §7, com caminho único de falha no domínio e no worker; `404` da Central vira resposta tipada, fora do circuito, e mantém a operação retomável com o corpo bruto na trilha; rejeição com motivo fora do contrato fecha a operação como `REJECTED` com o código `UNMAPPED_REJECTION`; contrato público inalterado.
+- **Verificação:** teste parametrizado da máquina de estados com a auto-transição; teste do cliente com `404` e motivo desconhecido; teste do worker com o relógio controlado; E2E com a Central real.
+
+### 2.13 — Confirmação e atualização de conta
 - **Objetivo:** fechar o ciclo em uma única transação.
-- **Arquivos:** `application/portability/CompleteOperation.java`, `PortabilityOperation.java`, testes de integração.
+- **Arquivos:** `application/portability/CompleteOperation.java`, `application/portability/TransitionRecorder.java`, `application/portability/PollOperation.java`, `PortabilityOperation.java`, testes de integração.
 - **Aceite:** `CONFIRMADA` → `CONFIRMED` → `COMPLETED` com `account_updated_at`; `REJEITADA` → `REJECTED` com motivo; dois eventos gravados na mesma transação.
 - **Verificação:** teste que simula falha entre as etapas e confirma rollback completo.
 
-### 2.13 — Consulta de operações e trilha
+### 2.14 — Consulta de operações e trilha
 - **Objetivo:** expor leitura paginada e timeline.
-- **Arquivos:** `application/portability/FindOperation.java`, `ListOperations.java`, `application/audit/ListOperationEvents.java`.
+- **Arquivos:** `application/portability/FindOperation.java`, `ListOperations.java`, `application/audit/ListOperationEvents.java`, `domain/portability/OperationSummary.java`, `OperationDetail.java`, `OperationFilter.java`, `domain/shared/Page.java`, `adapters/out/persistence/JpaPortabilityOperationRepository.java`, `adapters/in/web/PortabilityOperationResource.java`, `adapters/in/web/dto/OperationSummaryResponse.java`, `OperationDetailResponse.java`, `OperationPageResponse.java`, `InstallmentSnapshotResponse.java`, `ReceivingAccountResponse.java`, `adapters/in/web/ApiExceptionHandler.java`.
 - **Aceite:** filtro por status, página e tamanho; eventos em ordem cronológica; `404 OPERATION_NOT_FOUND`.
 - **Verificação:** testes de integração com 25 operações e paginação conferida.
+- **Realizado:** a consulta paginada e o detalhe saem pela porta com o modelo de leitura
+  (`OperationSummary`, `OperationDetail`), porque o instante da última escrita da linha
+  pertence ao armazenamento e não ao agregado; `GET /portability-operations` aceita
+  `status`, `page` e `size` (1 a 100) e `GET /portability-operations/{id}` devolve o
+  detalhe; a operação inexistente responde `404 OPERATION_NOT_FOUND`; a trilha continua
+  sendo lida em ordem cronológica por `ListOperationEvents` (a rota REST da trilha
+  entra na task 2.15, com `OperationEventResource`).
 
-### 2.14 — Recursos REST e tratamento de erros
+### 2.15 — Recursos REST e tratamento de erros
 - **Objetivo:** completar a superfície `/api/v1`.
 - **Arquivos:** `adapters/in/web/AuthorizationResource.java`, `AgendaResource.java`, `OperationEventResource.java`, `ApiExceptionHandler.java`.
 - **Aceite:** rotas do `ARCHITECTURE.md` §8; erro com `code`, `message`, `locale`, `timestamp`, `path`, `details`; códigos EN estáveis.
 - **Verificação:** `@WebMvcTest` por recurso e teste do handler para cada código.
+- **Realizado:** a superfície pública ficou completa — `POST /api/v1/authorizations` (`201`
+  no opt-in novo, `200` no opt-in repetido), `GET /api/v1/authorizations/{beneficiaryId}`
+  (`200`/`404 AUTHORIZATION_NOT_FOUND`), `GET /api/v1/beneficiaries/{beneficiaryId}/agenda`
+  (`200`/`403 AUTHORIZATION_REQUIRED`/`404 BENEFICIARY_NOT_FOUND`) e
+  `GET /api/v1/portability-operations/{operationId}/events`
+  (`200`/`404 OPERATION_NOT_FOUND`). O opt-in novo precisou do adaptador de produção da
+  porta `CentralAuthorizationPort`: `CentralHttpClient` responde agora a quarta porta do
+  domínio e replica o consentimento em `POST /autorizacoes`, assinado em HMAC como as
+  outras chamadas. O `ApiExceptionHandler` traduziu `AUTHORIZATION_NOT_FOUND` (antes
+  respondia `500`) e passou a ter um tratador genérico que devolve `500 INTERNAL_ERROR`
+  no formato do contrato, com a causa real apenas no log do servidor. A consulta do opt-in
+  responde o registro mais recente do beneficiário (`createdAt`, depois `id`), porque o
+  contrato público devolve uma autorização e o backend pode ter uma por convênio.
+  Arquivos reais: `adapters/in/web/AuthorizationResource.java`, `AgendaResource.java`,
+  `OperationEventResource.java`, `adapters/in/web/dto/AuthorizationRequest.java`,
+  `AuthorizationResponse.java`, `AgendaResponse.java`, `OperationEventsResponse.java`,
+  `adapters/in/web/ApiExceptionHandler.java`, `adapters/out/central/CentralHttpClient.java`,
+  `adapters/out/central/dto/CentralAuthorizationRequest.java`,
+  `CentralAuthorizationResponse.java`, `application/authorization/RegisterAuthorization.java`,
+  `FindAuthorization.java`, `domain/authorization/AuthorizationRepository.java`,
+  `domain/shared/DomainError.java`, `adapters/out/persistence/JpaAuthorizationRepository.java`,
+  `config/CompositionRoot.java` e os testes `AuthorizationResourceTest.java`,
+  `AgendaResourceTest.java`, `OperationEventResourceTest.java`, `ApiExceptionHandlerTest.java`,
+  `RegisterAuthorizationTest.java`, `CentralHttpClientTest.java`.
 
-### 2.15 — i18n, Swagger e snapshot OpenAPI
+### 2.16 — i18n, Swagger e snapshot OpenAPI
 - **Objetivo:** documentação viva e mensagens localizadas.
 - **Arquivos:** `backend/src/main/resources/i18n/messages_pt_BR.properties`, `messages_en.properties`, `messages_es.properties`, `config/MessageSourceConfig.java`, `config/OpenApiConfig.java`.
 - **Aceite:** `Accept-Language` com fallback `pt-BR`; `code` nunca traduzido; `/v3/api-docs` gera contrato equivalente a `contracts/consigport-api.yaml`.
 - **Verificação:** teste de negociação para os três locales e comparação do contrato no CI.
+- **Realizado:** as mensagens humanas saem de três catálogos (`messages_pt_BR`, `messages_en`
+  e `messages_es`), com a chave do catálogo sendo o próprio código estável do erro: o
+  código nunca é traduzido, só a mensagem. O `MessageSourceConfig` publica o
+  `MessageSource` (basename `i18n/messages`, UTF-8, sem fallback para o locale da JVM),
+  o `AcceptHeaderLocaleResolver` (padrão `pt-BR`, idiomas `pt-BR`/`en`/`es`) e o
+  `LocalValidatorFactoryBean` ligado aos mesmos catálogos — assim o detalhe de uma
+  falha de validação também vem no idioma do chamador, e não no locale da JVM. O
+  `OpenApiConfig` publica a informação da API (título, versão `1.0.0`, contato, licença
+  MIT, servidor local, quatro tags) e um `OpenApiCustomizer` que injeta o header
+  `Accept-Language` em todas as operações. Os quatro recursos receberam `@Tag`,
+  `@Operation` (com o `operationId` do contrato público), `@ApiResponse` por status e o
+  header `Idempotent-Replay` no `202`; o `Idempotency-Key` é publicado como obrigatório.
+  Os DTOs receberam `@Schema(name=..., requiredProperties=...)` e os dois DTOs da conta de
+  recebimento foram colapsados em um só (`ReceivingAccount`), como manda o contrato, que
+  publica um único schema. O `GeneratedContractTest` compara o `/v3/api-docs` do
+  backend real com o snapshot `contracts/consigport-api.yaml` (rotas, métodos,
+  `operationId`, parâmetros, status, corpo obrigatório e shape dos schemas, resolvendo
+  `$ref`/`allOf`/`oneOf`); a prova de vida quebrou o `404` de uma rota e o teste ficou
+  vermelho com a diferença apontada. Arquivos reais:
+  `backend/src/main/resources/i18n/messages_pt_BR.properties`, `messages_en.properties`,
+  `messages_es.properties`, `backend/src/main/java/br/com/consigport/config/MessageSourceConfig.java`,
+  `OpenApiConfig.java`, `backend/src/main/java/br/com/consigport/adapters/in/web/ApiExceptionHandler.java`,
+  `AuthorizationResource.java`, `AgendaResource.java`, `OperationEventResource.java`,
+  `PortabilityOperationResource.java`, `backend/src/main/java/br/com/consigport/adapters/in/web/dto/AuthorizationResponse.java`,
+  `AgendaResponse.java`, `ErrorResponse.java`, `ErrorDetail.java`, `InstallmentSnapshotResponse.java`,
+  `OperationAcceptedResponse.java`, `OperationDetailResponse.java`, `OperationEventsResponse.java`,
+  `OperationPageResponse.java`, `OperationSummaryResponse.java`, `PortabilityOperationRequest.java`,
+  `ReceivingAccount.java`, `backend/pom.xml` (dependência `jackson-dataformat-yaml`, que o
+  springdoc usa para ler o YAML do contrato) e os testes
+  `backend/src/test/java/br/com/consigport/adapters/in/web/LocaleNegotiationTest.java`,
+  `ApiExceptionHandlerTest.java`, `AuthorizationResourceTest.java`, `AgendaResourceTest.java`,
+  `OperationEventResourceTest.java`, `backend/src/test/java/br/com/consigport/contracts/GeneratedContractTest.java`
+  e `ContractComparator.java`.
 
-### 2.16 — Fechamento do backend
-- **Objetivo:** provar domínio, persistência e resiliência juntos.
-- **Arquivos:** testes de integração com Testcontainers, `backend/pom.xml` (JaCoCo).
-- **Aceite:** cobertura de linhas ≥ 80% no domínio e aplicação; fluxo completo `CREATED` → `COMPLETED` e `REJECTED`; ArchUnit verde.
-- **Verificação:** `./mvnw -q -pl backend -am verify` com relatório JaCoCo anexado.
+### 2.17 — Gate de cobertura do núcleo
+- **Objetivo:** ativar o portão de cobertura do backend sobre o núcleo e fechar as lacunas de branch.
+- **Arquivos:** `pom.xml` (propriedades e regras do JaCoCo), `backend/pom.xml` (ativação do plugin), testes dos invariantes do domínio e da aplicação, `.github/workflows/ci.yml` (publicação do relatório).
+- **Aceite:** `./mvnw -B -pl backend -am verify` falha quando o domínio ou a aplicação ficam abaixo de **80% de linhas e de branches**; relatório de cobertura anexado como artefato do CI.
+- **Verificação:** build verde com o relatório publicado; a redução proposital do limiar deixa o build vermelho com a regra apontada.
+- **Realizado:** o JaCoCo, que já estava declarado no `pom.xml` raiz mas nunca ativado em
+  nenhum módulo, passou a correr no backend: o plugin entra em `backend/pom.xml` e a
+  configuração do `pluginManagement` da raiz restringe a medição ao núcleo
+  (`br/com/consigport/domain/**` e `br/com/consigport/application/**`), como manda o
+  portão 3.2 do `docs/quality/GATES.md`. O portão cobra **80% de linhas e de branches**,
+  em dois limites distintos (`jacoco.line.coverage` e `jacoco.branch.coverage`). A
+  cobertura medida antes das correções era de 74,64% de branches: as lacunas estavam nos
+  invariantes dos read models (`OperationDetail`, `OperationSummary`, `OperationRequest`),
+  da agenda (`Installment`, `BeneficiaryAgenda`), dos status da Central
+  (`CentralStatus.Pending/Rejected/NotFound`), do filtro, do backoff e do construtor do
+  agregado. Os testes novos exercitam cada invariante recusado pelo domínio, e a
+  cobertura subiu para **99,71% de branches e 98,12% de linhas**. A prova de vida elevou
+  o limiar de branches para 1,00 e o build ficou vermelho com a regra apontada. O
+  relatório de cobertura é publicado pelo CI como o artefato `backend-coverage`.
+  Arquivos reais: `pom.xml` (propriedades `jacoco.branch.coverage`, `includes` do
+  núcleo e limite de branches), `backend/pom.xml` (ativação do plugin),
+  `.github/workflows/ci.yml` (artefato `backend-coverage`),
+  `backend/src/main/java/br/com/consigport/domain/portability/OperationRequest.java`
+  (correção da ordem da recusa da parcela nula),
+  `backend/src/test/java/br/com/consigport/domain/portability/OperationReadModelsTest.java`,
+  `OperationRequestTest.java`, `CentralStatusTest.java`, `PortabilityOperationTest.java`,
+  `backend/src/test/java/br/com/consigport/domain/agenda/AgendaReadModelsTest.java`,
+  `backend/src/test/java/br/com/consigport/domain/shared/SharedValueObjectsTest.java`,
+  `backend/src/test/java/br/com/consigport/domain/audit/OperationEventTest.java`,
+  `backend/src/test/java/br/com/consigport/application/portability/IntegrationBackoffTest.java`.
+
+### 2.18 — Fluxo completo com o banco real
+- **Objetivo:** provar o ciclo de vida inteiro de uma operação contra o PostgreSQL real.
+- **Arquivos:** testes de integração com Testcontainers em `backend/src/test/java/br/com/consigport/application/portability/`, fixtures do ciclo de vida.
+- **Aceite:** `CREATED` → `PENDING` → `CONFIRMED` → `COMPLETED` com a conta atualizada e a trilha completa; `CREATED` → `PENDING` → `REJECTED` com o motivo e a trilha; rollback quando o registro do evento falha.
+- **Verificação:** teste de integração verde com o PostgreSQL 16 do Testcontainers e E2E real com o mock da Central.
+- **Realizado:** o teste de integração `OperationLifecyclePersistenceTest` dirige os
+  casos de uso — `StartOperation`, `PollOperation` e `CompleteOperation` — contra o
+  PostgreSQL 16 do Testcontainers, com os adaptadores JPA e as transações reais: a
+  Central é a única peça simulada, porque a regra dos testes proíbe chamar uma API de
+  terceiro num teste de integração. O cenário prova `CREATED` → `PENDING` → (204 da
+  Central) → `CONFIRMED` → `COMPLETED` com a conta atualizada e a trilha de seis eventos
+  na ordem, `CREATED` → `PENDING` → `REJECTED` com o motivo
+  `MARGIN_INSUFFICIENT` e o corpo bruto da Central, e o **rollback**: quando a trilha
+  falha entre os passos da confirmação, a transação desfaz o estado da operação e o
+  evento já escrito, e a operação continua `PENDING`. O duplo que falha no enésimo
+  append saiu da classe de teste e virou `FailingOperationEventRepository`, no pacote
+  `support`, compartilhado com o `CompletionPersistenceTest`. As duas provas de vida
+  fecham a confiança no teste: sem a transação do `SpringTransactionRunner` o rollback
+  deixa a operação `COMPLETED` (o teste fica vermelho), e sem o evento `ACCOUNT_UPDATED`
+  a trilha fica com cinco eventos em vez de seis (o teste fica vermelho). O E2E real
+  repetiu os dois caminhos com o backend, o PostgreSQL e o mock da Central de verdade:
+  a operação confirmada levou nove eventos e `account_updated_at` preenchido, e a
+  rejeitada levou seis eventos e `rejection_reason = MARGIN_INSUFFICIENT`.
+  Arquivos reais:
+  `backend/src/test/java/br/com/consigport/application/portability/OperationLifecyclePersistenceTest.java`,
+  `backend/src/test/java/br/com/consigport/support/FailingOperationEventRepository.java`,
+  `backend/src/test/java/br/com/consigport/adapters/out/persistence/CompletionPersistenceTest.java`.
+
+### Dívidas da Fase 2 (polling e resiliência)
+- **Portão de formatação sem implementação:** o portão 3.2 do `docs/quality/GATES.md` exige `./mvnw -q spotless:check` (Google Java Format), mas nenhum `pom.xml` declara o plugin Spotless: o comando falha com "no such goal". Ativar o Spotless exige formatar o código existente, o que produz um diff largo que deve ficar em task própria, com o `spotless:apply` antes do `spotless:check` no CI.
+- **Teto de tentativas para `404` da Central:** hoje a operação que a Central não conhece continua em polling a cada 60 s, para sempre (`retry_count` cresce sem limite). Definir um orçamento de tentativas e um destino (alerta operacional ou estado que exija intervenção humana) sem tocar no contrato público.
+- **Alinhar "Falhas até `INTEGRATION_ERROR`":** o `ARCHITECTURE.md` §11 e o ADR-0003 dizem `5`, mas a implementação entra em `INTEGRATION_ERROR` assim que o cliente HTTP esgota as 3 tentativas. Decidir se o limiar de 5 é implementado no worker ou se a regra é corrigida.
+- **Protocolo repetido pela Central:** o esquema da §6 garante `protocol` único e o mock reinicia a sequência de protocolos a cada `POST /_admin/reset` ou a cada reinício do processo. Quando a Central reemite um protocolo já guardado, a violação da restrição chega como `DataIntegrityViolationException` e a API responde `500` em vez de um erro mapeado. Traduzir a colisão para um erro de domínio (falha de integração, operação retomável) no adaptador de persistência. Evidência: E2E da task 2.12, primeira rodada (`ERROR: duplicate key value violates unique constraint "uk_portability_operations_protocol"`).
+- **Central indisponível no opt-in:** `POST /api/v1/authorizations` responde `503 CENTRAL_UNAVAILABLE` quando a Central não registra o consentimento, mas o contrato público lista apenas `400` e `500` para essa rota. Alinhar o contrato (acrescentar `503`) ou o mapeamento (`500 INTERNAL_ERROR`), sem alterar o código estável `CENTRAL_UNAVAILABLE` sem autorização do responsável.
 
 ---
 
