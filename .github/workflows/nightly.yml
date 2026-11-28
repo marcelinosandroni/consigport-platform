@@ -19,6 +19,7 @@ env:
   NPM_VERSION: '12.0.2'
   JAVA_VERSION: '21'
   OASDIFF_VERSION: 'v1.39.0'
+  SCHEMATHESIS_VERSION: '4.34.4'
 
 jobs:
   detect:
@@ -46,7 +47,7 @@ jobs:
           else
             echo "k6=false" >> "$GITHUB_OUTPUT"
           fi
-          if [ -n "$(find tests/schemathesis -type f -print -quit 2>/dev/null)" ]; then
+          if [ -n "$(find tests/contract -name 'schemathesis.toml' -print -quit 2>/dev/null)" ]; then
             echo "schemathesis=true" >> "$GITHUB_OUTPUT"
           else
             echo "schemathesis=false" >> "$GITHUB_OUTPUT"
@@ -183,16 +184,82 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.13'
 
       - name: Install Schemathesis
-        run: pip install schemathesis
+        run: pip install "schemathesis==${SCHEMATHESIS_VERSION}"
 
+      - name: Start PostgreSQL 16
+        run: docker compose up -d --wait postgres
+
+      - name: Build the jars
+        run: ./mvnw -B -DskipTests package
+
+      - name: Boot the mock and the backend
+        run: |
+          nohup java -jar central-convenios-mock/target/central-convenios-mock-0.1.0-SNAPSHOT.jar \
+            --server.port=8081 > mock.log 2>&1 &
+          mock_pid=$!
+          nohup java -jar backend/target/consigport-backend-0.1.0-SNAPSHOT.jar \
+            --server.port=8080 > backend.log 2>&1 &
+          backend_pid=$!
+          echo "mock_pid=${mock_pid}" >> "$GITHUB_ENV"
+          echo "backend_pid=${backend_pid}" >> "$GITHUB_ENV"
+
+      - name: Wait for the health probes
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://localhost:8081/actuator/health > /dev/null \
+              && curl -fsS http://localhost:8080/actuator/health > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "the stack did not become healthy" >&2
+          tail -n 100 mock.log backend.log >&2 || true
+          exit 1
+
+      - name: Register the opt-in of the beneficiary
+        run: |
+          curl -sSf -X POST http://localhost:8080/api/v1/authorizations \
+            -H 'Content-Type: application/json' \
+            -d '{"beneficiaryId":"BEN-001","agreementId":"AGR-001"}'
+
+      # The same configuration of the pull request gate: the nightly is the
+      # canary of the contract, not a second truth.
       - name: Run the dynamic contract test
-        run: schemathesis run tests/schemathesis/consigport.yaml
+        run: >
+          schemathesis --config-file tests/contract/schemathesis.toml
+          run contracts/consigport-api.yaml --no-color
+
+      - name: Prove that the dynamic contract gate is armed
+        run: node scripts/check-schemathesis-gate.mjs
+
+      - name: Upload the Schemathesis report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-schemathesis-report
+          path: schemathesis-report
+          if-no-files-found: ignore
+
+      - name: Stop the services
+        if: always()
+        run: kill "${{ env.mock_pid }}" "${{ env.backend_pid }}" || true
+
+      - name: Stop PostgreSQL 16
+        if: always()
+        run: docker compose down -v
 
   security-images:
     name: Security — container images

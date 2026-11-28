@@ -824,11 +824,50 @@
     pt-BR, precisa cadastrar a seção no `release-please-config.json` para que os
     portões de qualidade apareçam na release `v1.0.0`.
 
-### 4.2 — Testes de propriedade com Schemathesis
+### 4.2 — Testes de propriedade com Schemathesis — Realizado
 - **Objetivo:** exercitar a API real contra o contrato.
-- **Arquivos:** `.github/workflows/ci.yml`, `tests/contract/schemathesis.toml`.
+- **Arquivos:** `.github/workflows/ci.yml`, `.github/workflows/nightly.yml`,
+  `tests/contract/schemathesis.toml`, `tests/contract/fixtures/drifted-contract.yaml`,
+  `scripts/check-schemathesis-gate.mjs`, `.gitignore`, `docs/quality/GATES.md`,
+  `SDD/specs/PLAN.md`, `SDD/specs/ROADMAP.md`, `SDD/specs/BACKLOG.md`,
+  `SDD/docs/EVIDENCE.md`, `docs/ai-harness/AI_USAGE_LOG.md`.
 - **Aceite:** Schemathesis roda contra o compose; qualquer resposta fora do contrato falha o job; relatório anexado.
 - **Verificação:** job `contracts` com Schemathesis verde e relatório publicado.
+- **Realizado:** o job `contracts` sobe a stack real (PostgreSQL 16, Central
+  simulada e backend), registra o opt-in do beneficiário e exercita as sete
+  operações do contrato contra a API em execução — 94 casos, 94 aprovados. O
+  relatório JUnit e JSON é publicado como artefato `schemathesis-report`. O
+  portão está armado: o contrato de fixture que esquece o `404` da API reprova
+  o teste, e a prova roda a cada PR (`scripts/check-schemathesis-gate.mjs`). O
+  nightly usa a mesma configuração, então há uma única verdade.
+- **Dívidas da Fase 4 (contrato dinâmico):**
+  - **O contrato público não declara todas as respostas que a API dá.** A fase de
+    fuzzing (desligada no portão) encontrou cinco divergências reais, com o
+    contrato como responsável: o `400 VALIDATION_ERROR` que a API devolve quando o
+    identificador do caminho não tem o formato esperado (em
+    `GET /authorizations/{beneficiaryId}`,
+    `GET /beneficiaries/{beneficiaryId}/agenda`,
+    `GET /portability-operations/{operationId}` e
+    `GET /portability-operations/{operationId}/events`); o `403
+    AUTHORIZATION_REQUIRED` que a criação da operação devolve quando o opt-in do
+    beneficiário não existe; e o `503 CENTRAL_UNAVAILABLE` que a consulta da
+    agenda devolve quando a Central não está disponível. **Cada correção exige
+    autorização para alterar o contrato público** — é a lista de perguntas
+    levadas ao responsável.
+  - **O contrato é mais frouxo do que a API em dois limites.** O parâmetro `page`
+    não declara `maximum` e a API recusa `page` acima de `2147483647`; os
+    `installmentIds` não declaram `maxLength` e a API recusa identificadores com
+    mais de 64 caracteres. Nenhum dos dois quebra quem consome a API — a API é
+    mais estrita —, mas o contrato precisa declarar o limite para que a fase de
+    fuzzing possa ser ligada.
+  - **A API devolve `500` quando a requisição traz um `Content-Type` não
+    declarado.** O certo é `400` ou `415`: um pedido malformado não é erro
+    interno. É um defeito do backend, não do contrato, e não depende de
+    autorização — fica para uma task própria.
+  - **A fase de fuzzing só pode ser ligada depois dessas correções.** Com o
+    contrato como está, ela reprova por respostas legítimas da API que o
+    contrato não declara. O portão de hoje usa as fases `examples` e `coverage`,
+    que medem o contrato.
 
 ### 4.3 — E2E com Playwright no CI
 - **Objetivo:** provar o fluxo completo no navegador.
