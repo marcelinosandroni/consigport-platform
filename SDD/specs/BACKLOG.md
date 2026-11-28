@@ -568,6 +568,44 @@
 - **Arquivos:** `frontend/src/features/portability/ui/receiving-account-form.tsx`, `ui/submit-operation.tsx`, `actions.ts`.
 - **Aceite:** validação com Zod; `Idempotency-Key` gerada uma vez por tentativa; `409` e `422` exibidos com mensagem do servidor.
 - **Verificação:** teste de formulário cobrindo válido, inválido e conflito.
+- **Realizado:** a criação da operação de portabilidade, do formulário ao protocolo.
+  A **Server Action** (`features/portability/actions.ts`) é a única porta da
+  mutação: ela valida a conta de recebimento com **Zod** — as mesmas regras do
+  contrato (banco até 64, agência até 32, conta até 64, credor até 255, todas
+  não vazias) — envia a **`Idempotency-Key`** e devolve um estado serializável.
+  A **`Idempotency-Key` nomeia a tentativa, não o render**: a folha cliente
+  (`features/portability/ui/receiving-account-form.tsx`) calcula a impressão
+  digital do conteúdo (beneficiário, convênio, parcelas e conta) e guarda a chave
+  num `ref`; o mesmo conteúdo **mantém a chave** — uma repetição de um envio
+  falho não pode criar uma segunda operação — e outro conteúdo **recebe uma
+  chave nova**, porque a API recusa uma chave que chega com outro corpo. Sem
+  JavaScript não há chave para enviar, e a ação cria uma: a operação nasce
+  mesmo assim, uma vez só. O **resultado** (`features/portability/ui/submit-operation.tsx`)
+  fala com duas vozes: o catálogo da interface, indexado pelo `code` estável do
+  contrato, e a **mensagem do servidor** — o motivo que a API deu de fato ("a
+  parcela PAR-003 não está aberta") — que aparece como detalhe quando diz algo
+  que a primeira voz não diz. O `409` e o `422` aparecem assim, com a mensagem do
+  servidor visível. A página (`features/portability/server/page.tsx`) é um
+  **Server Component**: mostra as parcelas que vieram da agenda e entrega o
+  formulário à folha cliente; sem seleção, ela aponta de volta para a agenda.
+  A seleção viaja pela URL — `/portabilidade?beneficiaryId=…&agreementId=…&installments=…`
+  — e o **convênio** passou a fazer parte dela, porque o pedido do contrato o
+  exige. Arquivos reais:
+  `frontend/src/features/portability/actions.ts`,
+  `frontend/src/features/portability/actions.test.ts`,
+  `frontend/src/features/portability/idempotency.ts`,
+  `frontend/src/features/portability/idempotency.test.ts`,
+  `frontend/src/features/portability/ui/receiving-account-form.tsx`,
+  `frontend/src/features/portability/ui/receiving-account-form.test.tsx`,
+  `frontend/src/features/portability/ui/submit-operation.tsx`,
+  `frontend/src/features/portability/server/page.tsx`,
+  `frontend/src/features/agenda/ui/installment-table.tsx`,
+  `frontend/src/features/agenda/ui/installment-table.test.tsx`,
+  `frontend/src/app/router.tsx`,
+  `frontend/src/shared/i18n/pt-BR.json`,
+  `frontend/src/shared/i18n/en.json`,
+  `frontend/src/shared/i18n/es.json`,
+  `frontend/src/test/mocks/handlers.ts`.
 
 ### 3.7 — Painel de status com polling
 - **Objetivo:** acompanhar a operação até o terminal.

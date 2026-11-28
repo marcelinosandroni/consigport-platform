@@ -5,6 +5,7 @@ import { NotFoundPage } from './pages/not-found.tsx'
 import { SectionPage } from './pages/section.tsx'
 import { AgendaPage, AgendaWithoutBeneficiary } from '../features/agenda/server/page.tsx'
 import { AuthorizationPage } from '../features/authorization/server/page.tsx'
+import { PortabilityPage, PortabilityWithoutSelection } from '../features/portability/server/page.tsx'
 import { DEFAULT_LOCALE, type SupportedLocale } from '../shared/i18n/locales.ts'
 import { createTranslator, type Translator } from '../shared/i18n/server.ts'
 
@@ -35,13 +36,27 @@ const ROUTES: Route[] = [
   },
   {
     path: '/portabilidade',
-    render: ({ t }) => (
-      <SectionPage
-        eyebrow={t('portability.eyebrow')}
-        title={t('portability.title')}
-        description={t('portability.description')}
-      />
-    ),
+    render: ({ t, searchParams }) => {
+      const beneficiaryId = searchParams.get('beneficiaryId')?.trim() ?? ''
+      const agreementId = searchParams.get('agreementId')?.trim() ?? ''
+      const installmentIds = (searchParams.get('installments') ?? '')
+        .split(',')
+        .map((installmentId) => installmentId.trim())
+        .filter((installmentId) => installmentId.length > 0)
+
+      if (beneficiaryId.length === 0 || agreementId.length === 0 || installmentIds.length === 0) {
+        return <PortabilityWithoutSelection t={t} />
+      }
+
+      return (
+        <PortabilityPage
+          beneficiaryId={beneficiaryId}
+          agreementId={agreementId}
+          installmentIds={installmentIds}
+          t={t}
+        />
+      )
+    },
   },
   {
     path: '/agenda',

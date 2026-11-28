@@ -64,6 +64,9 @@ const AGENDAS: Record<string, { installments: unknown[] }> = {
   'BEN-EMPTY': { installments: [] },
 }
 
+/** The operations the fake already accepted, by idempotency key. */
+const operations = new Map<string, { payload: string; response: Record<string, unknown> }>()
+
 /**
  * The fake of the public API.
  *
@@ -157,5 +160,80 @@ export const handlers = [
     }
 
     return HttpResponse.json({ beneficiaryId, installments: agenda.installments })
+  }),
+
+  http.post(`${API_BASE_URL}/api/v1/portability-operations`, async ({ request }) => {
+    const key = request.headers.get('idempotency-key') ?? ''
+    const body = (await request.json()) as {
+      beneficiaryId?: string
+      agreementId?: string
+      installmentIds?: string[]
+      assigneeCreditor?: string
+      receivingAccount?: { bank?: string; branch?: string; account?: string }
+    }
+
+    if (key.length === 0) {
+      return errorResponse(
+        400,
+        'IDEMPOTENCY_KEY_REQUIRED',
+        '/api/v1/portability-operations',
+        'A chave de idempotência é obrigatória.',
+      )
+    }
+
+    const installmentIds = body.installmentIds ?? []
+
+    if (installmentIds.length === 0) {
+      return errorResponse(
+        400,
+        'VALIDATION_ERROR',
+        '/api/v1/portability-operations',
+        'Nenhuma parcela foi informada.',
+      )
+    }
+
+    const closed = installmentIds.find((installmentId) => installmentId === 'PAR-003')
+    if (closed !== undefined) {
+      return errorResponse(
+        422,
+        'INSTALLMENT_NOT_ELIGIBLE',
+        '/api/v1/portability-operations',
+        `A parcela ${closed} não está aberta.`,
+        [{ field: 'installmentIds', message: `${closed} está CLOSED` }],
+      )
+    }
+
+    const payload = JSON.stringify(body)
+    const existing = operations.get(key)
+
+    if (existing !== undefined) {
+      if (existing.payload !== payload) {
+        return errorResponse(
+          409,
+          'IDEMPOTENCY_CONFLICT',
+          '/api/v1/portability-operations',
+          'A chave de idempotência já foi usada com outro conteúdo.',
+        )
+      }
+
+      return HttpResponse.json(existing.response, {
+        status: 202,
+        headers: { 'Idempotent-Replay': 'true' },
+      })
+    }
+
+    const response = {
+      operationId: 'c1a2b3c4-d5e6-4f70-8a91-b2c3d4e5f601',
+      protocol: 'PRT-20261128-0001',
+      status: 'PENDING',
+      totalAmount: 750,
+      createdAt: '2026-11-28T10:00:05Z',
+    }
+    operations.set(key, { payload, response })
+
+    return HttpResponse.json(response, {
+      status: 202,
+      headers: { 'Idempotent-Replay': 'false' },
+    })
   }),
 ]

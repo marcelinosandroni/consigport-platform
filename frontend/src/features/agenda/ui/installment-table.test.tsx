@@ -120,6 +120,7 @@ describe('InstallmentTable', () => {
 
     expect(window.location.pathname).toBe('/portabilidade')
     expect(window.location.search).toContain('beneficiaryId=BEN-001')
+    expect(window.location.search).toContain('agreementId=AGR-001')
     expect(window.location.search).toContain('installments=PAR-001%2CPAR-002')
   })
 
