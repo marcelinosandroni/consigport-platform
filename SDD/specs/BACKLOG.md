@@ -132,7 +132,7 @@
 
 ---
 
-## Fase 2 — Backend core (17 tasks)
+## Fase 2 — Backend core (18 tasks)
 
 ### 2.1 — Esqueleto hexagonal e regras ArchUnit
 - **Objetivo:** criar as camadas e impedir dependências proibidas desde o primeiro commit.
@@ -294,13 +294,45 @@
   `OperationEventResourceTest.java`, `backend/src/test/java/br/com/consigport/contracts/GeneratedContractTest.java`
   e `ContractComparator.java`.
 
-### 2.17 — Fechamento do backend
-- **Objetivo:** provar domínio, persistência e resiliência juntos.
-- **Arquivos:** testes de integração com Testcontainers, `backend/pom.xml` (JaCoCo).
-- **Aceite:** cobertura de linhas ≥ 80% no domínio e aplicação; fluxo completo `CREATED` → `COMPLETED` e `REJECTED`; ArchUnit verde.
-- **Verificação:** `./mvnw -q -pl backend -am verify` com relatório JaCoCo anexado.
+### 2.17 — Gate de cobertura do núcleo
+- **Objetivo:** ativar o portão de cobertura do backend sobre o núcleo e fechar as lacunas de branch.
+- **Arquivos:** `pom.xml` (propriedades e regras do JaCoCo), `backend/pom.xml` (ativação do plugin), testes dos invariantes do domínio e da aplicação, `.github/workflows/ci.yml` (publicação do relatório).
+- **Aceite:** `./mvnw -B -pl backend -am verify` falha quando o domínio ou a aplicação ficam abaixo de **80% de linhas e de branches**; relatório de cobertura anexado como artefato do CI.
+- **Verificação:** build verde com o relatório publicado; a redução proposital do limiar deixa o build vermelho com a regra apontada.
+- **Realizado:** o JaCoCo, que já estava declarado no `pom.xml` raiz mas nunca ativado em
+  nenhum módulo, passou a correr no backend: o plugin entra em `backend/pom.xml` e a
+  configuração do `pluginManagement` da raiz restringe a medição ao núcleo
+  (`br/com/consigport/domain/**` e `br/com/consigport/application/**`), como manda o
+  portão 3.2 do `docs/quality/GATES.md`. O portão cobra **80% de linhas e de branches**,
+  em dois limites distintos (`jacoco.line.coverage` e `jacoco.branch.coverage`). A
+  cobertura medida antes das correções era de 74,64% de branches: as lacunas estavam nos
+  invariantes dos read models (`OperationDetail`, `OperationSummary`, `OperationRequest`),
+  da agenda (`Installment`, `BeneficiaryAgenda`), dos status da Central
+  (`CentralStatus.Pending/Rejected/NotFound`), do filtro, do backoff e do construtor do
+  agregado. Os testes novos exercitam cada invariante recusado pelo domínio, e a
+  cobertura subiu para **99,71% de branches e 98,12% de linhas**. A prova de vida elevou
+  o limiar de branches para 1,00 e o build ficou vermelho com a regra apontada. O
+  relatório de cobertura é publicado pelo CI como o artefato `backend-coverage`.
+  Arquivos reais: `pom.xml` (propriedades `jacoco.branch.coverage`, `includes` do
+  núcleo e limite de branches), `backend/pom.xml` (ativação do plugin),
+  `.github/workflows/ci.yml` (artefato `backend-coverage`),
+  `backend/src/main/java/br/com/consigport/domain/portability/OperationRequest.java`
+  (correção da ordem da recusa da parcela nula),
+  `backend/src/test/java/br/com/consigport/domain/portability/OperationReadModelsTest.java`,
+  `OperationRequestTest.java`, `CentralStatusTest.java`, `PortabilityOperationTest.java`,
+  `backend/src/test/java/br/com/consigport/domain/agenda/AgendaReadModelsTest.java`,
+  `backend/src/test/java/br/com/consigport/domain/shared/SharedValueObjectsTest.java`,
+  `backend/src/test/java/br/com/consigport/domain/audit/OperationEventTest.java`,
+  `backend/src/test/java/br/com/consigport/application/portability/IntegrationBackoffTest.java`.
+
+### 2.18 — Fluxo completo com o banco real
+- **Objetivo:** provar o ciclo de vida inteiro de uma operação contra o PostgreSQL real.
+- **Arquivos:** testes de integração com Testcontainers em `backend/src/test/java/br/com/consigport/application/portability/`, fixtures do ciclo de vida.
+- **Aceite:** `CREATED` → `PENDING` → `CONFIRMED` → `COMPLETED` com a conta atualizada e a trilha completa; `CREATED` → `PENDING` → `REJECTED` com o motivo e a trilha; rollback quando o registro do evento falha.
+- **Verificação:** teste de integração verde com o PostgreSQL 16 do Testcontainers e E2E real com o mock da Central.
 
 ### Dívidas da Fase 2 (polling e resiliência)
+- **Portão de formatação sem implementação:** o portão 3.2 do `docs/quality/GATES.md` exige `./mvnw -q spotless:check` (Google Java Format), mas nenhum `pom.xml` declara o plugin Spotless: o comando falha com "no such goal". Ativar o Spotless exige formatar o código existente, o que produz um diff largo que deve ficar em task própria, com o `spotless:apply` antes do `spotless:check` no CI.
 - **Teto de tentativas para `404` da Central:** hoje a operação que a Central não conhece continua em polling a cada 60 s, para sempre (`retry_count` cresce sem limite). Definir um orçamento de tentativas e um destino (alerta operacional ou estado que exija intervenção humana) sem tocar no contrato público.
 - **Alinhar "Falhas até `INTEGRATION_ERROR`":** o `ARCHITECTURE.md` §11 e o ADR-0003 dizem `5`, mas a implementação entra em `INTEGRATION_ERROR` assim que o cliente HTTP esgota as 3 tentativas. Decidir se o limiar de 5 é implementado no worker ou se a regra é corrigida.
 - **Protocolo repetido pela Central:** o esquema da §6 garante `protocol` único e o mock reinicia a sequência de protocolos a cada `POST /_admin/reset` ou a cada reinício do processo. Quando a Central reemite um protocolo já guardado, a violação da restrição chega como `DataIntegrityViolationException` e a API responde `500` em vez de um erro mapeado. Traduzir a colisão para um erro de domínio (falha de integração, operação retomável) no adaptador de persistência. Evidência: E2E da task 2.12, primeira rodada (`ERROR: duplicate key value violates unique constraint "uk_portability_operations_protocol"`).

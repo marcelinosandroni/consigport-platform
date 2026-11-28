@@ -48,4 +48,11 @@ class RejectionReasonTest {
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("rejection reason code must not be blank");
   }
+
+  @Test
+  void refusesAMissingCode() {
+    assertThatThrownBy(() -> RejectionReason.fromCode(null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("rejection reason code must not be blank");
+  }
 }

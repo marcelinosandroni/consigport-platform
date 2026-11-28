@@ -139,6 +139,22 @@ class OperationEventTest {
   }
 
   @Test
+  void refusesMissingDetails() {
+    assertThatThrownBy(
+            () ->
+                OperationEvent.record(
+                    OPERATION_ID,
+                    null,
+                    OperationStatus.CREATED,
+                    EventType.OPERATION_CREATED,
+                    null,
+                    null,
+                    CREATED_AT))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("details must not be blank");
+  }
+
+  @Test
   void refusesAMissingInstant() {
     assertThatThrownBy(
             () ->
@@ -169,6 +185,22 @@ class OperationEventTest {
                     CREATED_AT))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("eventId must be positive");
+  }
+
+  @Test
+  void acceptsTheEventReadFromTheStorage() {
+    OperationEvent event =
+        new OperationEvent(
+            7L,
+            OPERATION_ID,
+            null,
+            OperationStatus.CREATED,
+            EventType.OPERATION_CREATED,
+            "Operation created",
+            null,
+            CREATED_AT);
+
+    assertThat(event.eventId()).isEqualTo(7L);
   }
 
   @Test

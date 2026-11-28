@@ -98,6 +98,13 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
       </plugin>
+
+      <!-- The coverage gate of the backend: 80% of lines and branches in the
+           domain and in the use cases, with the report in the build. -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+      </plugin>
     </plugins>
   </build>
 </project>

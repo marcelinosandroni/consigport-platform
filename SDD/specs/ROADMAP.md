@@ -13,8 +13,8 @@
 | Bootstrap do repositório | ✅ `main` com commit inicial |
 | Fase 0 — Fundação | ✅ concluída e arquivada, tag `v0.1.0` |
 | Fase 1 — Central mock | ✅ concluída e arquivada, tag `v0.2.0` |
-| Fase em andamento | Fase 2 — Backend core (task 2.17 em voo) |
-| Próxima task | 2.17 — Fechamento do backend |
+| Fase em andamento | Fase 2 — Backend core (task 2.18 em voo) |
+| Próxima task | 2.18 — Fluxo completo com o banco real |
 | Versão | `v0.2.0` (a Fase 2 fecha em `v0.3.0`) |
 
 A Fase 0 entregou specs, ADRs, harness, gates, contratos, scaffolds, CI/CD e a
@@ -30,11 +30,11 @@ backend começa na Fase 2, sempre em branch própria e via PR.
 |---|---|---|---|---|
 | 0 — Fundação | Specs, contratos, CI/CD, Docker base, scaffolds | 12 | `docs/000-sdd-foundation`, `feat/00x-*` | `v0.1.0` ✅ |
 | 1 — Central mock | Simular a Central com HMAC, idempotência, caos e admin | 7 | `feat/01x-central-mock` | `v0.2.0` ✅ |
-| 2 — Backend core | DDD + hexagonal + ACL + Flyway + i18n + polling + Swagger | 17 | `feat/02x-backend-*` | `v0.3.0` |
+| 2 — Backend core | DDD + hexagonal + ACL + Flyway + i18n + polling + Swagger | 18 | `feat/02x-backend-*` | `v0.3.0` |
 | 3 — Frontend RSC | React 19 RSC, design Matrix, i18n, fluxo completo | 9 | `feat/03x-frontend-*` | `v0.4.0` |
 | 4 — Qualidade | Contratos, E2E, k6, Docker full, CD, release, README | 7 | `feat/04x-quality-*` | `v1.0.0` |
 
-Total: **52 tasks**, cada uma com 2–4 arquivos e um commit.
+Total: **53 tasks**, cada uma com 2–4 arquivos e um commit.
 
 ---
 

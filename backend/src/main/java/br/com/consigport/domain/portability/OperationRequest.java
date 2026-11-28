@@ -50,10 +50,13 @@ public record OperationRequest(
     if (installmentIds == null || installmentIds.isEmpty()) {
       throw new IllegalArgumentException("installmentIds must have at least one element");
     }
-    installmentIds = List.copyOf(installmentIds);
+    // The check of the null element comes before the copy: `List.copyOf` refuses a null
+    // with a NullPointerException, which would hide the invariant of the domain behind a
+    // failure of the library.
     if (installmentIds.stream().anyMatch(installmentId -> installmentId == null)) {
       throw new IllegalArgumentException("installmentIds must not contain null");
     }
+    installmentIds = List.copyOf(installmentIds);
     if (installmentIds.stream().distinct().count() != installmentIds.size()) {
       throw new IllegalArgumentException("installmentIds must not repeat an installment");
     }

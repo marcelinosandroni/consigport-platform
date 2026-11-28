@@ -63,6 +63,7 @@
 
     <!-- Coverage threshold (enforced by JaCoCo) -->
     <jacoco.line.coverage>0.80</jacoco.line.coverage>
+    <jacoco.branch.coverage>0.80</jacoco.branch.coverage>
 
     <!-- Late-replaced by JaCoCo's prepare-agent; empty when a module has no agent. -->
     <argLine></argLine>
@@ -152,6 +153,14 @@
           <groupId>org.jacoco</groupId>
           <artifactId>jacoco-maven-plugin</artifactId>
           <version>${jacoco.version}</version>
+          <configuration>
+            <!-- The gate of the backend covers the core: the domain and the use
+                 cases. The adapters are proven by their own integration tests. -->
+            <includes>
+              <include>br/com/consigport/domain/**</include>
+              <include>br/com/consigport/application/**</include>
+            </includes>
+          </configuration>
           <executions>
             <execution>
               <id>prepare-agent</id>
@@ -175,6 +184,11 @@
                         <counter>LINE</counter>
                         <value>COVEREDRATIO</value>
                         <minimum>${jacoco.line.coverage}</minimum>
+                      </limit>
+                      <limit>
+                        <counter>BRANCH</counter>
+                        <value>COVEREDRATIO</value>
+                        <minimum>${jacoco.branch.coverage}</minimum>
                       </limit>
                     </limits>
                   </rule>

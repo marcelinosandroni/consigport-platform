@@ -192,6 +192,38 @@ class PortabilityOperationTest {
   }
 
   @Test
+  void refusesToSubmitWithoutAnyProtocol() {
+    assertThatThrownBy(() -> newOperation().submit(null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("protocol must not be blank");
+  }
+
+  @Test
+  void refusesToPollWithoutTheInstantOfTheNextPoll() {
+    PortabilityOperation pending = newOperation().submit(PROTOCOL);
+
+    assertThatThrownBy(() -> pending.pollAttempt(null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("nextPollAt must not be null");
+  }
+
+  @Test
+  void refusesToRegisterAFailureWithoutTheInstantOfTheNextPoll() {
+    assertThatThrownBy(() -> newOperation().registerIntegrationFailure(null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("nextPollAt must not be null");
+  }
+
+  @Test
+  void refusesToCompleteWithoutTheInstantOfTheAccountUpdate() {
+    PortabilityOperation confirmed = newOperation().submit(PROTOCOL).confirm();
+
+    assertThatThrownBy(() -> confirmed.complete(null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("accountUpdatedAt must not be null");
+  }
+
+  @Test
   void refusesToRejectWithoutAReason() {
     PortabilityOperation pending = newOperation().submit(PROTOCOL);
 
@@ -326,6 +358,212 @@ class PortabilityOperationTest {
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessage("assigneeCreditor must not be blank");
     }
+
+    @Test
+    void refusesAMissingSnapshot() {
+      assertThatThrownBy(
+              () ->
+                  PortabilityOperation.create(
+                      new PortabilityOperation.OperationId(UUID.randomUUID()),
+                      IdempotencyKey.parse("6f1a1b4e-0f9d-4d0a-9f37-3a1d1a2b3c4d"),
+                      new BeneficiaryId("BEN-001"),
+                      new AgreementId("AGR-001"),
+                      null,
+                      "CREDOR-CESSIONARIO",
+                      new ReceivingAccount("001", "1234", "56789-0"),
+                      CREATED_AT))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("installments must have at least one element");
+    }
+
+    @Test
+    void refusesAMissingSnapshotInTheConstructor() {
+      assertThatThrownBy(() -> without(MissingField.INSTALLMENTS))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("installments must have at least one element");
+    }
+
+    @Test
+    void refusesAMissingAssigneeCreditor() {
+      assertThatThrownBy(
+              () ->
+                  PortabilityOperation.create(
+                      new PortabilityOperation.OperationId(UUID.randomUUID()),
+                      IdempotencyKey.parse("6f1a1b4e-0f9d-4d0a-9f37-3a1d1a2b3c4d"),
+                      new BeneficiaryId("BEN-001"),
+                      new AgreementId("AGR-001"),
+                      List.of(
+                          new InstallmentSnapshot(
+                              new InstallmentId("PAR-001"),
+                              new AgreementId("AGR-001"),
+                              new Money(new BigDecimal("450.00")),
+                              LocalDate.parse("2026-12-05"))),
+                      null,
+                      new ReceivingAccount("001", "1234", "56789-0"),
+                      CREATED_AT))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("assigneeCreditor must not be blank");
+    }
+
+    @Test
+    void refusesAMissingIdentity() {
+      assertThatThrownBy(() -> without(MissingField.ID))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("operationId must not be null");
+    }
+
+    @Test
+    void refusesAMissingIdempotencyKey() {
+      assertThatThrownBy(() -> without(MissingField.IDEMPOTENCY_KEY))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("idempotencyKey must not be null");
+    }
+
+    @Test
+    void refusesAMissingBeneficiary() {
+      assertThatThrownBy(() -> without(MissingField.BENEFICIARY))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("beneficiaryId must not be null");
+    }
+
+    @Test
+    void refusesAMissingAgreement() {
+      assertThatThrownBy(() -> without(MissingField.AGREEMENT))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("agreementId must not be null");
+    }
+
+    @Test
+    void refusesAMissingAccount() {
+      assertThatThrownBy(() -> without(MissingField.ACCOUNT))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("receivingAccount must not be null");
+    }
+
+    @Test
+    void refusesAMissingTotal() {
+      assertThatThrownBy(() -> without(MissingField.TOTAL))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("totalAmount must not be null");
+    }
+
+    @Test
+    void refusesAMissingStatus() {
+      assertThatThrownBy(() -> without(MissingField.STATUS))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("status must not be null");
+    }
+
+    @Test
+    void refusesAMissingCreationInstant() {
+      assertThatThrownBy(() -> without(MissingField.CREATED_AT))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("createdAt must not be null");
+    }
+
+    @Test
+    void refusesANegativeCountOfRetries() {
+      PortabilityOperation operation = newOperation();
+
+      assertThatThrownBy(
+              () ->
+                  new PortabilityOperation(
+                      operation.id(),
+                      operation.idempotencyKey(),
+                      operation.beneficiaryId(),
+                      operation.agreementId(),
+                      operation.installments(),
+                      operation.assigneeCreditor(),
+                      operation.receivingAccount(),
+                      operation.totalAmount(),
+                      operation.status(),
+                      operation.protocol(),
+                      operation.rejectionReason(),
+                      -1,
+                      operation.nextPollAt(),
+                      operation.accountUpdatedAt(),
+                      operation.createdAt()))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("retryCount must not be negative");
+    }
+
+    @Test
+    void refusesAProtocolBeforeTheCentralAccepts() {
+      PortabilityOperation operation = newOperation();
+
+      assertThatThrownBy(
+              () ->
+                  new PortabilityOperation(
+                      operation.id(),
+                      operation.idempotencyKey(),
+                      operation.beneficiaryId(),
+                      operation.agreementId(),
+                      operation.installments(),
+                      operation.assigneeCreditor(),
+                      operation.receivingAccount(),
+                      operation.totalAmount(),
+                      OperationStatus.CREATED,
+                      PROTOCOL,
+                      null,
+                      0,
+                      null,
+                      null,
+                      operation.createdAt()))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("protocol must be null while the operation is CREATED");
+    }
+
+    @Test
+    void refusesAReasonOutsideTheRejectedStatus() {
+      PortabilityOperation operation = newOperation().submit(PROTOCOL);
+
+      assertThatThrownBy(
+              () ->
+                  new PortabilityOperation(
+                      operation.id(),
+                      operation.idempotencyKey(),
+                      operation.beneficiaryId(),
+                      operation.agreementId(),
+                      operation.installments(),
+                      operation.assigneeCreditor(),
+                      operation.receivingAccount(),
+                      operation.totalAmount(),
+                      OperationStatus.PENDING,
+                      operation.protocol(),
+                      new RejectionReason.MarginInsufficient(),
+                      0,
+                      null,
+                      null,
+                      operation.createdAt()))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("rejectionReason must be null unless rejected");
+    }
+
+    @Test
+    void refusesARejectionWithoutAReason() {
+      PortabilityOperation operation = newOperation().submit(PROTOCOL);
+
+      assertThatThrownBy(
+              () ->
+                  new PortabilityOperation(
+                      operation.id(),
+                      operation.idempotencyKey(),
+                      operation.beneficiaryId(),
+                      operation.agreementId(),
+                      operation.installments(),
+                      operation.assigneeCreditor(),
+                      operation.receivingAccount(),
+                      operation.totalAmount(),
+                      OperationStatus.REJECTED,
+                      operation.protocol(),
+                      null,
+                      0,
+                      null,
+                      null,
+                      operation.createdAt()))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("rejectionReason must not be null when rejected");
+    }
   }
 
   @Nested
@@ -349,6 +587,16 @@ class PortabilityOperationTest {
       assertThatThrownBy(() -> PortabilityOperation.OperationId.parse(null))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessage("operationId must not be blank");
+      assertThatThrownBy(() -> PortabilityOperation.OperationId.parse("  "))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("operationId must not be blank");
+    }
+
+    @Test
+    void rejectsAMissingUuid() {
+      assertThatThrownBy(() -> new PortabilityOperation.OperationId(null))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("operationId must not be null");
     }
 
     @Test
@@ -357,6 +605,183 @@ class PortabilityOperationTest {
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessage("operationId must be a UUID");
     }
+  }
+
+  /**
+   * Rebuilds the aggregate without one of its fields, to prove the invariants of the
+   * constructor.
+   */
+  private static PortabilityOperation without(MissingField field) {
+    PortabilityOperation operation = newOperation();
+
+    return switch (field) {
+      case INSTALLMENTS ->
+          new PortabilityOperation(
+              operation.id(),
+              operation.idempotencyKey(),
+              operation.beneficiaryId(),
+              operation.agreementId(),
+              null,
+              operation.assigneeCreditor(),
+              operation.receivingAccount(),
+              operation.totalAmount(),
+              operation.status(),
+              operation.protocol(),
+              operation.rejectionReason(),
+              operation.retryCount(),
+              operation.nextPollAt(),
+              operation.accountUpdatedAt(),
+              operation.createdAt());
+      case ID ->
+          new PortabilityOperation(
+              null,
+              operation.idempotencyKey(),
+              operation.beneficiaryId(),
+              operation.agreementId(),
+              operation.installments(),
+              operation.assigneeCreditor(),
+              operation.receivingAccount(),
+              operation.totalAmount(),
+              operation.status(),
+              operation.protocol(),
+              operation.rejectionReason(),
+              operation.retryCount(),
+              operation.nextPollAt(),
+              operation.accountUpdatedAt(),
+              operation.createdAt());
+      case IDEMPOTENCY_KEY ->
+          new PortabilityOperation(
+              operation.id(),
+              null,
+              operation.beneficiaryId(),
+              operation.agreementId(),
+              operation.installments(),
+              operation.assigneeCreditor(),
+              operation.receivingAccount(),
+              operation.totalAmount(),
+              operation.status(),
+              operation.protocol(),
+              operation.rejectionReason(),
+              operation.retryCount(),
+              operation.nextPollAt(),
+              operation.accountUpdatedAt(),
+              operation.createdAt());
+      case BENEFICIARY ->
+          new PortabilityOperation(
+              operation.id(),
+              operation.idempotencyKey(),
+              null,
+              operation.agreementId(),
+              operation.installments(),
+              operation.assigneeCreditor(),
+              operation.receivingAccount(),
+              operation.totalAmount(),
+              operation.status(),
+              operation.protocol(),
+              operation.rejectionReason(),
+              operation.retryCount(),
+              operation.nextPollAt(),
+              operation.accountUpdatedAt(),
+              operation.createdAt());
+      case AGREEMENT ->
+          new PortabilityOperation(
+              operation.id(),
+              operation.idempotencyKey(),
+              operation.beneficiaryId(),
+              null,
+              operation.installments(),
+              operation.assigneeCreditor(),
+              operation.receivingAccount(),
+              operation.totalAmount(),
+              operation.status(),
+              operation.protocol(),
+              operation.rejectionReason(),
+              operation.retryCount(),
+              operation.nextPollAt(),
+              operation.accountUpdatedAt(),
+              operation.createdAt());
+      case ACCOUNT ->
+          new PortabilityOperation(
+              operation.id(),
+              operation.idempotencyKey(),
+              operation.beneficiaryId(),
+              operation.agreementId(),
+              operation.installments(),
+              operation.assigneeCreditor(),
+              null,
+              operation.totalAmount(),
+              operation.status(),
+              operation.protocol(),
+              operation.rejectionReason(),
+              operation.retryCount(),
+              operation.nextPollAt(),
+              operation.accountUpdatedAt(),
+              operation.createdAt());
+      case TOTAL ->
+          new PortabilityOperation(
+              operation.id(),
+              operation.idempotencyKey(),
+              operation.beneficiaryId(),
+              operation.agreementId(),
+              operation.installments(),
+              operation.assigneeCreditor(),
+              operation.receivingAccount(),
+              null,
+              operation.status(),
+              operation.protocol(),
+              operation.rejectionReason(),
+              operation.retryCount(),
+              operation.nextPollAt(),
+              operation.accountUpdatedAt(),
+              operation.createdAt());
+      case STATUS ->
+          new PortabilityOperation(
+              operation.id(),
+              operation.idempotencyKey(),
+              operation.beneficiaryId(),
+              operation.agreementId(),
+              operation.installments(),
+              operation.assigneeCreditor(),
+              operation.receivingAccount(),
+              operation.totalAmount(),
+              null,
+              operation.protocol(),
+              operation.rejectionReason(),
+              operation.retryCount(),
+              operation.nextPollAt(),
+              operation.accountUpdatedAt(),
+              operation.createdAt());
+      case CREATED_AT ->
+          new PortabilityOperation(
+              operation.id(),
+              operation.idempotencyKey(),
+              operation.beneficiaryId(),
+              operation.agreementId(),
+              operation.installments(),
+              operation.assigneeCreditor(),
+              operation.receivingAccount(),
+              operation.totalAmount(),
+              operation.status(),
+              operation.protocol(),
+              operation.rejectionReason(),
+              operation.retryCount(),
+              operation.nextPollAt(),
+              operation.accountUpdatedAt(),
+              null);
+    };
+  }
+
+  /** The field of the aggregate that a test removes. */
+  private enum MissingField {
+    INSTALLMENTS,
+    ID,
+    IDEMPOTENCY_KEY,
+    BENEFICIARY,
+    AGREEMENT,
+    ACCOUNT,
+    TOTAL,
+    STATUS,
+    CREATED_AT
   }
 
   /**
@@ -384,7 +809,8 @@ class PortabilityOperationTest {
         operation.createdAt());
   }
 
-  private static PortabilityOperation operationIn(OperationStatus status) {    PortabilityOperation operation = newOperation();
+  private static PortabilityOperation operationIn(OperationStatus status) {
+    PortabilityOperation operation = newOperation();
     return switch (status) {
       case CREATED -> operation;
       case PENDING -> operation.submit(PROTOCOL);
