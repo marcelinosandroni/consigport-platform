@@ -35,7 +35,7 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
 | **E2E Smoke** | Playwright (fluxo completo em Docker) | `e2e` | ❌ | ✅ (quando a suíte existe) | ✅ |
 | **Performance Smoke** | k6 smoke test (thresholds estritos) | `k6-smoke` | ❌ | ✅ (quando o script existe) | — |
 | **Performance Load** | k6 load test sustentado + relatório HTML | `k6-load` | ❌ | ❌ | ✅ |
-| **Contrato Dinâmico** | Schemathesis (property-based) | `schemathesis` | ❌ | ✅ (smoke) | ✅ (full) |
+| **Contrato Dinâmico** | Schemathesis (property-based) contra a API em execução | `contracts` e `schemathesis` | ✅ | ✅ | ✅ |
 | **Segurança** | `npm audit` + Trivy (fs e imagens) | `security` | ❌ | ✅ | ✅ |
 | **Release** | release-please: PR de release, CHANGELOG e tag `vX.Y.Z` | `release-please` | ❌ | — | ✅ (push em `main`) | — |
 | **Imagens GHCR** | Build e push das três imagens (tag SemVer + `latest`) | `publish-images` | ❌ | — | ✅ (tag) | — |
@@ -43,7 +43,9 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
 
 > Os jobs `e2e`, `k6-smoke`, `k6-load`, `schemathesis` e `security-images` ficam
 > condicionados à existência da suíte no commit: eles acendem sozinhos quando o
-> artefato chega, em vez de fingir um verde que não existe.
+> artefato chega, em vez de fingir um verde que não existe. O portão do contrato
+> dinâmico roda no job `contracts` de todo PR e também no nightly, com a mesma
+> configuração — [`tests/contract/schemathesis.toml`](../../tests/contract/schemathesis.toml).
 
 ---
 
@@ -134,7 +136,56 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
 
 ---
 
-### 3.4. Portão de Frontend (React 19.2 + RSC + Tailwind 4)
+### 3.4. Portão do Contrato Dinâmico (Schemathesis — CI e Nightly)
+- **Workflow:** [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml), job `contracts`
+  (e job `schemathesis` do [nightly](../../.github/workflows/nightly.yml), que usa a
+  mesma configuração).
+- **Configuração:** [`tests/contract/schemathesis.toml`](../../tests/contract/schemathesis.toml).
+- **Comandos:**
+  ```bash
+  # A stack no ar: PostgreSQL 16 real, Central simulada, backend real.
+  docker compose up -d --wait postgres
+  # O opt-in do beneficiário é registrado antes do teste: a API guarda o
+  # estado da operação e, sem o opt-in, a criação responde 403 em vez de 202.
+  curl -sSf -X POST http://localhost:8080/api/v1/authorizations \
+    -H 'Content-Type: application/json' \
+    -d '{"beneficiaryId":"BEN-001","agreementId":"AGR-001"}'
+
+  schemathesis --config-file tests/contract/schemathesis.toml \
+    run contracts/consigport-api.yaml --no-color
+
+  # A prova de que o portão está armado.
+  node scripts/check-schemathesis-gate.mjs
+  ```
+- **O que o portão mede:** a resposta da API em execução contra o contrato
+  versionado. As verificações ligadas são as que medem o contrato —
+  `status_code_conformance` (o status não declarado), `response_schema_conformance`
+  (o corpo fora do esquema), `content_type_conformance`, `response_headers_conformance`,
+  `not_a_server_error` — e três que medem o comportamento da API:
+  `ensure_resource_availability` (o recurso inexistente responde 404),
+  `missing_required_header` (o header obrigatório ausente responde 400) e
+  `object_level_authorization` (o recurso de outro beneficiário responde 404).
+- **Por que as verificações de rigidez estão desligadas:** `positive_data_acceptance`
+  e `negative_data_rejection` medem se a API aceita ou recusa um conteúdo
+  específico — uma pergunta de regra de negócio, não de contrato. O `Accept-Language`
+  é opcional e tem valor padrão: a API negocia o idioma e cai no padrão em vez de
+  recusar a requisição, o que é um comportamento deliberado. O header é fixado em
+  `pt-BR` na configuração para que o teste nunca envie um locale fora do enum.
+- **Fases:** `examples` (os exemplos do contrato, enviados como estão escritos) e
+  `coverage` (um caso gerado por operação, com todas as verificações). A fase
+  `fuzzing` — que gera valores fora dos exemplos — espera o contrato declarar
+  todas as respostas da API; o que ela encontrou está registrado como dívida no
+  [`../../SDD/specs/BACKLOG.md`](../../SDD/specs/BACKLOG.md).
+- **Critérios de Aceite:**
+  - Todas as operações do contrato exercitadas contra a API em execução, sem
+    nenhuma resposta fora do contrato.
+  - Relatório publicado como artefato `schemathesis-report` (JUnit e JSON).
+  - O portão armado: o contrato de fixture que esquece o `404` da API reprova o
+    teste com a violação esperada (`Undocumented status code`).
+
+---
+
+### 3.5. Portão de Frontend (React 19.2 + RSC + Tailwind 4)
 - **Comandos:**
   ```bash
   npm run --prefix frontend lint
@@ -150,7 +201,7 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
 
 ---
 
-### 3.5. Portão de Testes Ponta a Ponta (Playwright — CI Only)
+### 3.6. Portão de Testes Ponta a Ponta (Playwright — CI Only)
 - **Execução:**
   - O pipeline do GitHub Actions inicia o ambiente completo via `docker compose up -d --wait` (PostgreSQL, Backend, Mock da Central e Frontend).
   - Executa a suite de testes Playwright contra `http://localhost:5173`.
@@ -163,7 +214,7 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
 
 ---
 
-### 3.6. Portão de Performance (k6 — CI & Nightly)
+### 3.7. Portão de Performance (k6 — CI & Nightly)
 - **Execução:**
   - Executado via runner de k6 no CI contra os serviços em Docker.
 - **Thresholds Estabelecidos:**
@@ -177,7 +228,7 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
 
 ---
 
-### 3.7. Portão de Segurança e Imagens
+### 3.8. Portão de Segurança e Imagens
 - **Execução:**
   - No PR, o job `security` roda `npm audit --omit=dev --audit-level=high` e a varredura de filesystem com Trivy, que lê `pom.xml` e `package-lock.json` e cobre a superfície de dependências do repositório.
   - No nightly, o job `security-images` constrói as três imagens (`backend`, `central-convenios-mock`, `frontend`) a partir da raiz do repositório e escaneia cada uma com Trivy.
@@ -187,7 +238,7 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
 
 ---
 
-### 3.8. Portão de Release e Entrega Contínua
+### 3.9. Portão de Release e Entrega Contínua
 - **Workflows:** [`.github/workflows/release.yml`](../../.github/workflows/release.yml) e
   [`.github/workflows/cd-staging.yml`](../../.github/workflows/cd-staging.yml).
 - **Versionamento:**

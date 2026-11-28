@@ -1,0 +1,82 @@
+# The dynamic contract test of the ConsigPort API.
+#
+# The gate answers one question: does every answer of the running API honour the
+# versioned contract? The checks below are the ones that measure the contract
+# itself. The checks that measure the strictness of the API (whether it accepts
+# or rejects a particular payload) are off, and the reason is written down in
+# `docs/quality/GATES.md` §3.4 and in the debts of `SDD/specs/BACKLOG.md`.
+
+# The API answers on the same origin in every environment: the compose of the
+# CI, the local stack and the staging.
+base-url = "http://localhost:8080"
+
+# One worker at a time: the API keeps the state of the operation and the test
+# has to be reproducible.
+workers = 1
+
+# The run stops after this many failures: the report names all of them anyway.
+max-failures = 10
+
+# The first call of a stack is slow (the JVM warms up): the default of ten
+# seconds is too tight for the first request of each endpoint.
+request-timeout = 30
+
+# The API negotiates the locale of the human messages: an unknown locale falls
+# back to the default instead of failing the request. The header is fixed here
+# so the test never sends a locale outside the enum of the contract.
+headers = { "Accept-Language" = "pt-BR" }
+
+[generation]
+# Only data that honours the contract: the negative generation sends values
+# that break the schema on purpose, and the answer of the API to those values
+# is a question about the strictness of the API, not about the contract.
+mode = "positive"
+max-examples = 5
+deterministic = true
+
+[phases]
+# The examples of the contract, sent exactly as they are written.
+examples = { enabled = true }
+# One generated case per operation, with every check of the gate.
+coverage = { enabled = true }
+# The fuzzing phase explores values outside the examples: it waits for the
+# contract to declare every answer of the API (the debts of the BACKLOG).
+fuzzing = { enabled = false }
+stateful = { enabled = false }
+
+[checks]
+enabled = true
+
+# The answer is a status that the contract does not declare.
+status_code_conformance = { enabled = true }
+# The answer is a body that does not honour the schema of the declared status.
+response_schema_conformance = { enabled = true }
+# The answer is not sent with the content type of the contract.
+content_type_conformance = { enabled = true }
+# The answer is missing a header that the contract declares.
+response_headers_conformance = { enabled = true }
+# The answer is a server error.
+not_a_server_error = { enabled = true }
+
+# The resource that does not exist answers 404.
+ensure_resource_availability = { enabled = true }
+# The missing mandatory header answers 400.
+missing_required_header = { enabled = true }
+# The resource of another beneficiary answers 404.
+object_level_authorization = { enabled = true }
+
+# The API is not strict about the payload: the acceptance of a valid payload
+# and the rejection of an invalid one are questions about the business rules.
+positive_data_acceptance = { enabled = false }
+negative_data_rejection = { enabled = false }
+# The API has no authentication, no deletion and no other method to guess.
+use_after_free = { enabled = false }
+ignored_auth = { enabled = false }
+unsupported_method = { enabled = false }
+allow_header_conformance = { enabled = false }
+
+[reports]
+# The report is an artifact of the CI, never a file of the repository.
+directory = "schemathesis-report"
+junit = { enabled = true, path = "schemathesis-report/junit.xml" }
+json = { enabled = true, path = "schemathesis-report/report.json" }

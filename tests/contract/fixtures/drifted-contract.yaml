@@ -1,0 +1,39 @@
+openapi: 3.1.0
+info:
+  title: ConsigPort — fixture do portão dinâmico
+  version: 1.0.0
+  description: |
+    Contrato incompleto, usado só para provar que o portão do Schemathesis está
+    armado. A operação real existe na API e responde `404` quando a operação não
+    existe; este contrato declara apenas o `200`, então a resposta real está
+    fora do contrato e o portão tem de reprovar.
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/v1/portability-operations/{operationId}:
+    get:
+      tags:
+        - Portability Operations
+      operationId: findPortabilityOperation
+      summary: Consulta uma operação de portabilidade
+      parameters:
+        - name: operationId
+          in: path
+          required: true
+          description: Identificador da operação no ConsigPort.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Operação encontrada.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - operationId
+                properties:
+                  operationId:
+                    type: string
+                    format: uuid

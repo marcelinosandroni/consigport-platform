@@ -87,6 +87,8 @@ playwright-report/
 blob-report/
 playwright/.cache/
 k6-report.html
+schemathesis-report/
+.schemathesis/
 
 # ------------------------------------------------------------------------------
 # Docker & Local Data Volumes

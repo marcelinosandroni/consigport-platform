@@ -193,7 +193,8 @@ polling resiliente e Swagger.
 | ID | Entrega | Estado |
 |---|---|---|
 | 4.1 | Gates de contrato | `[x]` |
-| 4.2 | Testes de propriedade com Schemathesis | `[-]` |
+| 4.2 | Testes de propriedade com Schemathesis | `[x]` |
+| 4.3 | E2E com Playwright no CI | `[-]` |
 | 4.3 | E2E com Playwright no CI | `[ ]` |
 | 4.4 | Performance com k6 | `[ ]` |
 | 4.5 | Segurança e dependências | `[ ]` |

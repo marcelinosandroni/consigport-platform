@@ -2122,3 +2122,53 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    referência do PR e o portão `check-ai-log` a reprovou — "the log changed but
    no session was added (base: 56, head: 56)". A regra exige uma sessão nova
    quando o PR mexe em arquivo de projeto; esta sessão é a resposta.
+
+## Sessão #58 — Task 4.2 (Testes de propriedade com Schemathesis)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/042-quality-schemathesis`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** exercitar a API real contra o contrato versionado — toda resposta
+  fora do contrato reprova o job `contracts`, e o relatório vai para o CI como
+  artefato.
+
+### Atividades Realizadas:
+1. **O estado do portão:** o job `contracts` comparava o contrato com a versão
+   de `main` e com o documento publicado, mas a API em execução nunca era
+   exercitada contra o contrato. O job `schemathesis` do nightly apontava para
+   `tests/schemathesis/consigport.yaml`, que nunca existiu, e não subia a stack:
+   ele ficaria skipped para sempre.
+2. **A configuração do portão** (`tests/contract/schemathesis.toml`): uma origem
+   só de verdade, usada pelo job `contracts` do CI e pelo job `schemathesis` do
+   nightly. As fases `examples` e `coverage` exercitam as sete operações do
+   contrato; as verificações que medem o contrato estão ligadas, e as que medem
+   a rigidez da API (`positive_data_acceptance`, `negative_data_rejection`)
+   estão desligadas, com o motivo escrito no arquivo e em
+   `docs/quality/GATES.md` §3.4.
+3. **A medição do que a API realmente faz:** a primeira execução, com todos os
+   checks ligados, reprovou por duas razões — o `Accept-Language` inválido que a
+   API aceita (a API negocia o idioma e cai no padrão, por decisão) e o `page`
+   acima de `2^31-1` que a API recusa (o contrato não declara `maximum`). Com o
+   `Accept-Language` fixado em `pt-BR` e as verificações de rigidez desligadas,
+   o portão fecha em 94 casos, 94 aprovados.
+4. **A prova de que o portão está armado**
+   (`scripts/check-schemathesis-gate.mjs` com
+   `tests/contract/fixtures/drifted-contract.yaml`): um contrato que descreve a
+   operação real da API e esquece o `404` dela reprova o teste com a violação
+   esperada. A prova roda a cada PR.
+5. **A exploração de fora dos exemplos:** a fase de fuzzing, desligada no
+   portão, gerou 453 casos e encontrou 10 falhas únicas — o `400` de
+   identificador fora do formato, o `403` de opt-in ausente, o `503` de Central
+   indisponível e o `500` de `Content-Type` malformado. As divergências de
+   contrato estão registradas no `BACKLOG.md` e esperam autorização; o `500` de
+   `Content-Type` malformado é defeito do backend.
+6. **O CI:** o job `contracts` sobe a stack real (PostgreSQL 16, mock e
+   backend), registra o opt-in do beneficiário — a API guarda o estado da
+   operação —, roda o teste dinâmico, prova que o portão está armado e publica
+   o relatório JUnit e JSON como artefato `schemathesis-report`. O nightly usa
+   a mesma configuração.
+7. **A medição da latência:** a primeira requisição de uma stack leva 7,4 s
+   (a JVM aquece) e a primeira criação de operação 1,0 s. O `request-timeout`
+   do portão é de 30 s por causa disso.

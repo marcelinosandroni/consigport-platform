@@ -6067,7 +6067,7 @@
      - Exactly 1 task in flight in SDD/specs/PLAN.md.
      - Tasks in PLAN.md are cataloged in BACKLOG.md.
    $ node scripts/check-architecture.mjs
-   🎉 Todos os 22 testes de validação dos desenhos passaram com sucesso!
+   🎉 Todos os 22 testes de validação dos desenhos e arquitetura passaram com sucesso!
    $ node scripts/check-theme-tokens.mjs
    ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css (line endings normalized).
    $ node scripts/check-ai-log.mjs
@@ -6185,6 +6185,304 @@
 - `.spectral.yaml`
 - `.github/workflows/ci.yml`
 - `.github/workflows/nightly.yml`
+- `docs/quality/GATES.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/specs/BACKLOG.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 4.2 — Testes de propriedade com Schemathesis
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/042-quality-schemathesis`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** exercitar a API real contra o contrato versionado — toda resposta
+  fora do contrato reprova o job `contracts`, e o relatório vai para o CI como
+  artefato.
+
+#### Comandos de Verificação e Saídas:
+
+1. **O portão contra a API em execução** (PostgreSQL 16 real, Central simulada,
+   backend real, stack zerada antes do teste):
+   ```text
+   $ curl -sSf -X POST http://localhost:8080/api/v1/authorizations -H 'Content-Type: application/json' -d '{"beneficiaryId":"BEN-001","agreementId":"AGR-001"}'
+   {"authorizationId":"bb43a3dd-38eb-4e5b-864e-f5ac185cf3b6","beneficiaryId":"BEN-001","agreementId":"AGR-001","createdAt":"2026-11-28T12:43:16.447385433Z"}
+
+   $ schemathesis --config-file tests/contract/schemathesis.toml run contracts/consigport-api.yaml --no-color
+   Schemathesis v4.34.4
+   ━━━━━━━━━━━━━━━━━━━━
+
+    ✅  Loaded specification from contracts/consigport-api.yaml (in 0.87s)
+
+        Base URL:         http://localhost:8080
+        Specification:    Open API 3.1.0
+        Operations:       7 selected / 7 total
+        Configuration:    /home/ec2-user/consigport-platform/tests/contract/schemathesis.toml
+
+    ✅  API capabilities:
+
+        Supports NULL byte in headers:                            ✘
+        Accepts backslash and control characters in URL paths:    ✘
+
+    ✅  Examples (in 1.41s)
+
+        ✅ 7 passed
+
+    ✅  Coverage (in 1.29s)
+
+        ✅ 7 passed
+
+   ==================================== SUMMARY ====================================
+
+   API Operations:
+     Selected: 7/7
+     Tested: 7
+
+   Test Phases:
+     ✅ Examples
+     ✅ Coverage
+     ⏭  Fuzzing (disabled)
+     ⏭  Stateful (disabled)
+
+   Test cases:
+     94 generated, 94 passed
+
+   Reports:
+     - JUnit: schemathesis-report/junit.xml
+     - JSON: schemathesis-report/report.json
+
+   Seed: not used in the deterministic mode
+
+   =========================== No issues found in 2.86s ===========================
+   exit: 0
+   ```
+2. **A prova de que o portão está armado** — o contrato de fixture que esquece o
+   `404` da API reprova o teste, e reprova pelo motivo certo:
+   ```text
+   $ node scripts/check-schemathesis-gate.mjs
+   ✓ the gate is armed: the undocumented answer of the API fails the test
+   ✓ the failure is the expected one: Undocumented status code
+   exit: 0
+   ```
+   A falha que a fixture provoca, com o relatório do Schemathesis:
+   ```text
+   $ schemathesis --config-file tests/contract/schemathesis.toml run tests/contract/fixtures/drifted-contract.yaml --no-color
+   _______________ GET /api/v1/portability-operations/{operationId} _______________
+   1. Test Case ID: sbebIM
+
+   - ST103 Undocumented status code
+
+       Received: 404
+       Documented: 200
+
+   [404] Not Found:
+
+       `{"code":"OPERATION_NOT_FOUND","message":"Operação não encontrada.","locale":"pt-BR","timestamp":"2026-11-28T12:28:57.926698829Z","path":"/api/v1/portability-operations/e3e70682-c209-1cac-a29f-6fbed82c07cd","details":[]}`
+
+   Failures:
+     ❌ ST103 Undocumented status code: 1
+
+   Test cases:
+     1 generated, 1 found 1 unique failure
+   exit: 1
+   ```
+3. **O relatório publicado pelo job:**
+   ```text
+   $ ls -la schemathesis-report/
+   total 24
+   drwxr-xr-x 2 ec2-user ec2-user  42 Nov 28 12:43 .
+   drwxr-xr-x 17 ec2-user ec2-user 16384 Nov 28 12:43 ..
+   -rw-r--r-- 1 ec2-user ec2-user 948 Nov 28 12:43 junit.xml
+   -rw-r--r-- 1 ec2-user ec2-user 2178 Nov 28 12:43 report.json
+   ```
+4. **A exploração de fora dos exemplos** — a fase de fuzzing, desligada no
+   portão, com 453 casos gerados e 10 falhas únicas. É a medida do que o contrato
+   público ainda não declara:
+   ```text
+   $ schemathesis --config-file <fuzzing> run contracts/consigport-api.yaml --no-color
+   Failures:
+     ❌ ST101 Server error: 2
+     ❌ ST102 Server error on undeclared request Content-Type: 3
+     ❌ ST103 Undocumented status code: 5
+
+   Test cases:
+     453 generated, 9 found 10 unique failures
+   exit: 1
+   ```
+   As respostas fora do contrato, uma a uma:
+   ```text
+   GET /api/v1/authorizations/{beneficiaryId}
+   - ST103 Undocumented status code
+       Received: 400
+       Documented: 200, 404, 500
+
+   GET /api/v1/beneficiaries/{beneficiaryId}/agenda
+   - ST103 Undocumented status code
+       Received: 400
+       Documented: 200, 403, 404, 500
+   - ST101 Server error
+   - ST103 Undocumented status code
+       Received: 503
+       Documented: 200, 403, 404, 500
+
+   GET /api/v1/portability-operations
+   - ST102 Server error on undeclared request Content-Type
+       `Content-Type: multipart/form-data` without a boundary returned 500, expected 400 Bad Request or 415 Unsupported Media Type
+
+   GET /api/v1/portability-operations/{operationId}
+   - ST103 Undocumented status code
+       Received: 400
+       Documented: 200, 404, 500
+
+   GET /api/v1/portability-operations/{operationId}/events
+   - ST103 Undocumented status code
+       Received: 400
+       Documented: 200, 404, 500
+
+   POST /api/v1/authorizations
+   - ST102 Server error on undeclared request Content-Type
+       [500] Internal Server Error
+
+   POST /api/v1/portability-operations
+   - ST102 Server error on undeclared request Content-Type
+       [500] Internal Server Error
+   - ST101 Server error
+       [503] Service Unavailable
+   ```
+   E o `403` que a criação da operação devolve quando o opt-in do beneficiário
+   não existe, encontrado na primeira execução, antes de a stack ter o opt-in
+   registrado:
+   ```text
+   [403] Forbidden:
+
+       `{"code":"AUTHORIZATION_REQUIRED","message":"É necessário registrar a autorização antes de consultar a agenda.","locale":"pt-BR","timestamp":"2026-11-28T11:37:07.462234595Z","path":"/api/v1/portability-operations","details":[]}`
+   ```
+5. **Os limites reais da API**, medidos para caracterizar as divergências do
+   contrato:
+   ```text
+   $ for P in 0 1 2147483647 2147483648 9223372036854775807 9223372036854775808; do ... done
+   page=0                      -> HTTP 200
+   page=1                      -> HTTP 200
+   page=2147483647             -> HTTP 200
+   page=2147483648             -> HTTP 400
+   page=9223372036854775807    -> HTTP 400
+   page=9223372036854775808    -> HTTP 400
+
+   $ for S in 0 1 100 101 1000; do ... done
+   size=0      -> HTTP 400
+   size=1      -> HTTP 200
+   size=100    -> HTTP 200
+   size=101    -> HTTP 400
+   size=1000   -> HTTP 400
+   ```
+6. **Os portões de documentação e especificação:**
+   ```text
+   $ node SDD/SKILLS/check-docs/check-docs.mjs .
+   ✓ 67 documents, every relative link resolves.
+   $ node scripts/check-specs.mjs
+     - Required core documents and ADRs present.
+     - Exactly 1 task in flight in SDD/specs/PLAN.md.
+     - Tasks in PLAN.md are cataloged in BACKLOG.md.
+   $ node scripts/check-architecture.mjs
+   🎉 Todos os 22 testes de validação dos desenhos e arquitetura passaram com sucesso!
+   $ node scripts/check-theme-tokens.mjs
+   ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css (line endings normalized).
+   $ node scripts/check-ai-log.mjs
+   ✓ AI usage log: 58 sessions, structure valid.
+   ```
+7. **Os workflows, com o YAML validado:**
+   ```text
+   $ npx --yes js-yaml@4.1.0 .github/workflows/ci.yml > /dev/null
+   .github/workflows/ci.yml: YAML válido
+   .github/workflows/nightly.yml: YAML válido
+   tests/contract/fixtures/drifted-contract.yaml: YAML válido
+   $ npx --yes js-yaml@4.1.0 .github/workflows/ci.yml | node -e "..."
+   detect → Detect the suites available in this commit
+   docs → Docs, Specs, Architecture and AI Log
+   backend → Backend — build, unit tests and coverage report
+   mock → Central Mock — build and unit tests
+   frontend → Frontend — lint, typecheck, unit tests and build
+   contracts → Contracts — Spectral, HMAC vector, breaking changes and dynamic test
+   compose → Docker Compose — configuration
+   smoke → Stack Smoke — backend and mock against PostgreSQL 16
+   e2e → E2E — Playwright
+   k6-smoke → Performance Smoke — k6
+   security → Security — dependency audit and vulnerability scan
+   ```
+
+#### Conteúdo Entregue:
+- `tests/contract/schemathesis.toml` (novo) — a configuração do portão: uma
+  origem só de verdade, usada pelo job `contracts` do CI e pelo job
+  `schemathesis` do nightly. As fases `examples` e `coverage` exercitam as sete
+  operações; as verificações de contrato (`status_code_conformance`,
+  `response_schema_conformance`, `content_type_conformance`,
+  `response_headers_conformance`, `not_a_server_error`) e as três de
+  comportamento (`ensure_resource_availability`, `missing_required_header`,
+  `object_level_authorization`) estão ligadas. As verificações de rigidez
+  (`positive_data_acceptance`, `negative_data_rejection`) estão desligadas, com o
+  motivo escrito no próprio arquivo e em `docs/quality/GATES.md` §3.4.
+- `tests/contract/fixtures/drifted-contract.yaml` (novo) — o contrato de fixture
+  que descreve a operação real da API e esquece o `404` dela.
+- `scripts/check-schemathesis-gate.mjs` (novo) — a prova de que o portão está
+  armado: roda o Schemathesis contra a fixture e exige que a falha seja a
+  esperada (`Undocumented status code`). Um portão que nunca falha não é
+  portão.
+- `.github/workflows/ci.yml` — o job `contracts` sobe a stack real (PostgreSQL
+  16, mock e backend), registra o opt-in do beneficiário, roda o teste dinâmico,
+  prova que o portão está armado e publica o relatório como artefato
+  `schemathesis-report`.
+- `.github/workflows/nightly.yml` — o job `schemathesis` passa a usar a mesma
+  configuração (antes apontava para `tests/schemathesis/consigport.yaml`, que
+  nunca existiu, e não subia a stack), e o `detect` procura a configuração no
+  lugar certo.
+- `.gitignore` — o diretório do relatório não entra no repositório.
+- `docs/quality/GATES.md` — §3.4 novo (o portão do contrato dinâmico) e a
+  matriz da §2 com o job e a execução local corrigidos.
+
+#### Descobertas e Decisões:
+- **O `oasdiff` não substitui o teste dinâmico.** O `oasdiff` compara contrato
+  com contrato; o Schemathesis compara contrato com a **resposta real**. Os
+  dois portões ficam: o primeiro no PR, sem stack; o segundo, com a stack real.
+- **A API guarda o estado da operação.** Sem o opt-in do beneficiário
+  registrado, a criação da operação responde `403` em vez de `202` — o job
+  registra o opt-in antes do teste, e é o mesmo passo que o smoke usa.
+- **O `Accept-Language` é opcional e tem valor padrão.** A API negocia o idioma
+  e cai no padrão em vez de recusar a requisição: o `negative_data_rejection`
+  acusava a API por ser tolerante. O header é fixado em `pt-BR` na configuração,
+  e a tolerância fica documentada como decisão, não como falha.
+- **O `page` e os `installmentIds` são mais frouxos no contrato do que na API.**
+  A API recusa `page` acima de `2147483647` e identificadores com mais de 64
+  caracteres; o contrato não declara nenhum dos dois limites. Nenhum dos dois
+  quebra quem consome a API, mas o contrato precisa declará-los para que a fase
+  de fuzzing possa ser ligada.
+- **A fase de fuzzing reprova por respostas legítimas da API.** As divergências
+  encontradas são: o `400 VALIDATION_ERROR` que a API devolve quando o
+  identificador do caminho não tem o formato esperado (em quatro operações de
+  leitura), o `403 AUTHORIZATION_REQUIRED` da criação da operação quando o
+  opt-in não existe, o `503 CENTRAL_UNAVAILABLE` da consulta da agenda quando a
+  Central não está disponível, e o `500 INTERNAL_ERROR` que a API devolve quando
+  a requisição traz um `Content-Type` malformado. As três primeiras são
+  contrato — esperam autorização do responsável; a quarta é defeito do backend.
+  Todas estão registradas como dívida no `BACKLOG.md`.
+- **O `Content-Type` malformado produz `500`.** Um pedido malformado não é erro
+  interno: o backend tem de responder `400` ou `415`. É defeito do backend e
+  não depende de autorização.
+- **A primeira requisição de uma stack é lenta** (a JVM aquece): o opt-in levou
+  7,4 s e a primeira criação de operação 1,0 s. O `request-timeout` do
+  Schemathesis é de 30 s por causa disso — o padrão de 10 s seria apertado.
+
+#### Arquivos Tocados:
+- `tests/contract/schemathesis.toml` (novo)
+- `tests/contract/fixtures/drifted-contract.yaml` (novo)
+- `scripts/check-schemathesis-gate.mjs` (novo)
+- `.github/workflows/ci.yml`
+- `.github/workflows/nightly.yml`
+- `.gitignore`
 - `docs/quality/GATES.md`
 - `SDD/specs/PLAN.md`
 - `SDD/specs/ROADMAP.md`

@@ -183,16 +183,18 @@
 
 > Objetivo: provar o sistema no CI/CD — contratos, E2E no navegador, performance,
 > segurança, entrega contínua e a vitrine do repositório.
-> Task em voo: **4.2 — Testes de propriedade com Schemathesis**.
+> Task em voo: **4.3 — E2E com Playwright no CI**.
 
 ### Tasks
 
 - [x] **4.1 — Gates de contrato**
       Spectral sem erro; `oasdiff` compara com a versão de `main` e falha em breaking
       change; snapshot do springdoc comparado ao contrato.
-- [-] **4.2 — Testes de propriedade com Schemathesis**
+- [x] **4.2 — Testes de propriedade com Schemathesis**
       Schemathesis roda contra o compose; qualquer resposta fora do contrato falha o
       job; relatório anexado.
+- [-] **4.3 — E2E com Playwright no CI**
+      Suíte E2E no navegador contra a stack completa; relatório publicado.
 
 ### Como usar este arquivo
 
