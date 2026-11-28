@@ -1500,3 +1500,508 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    - `./mvnw -B verify` → reactor verde (backend 481 testes, mock 39 testes).
    - Cobertura do núcleo inalterada: **99,71% de branches**, 98,12% de linhas, 100% de classes.
    - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).
+
+## Sessão #45 — Arquivamento da Fase 2 e release `v0.3.0`
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `chore/018-phase-2-archive`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** fechar a Fase 2 (18 tasks), promover a release `v0.3.0` e abrir a Fase 3.
+
+### Atividades Realizadas:
+1. **Merge da 2.18:** PR #50 (`feat/038-backend-lifecycle-integration` → `develop`) com CI
+   verde e merge commit `793099d`; branch remota deletada.
+2. **Promoção da fase:** PR #51 (`develop` → `staging`) e PR #52 (`staging` → `main`),
+   ambos com CI verde antes do merge.
+3. **Release:** o `release-please` abriu o PR #53 `chore(main): release 0.3.0`; o merge
+   criou a tag `v0.3.0` e a release no GitHub. O CI do `main` no push da release ficou
+   verde (run `46094354043`).
+4. **Publicação das imagens:** o `release-please` cria a tag pela API do GitHub, o que
+   não dispara o evento `push` da tag; as três imagens foram publicadas por
+   `workflow_dispatch` em `release.yml` com a tag `v0.3.0` (run `46095256699`).
+5. **Staging:** `workflow_dispatch` em `cd-staging.yml` com a tag `v0.3.0` (run
+   `46095428615`) — postgres, backend, mock e frontend `healthy`;
+   `/actuator/health` → `{"status":"UP","groups":["liveness","readiness"]}` nos dois
+   serviços; teardown verde.
+6. **Diagnóstico do CI do release-please:** o run `46093781359` falha com "This run
+   likely failed because of a workflow file issue", sem jobs e com `pull_requests = []`.
+   O mesmo padrão ocorreu nas releases da Fase 0 (`45658801729`) e da Fase 1
+   (`45816627838`): é o fechamento do PR antes de o job iniciar, não uma regressão do
+   conteúdo — o código idêntico passou no CI do PR #52 e no CI do `main`.
+7. **Arquivamento:** `SDD/specs/history/phases/phase-2-finished.md` com as 18 tasks, os
+   PRs, os critérios de saída, a evidência da release e as dívidas conhecidas; `PLAN.md`
+   com a Fase 2 concluída e a Fase 3 aberta com a task 3.1 em voo; `ROADMAP.md` com a
+   Fase 2 fechada na `v0.3.0`.
+8. **Padrão confirmado:** o arquivamento vai para `develop` depois da tag, como na Fase 1
+   (PR #32 mergeado em 13:00, `v0.2.0` às 12:08) — o arquivo de arquivamento entra na
+   release seguinte.
+9. **Validação:**
+   - 5 gates locais verdes (docs, specs, arquitetura, tokens e log de IA).
+   - `./mvnw -B verify` verde no reactor completo (backend 481 testes, mock 39 testes).
+
+## Sessão #46 — Task 3.1 (Cliente OpenAPI tipado)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/031-frontend-openapi-client`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** dar ao frontend um cliente tipado do contrato público, sem duplicar
+  tipos, com a base URL por ambiente e o erro mapeado pelo `code` estável.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/APP-STACK.md` (bibliotecas aprovadas e versões),
+   `SDD/stacks/react.md`, `SDD/stacks/typescript.md`, `SDD/stacks/testing.md`,
+   `SDD/stacks/tailwind.md`, `SDD/DESIGN.md`, `SDD/ARCHITECTURE.md` §5 e §8, o
+   `ADR-0005` e o `docs/quality/GATES.md`. Dois subagentes em paralelo levantaram as
+   regras do frontend e o estado do scaffold, para não redescobrir o que já existe.
+2. **Dependências dentro da faixa declarada:** `openapi-fetch@^0.13.8` (produção),
+   `openapi-typescript@^7.13.0` e `@types/node@^24` (desenvolvimento). O
+   `APP-STACK.md` fixa `openapi-typescript` em 7.x e `openapi-fetch` em 0.13.x.
+3. **Descoberta:** o `openapi-typescript` v7.13 não lê arquivo de config —
+   `defineConfig` não existe na série 7 e a v8 nunca foi publicada. A CLI ainda
+   interpreta um caminho passado como string como **conteúdo YAML**, o que produz
+   `Can't parse empty schema`. A solução foi fazer do `openapi-ts.config.ts` o
+   próprio gerador, com a URL `file://` e a API programática `openapiTS` +
+   `astToString`.
+4. **Gerador reprodutível:** `npm run --prefix frontend generate:types` reescreve
+   `src/shared/api/schema.ts` byte a byte a partir de `contracts/consigport-api.yaml`
+   — verificado com `diff` antes e depois.
+5. **Cliente tipado:** `client.ts` monta o `openapi-fetch` sobre os tipos gerados,
+   resolve a base URL por ambiente (`VITE_API_BASE_URL`, fallback local, sem barra
+   final) e expõe `parseErrorResponse`.
+6. **Erro mapeado por `code`:** `errors.ts` transforma o corpo da rede — `unknown`
+   até ser validado — em `ApiError` com `code`, `message`, `locale`, `timestamp`,
+   `path` e `details`. Um corpo quebrado degrada para `INTERNAL_ERROR` em vez de
+   derrubar a tela.
+7. **Testes:** `errors.test.ts` (oito casos do parser e do `isApiErrorCode`) e
+   `client.test.ts` (quatro casos da base URL).
+8. **Validação:**
+   - `npm run --prefix frontend lint` → EXIT=0
+   - `npm run --prefix frontend typecheck` → EXIT=0
+   - `npm run --prefix frontend test:unit` → 5 arquivos, 20 testes verdes
+   - `npm run --prefix frontend build` → os três ambientes (rsc, ssr, client) verdes
+   - 5 gates locais de documentação verdes
+
+## Sessão #47 — Task 3.2 (Catálogos i18n)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/032-frontend-i18n-catalogs`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** dar à interface três idiomas — pt-BR, en e es — com fallback pt-BR,
+  troca de idioma persistida e `Accept-Language` em toda requisição à API.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/APP-STACK.md` (a linha dos catálogos e da negociação),
+   `SDD/stacks/react.md`, `SDD/stacks/testing.md`, `docs/quality/GATES.md` (portões 3.1
+   e 3.4) e o `ADR-0004`, que fixa o par `code` estável / `message` localizada.
+2. **Dependências dentro da faixa declarada:** `i18next@^26.7.2` e
+   `react-i18next@^16.6.6` em produção, `msw@^2.15.0` em desenvolvimento.
+3. **Descoberta de segurança:** a série 25 do `i18next` carrega o advisory
+   **GHSA-6jcc-5g8w-32mx** (`deepExtend` recursivo sobre objetos embutidos, DoS),
+   corrigido apenas a partir da `26.3.4`. O `npm audit` do CI roda com
+   `--audit-level=high`, então a falha moderada não derrubaria o build — mas a
+   dependência corrigida foi escolhida, e o `APP-STACK.md` foi atualizado com a nota do
+   advisory ao lado da versão.
+4. **Catálogos:** `pt-BR.json`, `en.json` e `es.json` com o mesmo conjunto de chaves e
+   uma entrada para cada um dos dez códigos de erro do contrato. Um teste compara as
+   árvores dos três idiomas e falha se alguma chave divergir.
+5. **Idioma no servidor:** `locales.ts` resolve qualquer tag de idioma para um dos três
+   suportados (pt-BR como padrão) e lê o cookie `consigport-locale`; o `entry.rsc.tsx`
+   resolve o idioma antes de renderizar e o `Root` monta a página com o `<html lang>`
+   certo. As páginas continuam Server Components — o tradutor do servidor
+   (`server.ts`) caminha o catálogo, sem hooks.
+6. **Folhas clientes:** `provider.tsx` guarda a escolha, sincroniza com o idioma que o
+   servidor entregou e persiste o cookie; `language-switcher.tsx` é um `select`
+   nativo que, depois de gravar o cookie, pede ao servidor um novo render (o
+   `entry.browser.tsx` escuta o `replaceState`).
+7. **`Accept-Language`:** middleware do `openapi-fetch` que injeta o cabeçalho em toda
+   requisição; o `MSW` prova o cabeçalho e a leitura do corpo de erro no nível do
+   HTTP, sem mock de `fetch`.
+8. **Correção de estilo:** o scaffold do frontend usa aspas simples e sem ponto e
+   vírgula; os arquivos novos da 3.1 e da 3.2 foram alinhados a esse padrão.
+9. **Validação:**
+   - `npm run --prefix frontend lint` → EXIT=0
+   - `npm run --prefix frontend typecheck` → EXIT=0
+   - `npm run --prefix frontend test:unit` → 8 arquivos, 36 testes verdes
+   - `npm run --prefix frontend build` → os três ambientes (rsc, ssr, client) verdes
+   - `npm audit --prefix frontend` → 0 vulnerabilidades
+   - 5 gates locais de documentação verdes
+   - prova de vida: o servidor de preview respondeu em pt-BR, en e es, com o
+     `<html lang>` de cada idioma
+10. **Armadilha registrada:** o cookie do `curl` de verificação estava escrito com um
+    caractere a mais (`consignport-locale`), o que fez o idioma cair no fallback. O
+    diagnóstico comparou os códigos de caractere dos dois lados e mostrou a diferença;
+    o código do projeto estava correto desde o início.
+
+## Sessão #48 — Task 3.3 (Primitivas de UI)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/033-frontend-ui-primitives`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** entregar as primitivas de UI que as fatias seguintes consomem —
+  tokens da Matrix, foco visível, contraste AA e nenhuma cor literal em componente.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/DESIGN.md` §5 (componentes), §6 (UX), a lista de
+   PROIBIDOS e §4b (as quatro regras duras), `SDD/stacks/react.md`,
+   `SDD/stacks/testing.md` e `docs/quality/GATES.md` (portão 3.4).
+2. **`field.tsx`** — o `Field` é o dono da acessibilidade do formulário: rótulo
+   ligado por `htmlFor`, dica e erro ligados por `aria-describedby`, `aria-invalid`
+   no controle, `required` no controle e o asterisco marcado como decorativo. O
+   `TextField` monta o `input` por cima dele.
+3. **`table.tsx`** — a `Table` é uma região de rolagem nomeada e focável
+   (`role="region"`, `aria-label`, `tabIndex={0}`): no celular a tabela rola dentro
+   da própria caixa, sem empurrar a página, e o teclado consegue alcançar a rolagem.
+4. **`status-badge.tsx`** — conjunto fechado de tons (neutro, em andamento, sucesso,
+   técnico, erro) com ponto decorativo; o significado do estado fica com a feature.
+5. **`button.tsx`** — anel de foco visível em todas as variantes
+   (`focus-visible:outline-primary`, sem deslocamento de layout), estado `disabled`
+   e estado `loading` com `aria-busy` e sem segundo clique.
+6. **Contraste verificado, não presumido.** Um script calculou a razão do WCAG de
+   cada par antes de escrever o teste; o `contrast.test.ts` lê `src/theme.css` e
+   fixa os limiares: 4,5:1 para corpo, botões preenchidos e badges; 3:1 para o
+   `text-muted`, que o `DESIGN.md` §2 reserva ao texto decorativo.
+7. **Testes de componente** para as três primitivas novas e para o botão, com
+   Testing Library e checagem de `aria` (`aria-busy`, `aria-invalid`,
+   `aria-describedby`, `role="region"`, `role="alert"`, `aria-hidden` do ponto).
+8. **Validação:**
+   - `npm run --prefix frontend lint` → EXIT=0
+   - `npm run --prefix frontend typecheck` → EXIT=0
+   - `npm run --prefix frontend test:unit` → 13 arquivos, 56 testes verdes
+   - `npm run --prefix frontend build` → os três ambientes (rsc, ssr, client) verdes
+   - 5 gates locais de documentação verdes
+   - prova de vida: o CSS do bundle saiu de 20,54 kB para 24,14 kB e contém as
+     classes novas (`outline-primary`, `bg-error/8`, `border-error/40`,
+     `text-tertiary`, `min-h-11`, `overflow-x-auto`)
+9. **Ajuste de TypeScript:** o `tsconfig` do projeto tem `noUncheckedIndexedAccess`; a
+   desestruturação das componentes de cor do teste foi escrita com valores padrão
+   para satisfazer o compilador estrito.
+
+## Sessão #49 — Task 3.4 (Fluxo de autorização)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/034-frontend-authorization-flow`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** registrar o opt-in do beneficiário pela interface — Server Component
+  renderiza, a mutação passa pela Server Action, o erro sai localizado e o sucesso
+  leva à agenda.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/stacks/react.md` (Server Action para mutação, Server
+   Component por padrão, `useEffect` não busca dado), `SDD/APP-STACK.md` (a linha do
+   Zod), `contracts/consigport-api.yaml` (o `POST /api/v1/authorizations`, com `201`
+   na criação e `200` na repetição) e `docs/quality/GATES.md` (portão 3.4).
+2. **Dependência:** `zod@^4.6.7` em produção, dentro da faixa `4.x` do `APP-STACK.md`;
+   auditoria com zero vulnerabilidades.
+3. **Server Action** (`features/authorization/actions.ts`): valida o par
+   beneficiário/convênio com Zod, chama a API com o `Accept-Language` da interface e
+   devolve um estado serializável. A API fora do ar é capturada e vira
+   `INTERNAL_ERROR` — a primeira versão deixava a exceção escapar e o servidor
+   respondia `500`; o smoke do formulário sem JavaScript expôs isso.
+4. **Folha cliente** (`features/authorization/ui/authorization-form.tsx`): `useActionState`
+   sobre a ação, estado pendente, erro localizado pelo `code` estável (catálogo da
+   interface, `message` do servidor como fallback) e navegação para
+   `/agenda?beneficiaryId=…` no sucesso.
+5. **Server Component** (`features/authorization/server/page.tsx`): o cabeçalho da
+   jornada e o formulário; a página não busca nada e não guarda estado.
+6. **Rota e navegação:** `/autorizacao` no router e `nav.authorization` nos três
+   catálogos.
+7. **Ajuste no `field.tsx`:** o asterisco de obrigatório passou a ser desenhado pelo
+   CSS (`after:content-['*']`), porque o `textContent` do rótulo quebrava a busca
+   por nome acessível do controle.
+8. **Testes:** `actions.test.ts` (sete casos: criação, replay `200`, validação antes
+   da API, erro por `code`, API fora do ar, `Accept-Language` e fallback de idioma) e
+   `authorization-form.test.tsx` (cinco casos de componente com MSW: campos nomeados,
+   consentimento registrado, ida à agenda, erro localizado e permanência no
+   formulário quando o consentimento falha).
+9. **Validação:**
+   - `npm run --prefix frontend lint` → EXIT=0
+   - `npm run --prefix frontend typecheck` → EXIT=0
+   - `npm run --prefix frontend test:unit` → 15 arquivos, 68 testes verdes
+   - `npm run --prefix frontend build` → os três ambientes (rsc, ssr, client) verdes
+   - 5 gates locais de documentação verdes
+   - smoke no build de produção: a página renderiza em pt-BR e en, e o formulário
+     postado na própria URL (caminho sem JavaScript) devolve a página com o erro
+     localizado
+
+## Sessão #50 — Task 3.5 (Agenda e seleção de parcelas)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/035-frontend-agenda-selection`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** ler a agenda do beneficiário no servidor e escolher as parcelas
+  no navegador — apenas `OPEN` selecionável, total recalculado, estado vazio e
+  `403` tratados.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/specs/PLAN.md` (a task em voo), `SDD/ARCHITECTURE.md`
+   §5 (a árvore do frontend e a pasta `shared/format/`), `SDD/DESIGN.md` §4b e §6
+   (as quatro regras duras e as regras de interação), o contrato público
+   (`GET /api/v1/beneficiaries/{beneficiaryId}/agenda`, com `403` e `404`),
+   `SDD/stacks/react.md` (Server Component por padrão) e `docs/quality/GATES.md`
+   (portão 3.4).
+2. **`shared/format/`** — a pasta que o `ARCHITECTURE.md` §5 reserva para
+   "moeda, data, status" nasceu aqui: `money.ts` (reais no formato do leitor e
+   soma em centavos, sem a deriva do ponto flutuante), `date.ts` (a data do
+   calendário montada pelas partes, para o dia não andar com o fuso) e
+   `status.ts` (o tom da Plataforma por status).
+3. **Server Component assíncrono** (`features/agenda/server/page.tsx`): a agenda
+   é lida durante o render, com o `Accept-Language` da interface; os estados
+   (vazio, sem consentimento, beneficiário desconhecido, falha) são decididos
+   pelo `code` do erro.
+4. **Folha cliente** (`features/agenda/ui/installment-table.tsx`): a seleção
+   pertence à ilha; a parcela `CLOSED` aparece mas não pode ser escolhida; o
+   total é recalculado a cada mudança; a seleção viaja para a portabilidade pela
+   URL.
+5. **Resumo** (`features/agenda/ui/selection-summary.tsx`): o total numa região
+   `aria-live="polite"`, para quem navega pelo teclado ouvir o número se mover.
+6. **`shared/ui/page-header.tsx`** — o cabeçalho das páginas deixou de ser uma
+   cópia em três lugares e virou primitiva.
+7. **Roteador** (`app/router.tsx` e `root.tsx`): a rota recebe a URL inteira — o
+   caminho escolhe a tela, a query carrega o beneficiário — e o tradutor do
+   servidor ganhou o fallback da mensagem do servidor.
+8. **Catálogos** (`pt-BR.json`, `en.json`, `es.json`): a seção `agenda` foi
+   reescrita, com o mesmo conjunto de chaves nos três idiomas (as chaves do
+   esqueleto que não tinham uso foram removidas).
+9. **API falsa** (`test/mocks/handlers.ts`): a agenda de `BEN-001` (duas abertas
+   e uma fechada), `BEN-EMPTY`, `BEN-FORBIDDEN` e o `404` para o resto.
+10. **Testes:** `installment-table.test.tsx` (sete casos: a lista, a parcela
+    fechada desabilitada, o total recalculado, a contagem, a limpeza, a viagem
+    para a portabilidade e a impossibilidade de continuar sem seleção),
+    `page.test.tsx` (seis casos: a agenda, o estado vazio, o `403`, o `404`, a
+    falha com "Tentar de novo" e o `Accept-Language`), `money.test.ts` e
+    `date.test.ts`.
+11. **Validação:**
+    - `npm run --prefix frontend lint` → EXIT=0
+    - `npm run --prefix frontend typecheck` → EXIT=0
+    - `npm run --prefix frontend test:unit` → 19 arquivos, 89 testes verdes
+    - `npm run --prefix frontend build` → os três ambientes (rsc, ssr, client) verdes
+    - 5 gates locais de documentação verdes
+    - smoke no build de produção contra uma API falsa local: a agenda renderiza
+      em pt-BR e en, os quatro estados aparecem, a parcela fechada está
+      desabilitada e o `Accept-Language` chega à API no idioma do leitor
+
+## Sessão #51 — Task 3.6 (Conta de recebimento e envio)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/036-frontend-portability-submit`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** validar a conta de recebimento e criar a operação — validação com
+  Zod, `Idempotency-Key` gerada uma vez por tentativa, `409` e `422` exibidos com
+  a mensagem do servidor.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** o contrato público (`POST /api/v1/portability-operations`,
+   com o header `Idempotency-Key` no formato UUID, o `409` de conflito e o `422`
+   de parcela inelegível), o `ReceivingAccount` do domínio Java (64/32/64 e não
+   vazio), o ADR-0004 (a interface usa o `code` como chave estável e a `message`
+   do servidor como fallback), o `SDD/stacks/react.md` (mutação por Server
+   Action) e `docs/quality/GATES.md` (portão 3.4).
+2. **`idempotency.ts`** — a chave da tentativa: `createIdempotencyKey` (UUID v4,
+   com reserva para o `crypto.randomUUID` de contexto seguro) e `isUuid`.
+3. **Server Action** (`features/portability/actions.ts`): valida a conta e a
+   seleção com **Zod** (os mesmos limites do contrato e do domínio Java), envia
+   a `Idempotency-Key` e devolve o estado serializável — inclusive quando a API
+   está fora do ar (`INTERNAL_ERROR`, nunca uma exceção).
+4. **Folha cliente** (`features/portability/ui/receiving-account-form.tsx`): os
+   campos da conta e do credor, o estado pendente e a chave da tentativa. A
+   chave é calculada a partir da **impressão digital do conteúdo** e escrita no
+   campo oculto no `onSubmit` — o mesmo conteúdo mantém a chave, outro conteúdo
+   recebe uma nova.
+5. **Resultado** (`features/portability/ui/submit-operation.tsx`): o protocolo e
+   o total quando a operação nasce; o erro com duas vozes — o texto do catálogo
+   indexado pelo `code` e a mensagem do servidor como detalhe, quando acrescenta
+   alguma coisa.
+6. **Página** (`features/portability/server/page.tsx`): Server Component com as
+   parcelas selecionadas e o formulário; o estado sem seleção aponta de volta
+   para a agenda.
+7. **Ajuste da 3.5:** a seleção agora viaja com o **convênio**, que o pedido do
+   contrato exige — a tabela da agenda conhece o convênio de cada parcela.
+8. **Catálogos e API falsa:** a seção `portability` reescrita nos três idiomas;
+   a API falsa cria operações, repete com a mesma chave (`Idempotent-Replay`)
+   e recusa a mesma chave com outro corpo (`409`).
+9. **Testes:** `actions.test.ts` (oito casos: criação, repetição, conflito,
+   parcela fechada, validação da conta antes da API, chave criada quando o
+   navegador não manda, `Accept-Language` e API fora do ar),
+   `receiving-account-form.test.tsx` (seis casos de componente: os campos
+   nomeados, a criação com o protocolo, a chave estável para o mesmo conteúdo, a
+   chave nova para outro conteúdo, o `409` e o `422` com a mensagem do servidor)
+   e `idempotency.test.ts`.
+10. **Validação:**
+    - `npm run --prefix frontend lint` → EXIT=0
+    - `npm run --prefix frontend typecheck` → EXIT=0
+    - `npm run --prefix frontend test:unit` → 22 arquivos, 107 testes verdes
+    - `npm run --prefix frontend build` → os três ambientes (rsc, ssr, client) verdes
+    - 5 gates locais de documentação verdes
+    - smoke no build de produção contra uma API falsa local: a página renderiza
+      em pt-BR, en e es, o estado sem seleção aparece, e o caminho **sem
+      JavaScript** cria a operação e devolve o protocolo e o total
+
+## Sessão #52 — Task 3.7 (Painel de status com polling)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/037-frontend-operations-polling`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** acompanhar a operação até o terminal — TanStack Query com
+  intervalo de 2 s, parada em estado terminal, `nextPollAt` respeitado, sem
+  ISR.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** o contrato público (`GET /api/v1/portability-operations/{operationId}`,
+   o `OperationDetail` e o `OperationStatus` com `COMPLETED` e `REJECTED`
+   terminais), o `ARCHITECTURE.md` §5 (polling em ilha cliente, o resto
+   servidor, sem ISR) e §11 (`Retry-After` honrado no `next_poll_at`), o
+   `ADR-0003` (assincronismo, polling e trilha imutável), o
+   `SDD/stacks/react.md` (Server Component por padrão, folha cliente como
+   exceção) e o `docs/quality/GATES.md` (portão 3.4).
+2. **Dependência:** `@tanstack/react-query@^5` (`5.108.4`), dentro da faixa do
+   `APP-STACK.md`; `npm audit --omit=dev` → 0 vulnerabilidades.
+3. **Provedor do cache** (`shared/api/query-provider.tsx`): o `QueryClient` criado
+   uma vez por sessão, embrulhado pelo Shell.
+4. **Hook do polling** (`features/operations/ui/use-operation-polling.ts`): a
+   aritmética do ritmo isolada em funções puras — `POLL_INTERVAL_MS` (2 s),
+   `isTerminalStatus`, `readNextPollAt` e `pollDelay` — e o `useQuery` que as
+   usa: `refetchInterval` devolve `false` no estado terminal e no
+   `OPERATION_NOT_FOUND`, e o número de milissegundos nos demais casos.
+5. **Ilha do painel** (`features/operations/ui/operation-status.tsx`): o estado,
+   o protocolo, o total, as parcelas, o credor, a última atualização, o motivo
+   da rejeição, a região viva e o botão "Atualizar agora".
+6. **Server Component** (`features/operations/server/page.tsx`): o primeiro
+   estado lido no render, com o `Accept-Language` da cookie; os estados de
+   operação inexistente e de falha com o caminho de saída.
+7. **Integração com a 3.6:** o painel de sucesso da criação da operação passou
+   a oferecer o caminho `/operacoes?operationId=…`; a rota `/operacoes` entrou
+   no roteador e na navegação.
+8. **`formatDateTime`** (`shared/format/date.ts`): a hora da última atualização
+   — um instante é um momento, não um dia de calendário.
+9. **Catálogos e API falsa:** a seção `operations` completada nos três idiomas
+   e a entrada da navegação; a API falsa responde à consulta da operação.
+10. **Testes:** `use-operation-polling.test.ts` (a aritmética do ritmo),
+    `operation-status.test.tsx` (timers falsos: `PENDING` → `COMPLETED` parando
+    depois, `REJECTED` com o motivo e sem novo polling, `nextPollAt` de 10 s
+    adiado, `Accept-Language` e a falha da API) e `server/page.test.tsx` (o
+    estado lido no servidor, o `404`, a falha e o idioma da pergunta).
+11. **Validação:**
+    - `npm run --prefix frontend lint` → EXIT=0
+    - `npm run --prefix frontend typecheck` → EXIT=0
+    - `npm run --prefix frontend test:unit` → 25 arquivos, 131 testes verdes
+    - `npm run --prefix frontend build` → os três ambientes (rsc, ssr, client) verdes
+    - 5 gates locais de documentação verdes
+    - smoke no build de produção contra uma API falsa local: o painel renderiza
+      em pt-BR, en e es, os estados sem operação e de operação inexistente
+      aparecem, e o fluxo da criação leva ao painel com o `operationId` na URL
+    - preview e API falsa encerrados: 0 processos e 0 portas presas
+
+## Sessão #53 — Task 3.8 (Timeline de auditoria)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/038-frontend-audit-timeline`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** exibir a trilha imutável de eventos — ordem cronológica, tipo,
+  status anterior e novo, detalhe e horário, sem ação de edição ou exclusão.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** o contrato público
+   (`GET /api/v1/portability-operations/{operationId}/events`, o
+   `OperationEvent` com os sete campos e o `EventType` com os oito tipos), o
+   `ADR-0003` (a trilha é append-only, lida em ordem cronológica e exibida na
+   timeline do frontend), o `ARCHITECTURE.md` §5 (`features/audit/` com
+   `server/` e `ui/`) e o `SDD/stacks/react.md` (Server Component por padrão).
+2. **Server Component** (`features/audit/server/page.tsx`): a trilha lida no
+   render, com o `Accept-Language` da cookie; os estados de operação
+   inexistente e de falha com o caminho de saída.
+3. **Timeline** (`features/audit/ui/event-timeline.tsx`): a lista ordenada pelo
+   instante e, no empate, pelo identificador sequencial do evento — a ordem
+   da tela não depende da ordem do array.
+4. **Item do evento** (`features/audit/ui/event-item.tsx`): o tipo, o status
+   anterior, o novo status, o detalhe, a hora e a resposta crua da Central num
+   `<details>` nativo.
+5. **Vocabulário do status** (`shared/format/status.ts`): o tom e a chave de
+   catálogo de cada estado passaram a morar juntos, e o painel da 3.7 usa a
+   mesma tabela.
+6. **Integração:** o painel da operação passou a oferecer o caminho para a
+   trilha (`/auditoria?operationId=…`); a rota `/auditoria` lê a operação da
+   URL; o placeholder `SectionPage` saiu do código.
+7. **Catálogos e API falsa:** a seção `audit` completada nos três idiomas (os
+   oito tipos de evento e os estados) e a trilha na API falsa.
+8. **Testes:** `event-timeline.test.tsx` (eventos mistos fora de ordem, o tipo,
+   os dois status, o detalhe, a hora, o status anterior nulo, a resposta da
+   Central, a ausência de botão, campo e link, e a formatação em inglês) e
+   `server/page.test.tsx` (a trilha, a operação sem eventos, a operação
+   inexistente, a falha e o idioma da pergunta).
+9. **Validação:**
+   - `npm run --prefix frontend lint` → EXIT=0
+   - `npm run --prefix frontend typecheck` → EXIT=0
+   - `npm run --prefix frontend test:unit` → 27 arquivos, 143 testes verdes
+   - `npm run --prefix frontend build` → os três ambientes (rsc, ssr, client) verdes
+   - 5 gates locais de documentação verdes
+   - smoke no build de produção contra uma API falsa local: a trilha renderiza
+      em pt-BR, en e es, os estados sem operação e de operação inexistente
+      aparecem, e a trilha não oferece nenhum botão
+   - preview e API falsa encerrados: 0 processos e 0 portas presas
+
+## Sessão #54 — Task 3.9 (Responsividade, acessibilidade e testes finais)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/039-frontend-responsive-a11y`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** fechar a experiência em mobile e teclado — breakpoints do
+  `DESIGN.md` §4b, navegação por teclado, `prefers-reduced-motion` respeitado e
+  testes de unidade verdes.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** o `DESIGN.md` §4 (os três breakpoints) e §4b (as
+   quatro regras duras e a prova), o `PLAN.md` (task 3.9), o `BACKLOG.md` (o
+   aceite da 3.9) e o `frontend/src/styles.css` (os tokens e a folha de estilo
+   global).
+2. **Skip link e teclado:** o link "Pular para o conteúdo" no topo do shell,
+   fora da tela até o foco chegar, apontando para o `<main id="conteudo"
+   tabindex="-1">`; o anel de foco visível nos itens da navegação, na marca,
+   na região de rolagem da tabela, no `select` do idioma e no checkbox das
+   parcelas.
+3. **Breakpoints:** o `sm` do Tailwind (640px) saiu do código — o design
+   nomeia 768px e 1024px, e só esses; os grids da home e do painel da
+   operação passaram a usar `md`.
+4. **`prefers-reduced-motion`:** a regra global na raiz corta animação,
+   transição e `scroll-behavior` de tudo que se move.
+5. **Semântica corrigida:** as chamadas de ação da home viraram links (um
+   botão que navega mente para o teclado), o `<header>` da home deixou de
+   ser um segundo *banner* e o painel de sucesso da portabilidade ganhou
+   `role="status"`.
+6. **Região viva corrigida:** o painel da operação passou a anunciar o
+   **estado** da operação; o batimento do polling — que mudava a cada dois
+   segundos dentro de um `aria-live` — ficou visível e silencioso.
+7. **Testes:** `src/test/responsive.test.ts` (breakpoints, conteúdo
+   escondido, largura fixa e piso de 13px, lidos do fonte) e
+   `src/test/accessibility.test.tsx` (ordem do tabulador com o teclado de
+   verdade, landmarks, nome acessível de todo controle, alvo de 44px, anel de
+   foco e ligação entre campo e rótulo).
+8. **Validação:**
+   - `npm run --prefix frontend lint` → EXIT=0
+   - `npm run --prefix frontend typecheck` → EXIT=0
+   - `npm run --prefix frontend test:unit` → 29 arquivos, 159 testes verdes
+   - `npm run --prefix frontend build` → os três ambientes (rsc, ssr, client) verdes
+   - 5 gates locais de documentação verdes
+   - smoke no build de produção: o skip link, o `main` com `id` e
+     `tabindex`, as CTAs como links, os landmarks e a região viva do painel
+     da operação conferidos no HTML; o CSS emitido carrega a regra do
+     `prefers-reduced-motion` e as media queries de 48rem e 64rem
+   - preview e API falsa encerrados: 0 processos e 0 portas presas

@@ -4185,3 +4185,1627 @@
 - `SDD/specs/ROADMAP.md`
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Fase 2 — Backend core: arquivamento e promoção da `v0.3.0`
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `chore/018-phase-2-archive`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** fechar a Fase 2 (18 tasks), promover a release `v0.3.0` e abrir a Fase 3.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Gates locais antes da promoção:**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 65 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ SDD specifications valid.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos e arquitetura passaram com sucesso!
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css (line endings normalized).
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 44 sessions, structure valid.
+   ```
+2. **Reator completo (última task da fase):**
+   ```text
+   ./mvnw -B verify
+   → ConsigPort Platform ................................ SUCCESS [  0.005 s]
+   → ConsigPort Backend ................................. SUCCESS [01:29 min]
+   → Central de Convênios Mock .......................... SUCCESS [ 29.468 s]
+   → BUILD SUCCESS
+   → EXIT=0
+   Tests run: 481, Failures: 0, Errors: 0, Skipped: 0 (backend)
+   Tests run: 39, Failures: 0, Errors: 0, Skipped: 0  (central-convenios-mock)
+   Cobertura do núcleo: BRANCH 99.71% (342 de 343) | LINE 98.12% (679 de 692) | CLASS 100.00% (59 de 59)
+   ```
+3. **Promoção e release:**
+   ```text
+   PR #50  feat/038-backend-lifecycle-integration → develop → CI verde → merge (793099d)
+   PR #51  develop → staging   → CI verde → merge (e9024dd)
+   PR #52  staging → main      → CI verde → merge (64f23e7)
+   PR #53  chore(main): release 0.3.0 → merge (c472c6a)
+   → tag v0.3.0 e release publicada
+   → CI do main (46094354043): success
+   → Release (46095256699) — Publish backend/frontend/central-convenios-mock to GHCR: success
+   ```
+4. **Imagens e staging:**
+   ```text
+   backend              sha256:9cd162f26c72c90b78744f58fe5c4ab98e925b0da6865a3f7eafe53a0b0e1cf0
+   central-convenios-mock sha256:f651491272db2cebd7c0b4ff435b2a28b1ea39f902e570ef299026e209f18b3a
+   frontend             sha256:fd11ce5fe79d970e977c9ff19928683643f98465d3ce0d4436e15ef4da6336ac
+   CD Staging (46095428615): {"status":"UP","groups":["liveness","readiness"]} em backend e mock; frontend responde 200
+   ```
+5. **Fim da execução:**
+   ```text
+   containers restantes: 0
+   processos restantes: 0
+   ```
+
+#### Conteúdo Entregue:
+- `SDD/specs/history/phases/phase-2-finished.md` — as 18 tasks, os PRs, os critérios de
+  saída, a evidência da release e as dívidas conhecidas.
+- `SDD/specs/PLAN.md` — Fase 2 concluída e Fase 3 aberta com a task 3.1 em voo.
+- `SDD/specs/ROADMAP.md` — Fase 2 fechada com a tag `v0.3.0` e a Fase 3 como fase atual.
+
+#### Descobertas e Decisões:
+- O `release-please` cria a tag pela API do GitHub, o que **não** dispara o evento `push`
+  da tag. As imagens foram publicadas por `workflow_dispatch` em `release.yml` com a tag
+  `v0.3.0`, caminho já documentado em [`../../docs/process/RELEASE.md`](../../docs/process/RELEASE.md) §6.
+- O CI do branch do release-please falha com "This run likely failed because of a workflow
+  file issue" (run `46093781359`), sem jobs registrados e com `pull_requests = []`. O
+  mesmo padrão ocorreu nas releases anteriores (`45658801729`, na Fase 0, e
+  `45816627838`, na Fase 1): é o fechamento do PR antes de o job iniciar, não uma
+  regressão do conteúdo — o código idêntico passou no CI do PR #52 e no CI do `main`
+  (run `46094354043`, `success`).
+- O arquivamento da fase vai para `develop` **depois** da tag, como na Fase 1 (PR #32
+  mergeado em 13:00, `v0.2.0` às 12:08): o arquivo de arquivamento entra na release
+  seguinte, e não na que fecha a fase.
+
+#### Arquivos Tocados:
+- `SDD/specs/history/phases/phase-2-finished.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 3.1 — Cliente OpenAPI tipado
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/031-frontend-openapi-client`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** dar ao frontend um cliente tipado do contrato público, sem duplicar
+  tipos, com a base URL por ambiente e o erro mapeado pelo `code` estável.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Geração dos tipos a partir do contrato:**
+   ```text
+   $ npm run --prefix frontend generate:types
+   generated /home/ec2-user/consigport-platform/frontend/src/shared/api/schema.ts
+
+   $ diff -q /tmp/opencode/schema-before.ts frontend/src/shared/api/schema.ts
+   schema.ts idêntico após regenerar (EXIT=0)
+   ```
+   O `openapi-typescript` v7.13 não lê arquivo de config (`defineConfig` só existe a
+   partir da v8, que não foi publicada), e a entrada por string é interpretada como
+   **conteúdo YAML**, não como caminho — daí o `openapi-ts.config.ts` carregar a URL
+   `file://` e chamar a API programática `openapiTS` + `astToString`.
+2. **Portão 3.4 do `GATES.md` (frontend):**
+   ```text
+   $ npm run --prefix frontend lint
+   > eslint .
+   EXIT=0
+
+   $ npm run --prefix frontend typecheck
+   > tsc --noEmit
+   EXIT=0
+
+   $ npm run --prefix frontend test:unit
+   > vitest run
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  5 passed (5)
+         Tests  20 passed (20)
+    Duration  7.08s
+   EXIT=0
+
+   $ npm run --prefix frontend build
+   ✓ built in 1.22s   (client)
+   ✓ built in 2.16s   (ssr)
+   dist/ssr/index.js  1,581.90 kB
+   EXIT=0
+   ```
+3. **Portão 3.1 (documentação e SDD):**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 66 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ Exactly 1 task in flight in SDD/specs/PLAN.md.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos passaram.
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css.
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 46 sessions, structure valid.
+   ```
+
+#### Conteúdo Entregue:
+- `frontend/openapi-ts.config.ts` — o gerador dos tipos: carrega o contrato público
+  (`../contracts/consigport-api.yaml`) e o destino (`src/shared/api/schema.ts`), e
+  escreve o arquivo com a API programática do `openapi-typescript`.
+- `frontend/src/shared/api/schema.ts` — os tipos gerados (`paths`, `operations`,
+  `components`), versionados: um contrato quebrado quebra o build, não só a próxima
+  geração.
+- `frontend/src/shared/api/client.ts` — o `openapi-fetch` sobre esses tipos, a resolução
+  da base URL por ambiente (`VITE_API_BASE_URL`, fallback `http://localhost:8080`, sem
+  barra final) e o `parseErrorResponse`, que transforma uma resposta de erro em
+  `ApiError`.
+- `frontend/src/shared/api/errors.ts` — o mapeador por `code`: os dez códigos estáveis
+  do contrato viram a união `ApiErrorCode`, o corpo da rede é `unknown` até ser
+  validado, e um corpo quebrado degrada para `INTERNAL_ERROR` em vez de derrubar a
+  tela; a `message` localizada do servidor é preservada e os `details` por campo são
+  filtrados.
+- `frontend/src/shared/api/client.test.ts` e `frontend/src/shared/api/errors.test.ts` —
+  os testes de unidade do parser de erro e da resolução da base URL.
+- `frontend/package.json` — `openapi-fetch` como dependência de produção,
+  `openapi-typescript` e `@types/node` como de desenvolvimento, e o script
+  `generate:types`.
+- `frontend/tsconfig.json` — o gerador entra no `typecheck` e os tipos do Node
+  entram em `types`.
+
+#### Descobertas e Decisões:
+- **O `openapi-typescript` v7 não tem arquivo de config.** A versão mais recente é a
+  7.13.0: `defineConfig` não existe nela (chega na v8, que nunca foi publicada) e a
+  CLI não lê `openapi-ts.config.ts`. Passar o caminho como string faz a biblioteca
+  tratar o caminho como **conteúdo YAML** — o erro é `Can't parse empty schema`. A
+  solução é a URL `file://` e a API programática, com o módulo `.ts` fazendo as duas
+  coisas: configuração e geração. O Node 24 executa o TypeScript direto, sem
+  dependência nova de execução.
+- **O `theme.css` é cópia verbatim do `SDD/themes/matrix/tokens.css`** e o portão
+  `check-theme-tokens` compara os dois arquivos. Nenhum token novo foi necessário
+  nesta task.
+- **A UI deve ramificar por `code`, nunca por status HTTP.** O mesmo status carrega
+  códigos diferentes conforme a rota (`404` é `AUTHORIZATION_NOT_FOUND`,
+  `BENEFICIARY_NOT_FOUND` ou `OPERATION_NOT_FOUND`), então o status não serve de
+  decisão de tela. O `ApiError` expõe `code`, `message`, `locale`, `timestamp`,
+  `path` e `details`.
+- **O contrato público não foi alterado.** `contracts/consigport-api.yaml` é a
+  entrada do gerador e segue igual; a comparação com o snapshot do springdoc
+  continua valendo no CI.
+- `@types/node` entrou como dependência de desenvolvimento porque o gerador é um
+  script de Node — sem ele o `typecheck` não enxerga `node:fs/promises`.
+
+#### Arquivos Tocados:
+- `frontend/openapi-ts.config.ts`
+- `frontend/src/shared/api/schema.ts`
+- `frontend/src/shared/api/client.ts`
+- `frontend/src/shared/api/errors.ts`
+- `frontend/src/shared/api/client.test.ts`
+- `frontend/src/shared/api/errors.test.ts`
+- `frontend/package.json`
+- `frontend/package-lock.json`
+- `frontend/tsconfig.json`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 3.2 — Catálogos i18n
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/032-frontend-i18n-catalogs`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** dar à interface três idiomas — pt-BR, en e es — com fallback pt-BR,
+  troca de idioma persistida e `Accept-Language` em toda requisição à API.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Portão 3.4 do `GATES.md` (frontend):**
+   ```text
+   $ npm run --prefix frontend lint
+   > eslint .
+   EXIT=0
+
+   $ npm run --prefix frontend typecheck
+   > tsc --noEmit
+   EXIT=0
+
+   $ npm run --prefix frontend test:unit
+   > vitest run
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  8 passed (8)
+         Tests  36 passed (36)
+    Duration  12.48s
+   EXIT=0
+
+   $ npm run --prefix frontend build
+   [5/5] build ssr environment...
+   ✓ 90 modules transformed.
+   dist/ssr/assets/entry.rsc-7L_sN9Di.js     36.56 kB
+   dist/ssr/index.js                      1,582.37 kB
+   ✓ built in 2.40s
+   EXIT=0
+   ```
+2. **Portão 3.1 (documentação e SDD):**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 66 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ Exactly 1 task in flight in SDD/specs/PLAN.md.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos passaram.
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css.
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 46 sessions, structure valid.
+   ```
+3. **Prova de vida — o servidor renderiza nos três idiomas:**
+   ```text
+   $ npm run --prefix frontend preview -- --host 127.0.0.1 --port 5199
+
+   === cookie=pt-BR ===
+   <html lang="pt-BR"
+   Portabilidade de convênios sem fricção
+   === cookie=en ===
+   <html lang="en"
+   Consignment portability without friction
+   === cookie=es ===
+   <html lang="es"
+   Portabilidad de consignas sin fricción
+   === rota /agenda en ===
+   Discount agenda
+   === 404 pt-BR ===
+   <h1 class="text-headline-lg">Página não encontrada</h1>
+   === 404 es ===
+   <h1 class="text-headline-lg">Página no encontrada</h1>
+   ```
+   O `curl` leva o cookie `consigport-locale`; sem ele, a resposta é pt-BR. O
+   `<html lang>` acompanha o idioma pedido.
+4. **Auditoria de dependências:**
+   ```text
+   $ npm audit --prefix frontend --omit=dev --audit-level=high
+   found 0 vulnerabilities
+   EXIT=0
+
+   $ npm audit --prefix frontend
+   found 0 vulnerabilities
+   ```
+
+#### Conteúdo Entregue:
+- `frontend/src/shared/i18n/pt-BR.json`, `en.json`, `es.json` — os três catálogos,
+  com o mesmo conjunto de chaves e uma entrada para cada um dos dez códigos de erro do
+  contrato público.
+- `frontend/src/shared/i18n/locales.ts` — os idiomas suportados, a resolução de
+  qualquer tag (`pt-BR`, `pt`, `es-AR`) e a leitura/escrita do cookie
+  `consigport-locale`.
+- `frontend/src/shared/i18n/i18n.ts` — a instância do `i18next` com fallback pt-BR.
+- `frontend/src/shared/i18n/provider.tsx` — a folha cliente que guarda a escolha,
+  sincroniza com o idioma que o servidor entregou e persiste o cookie.
+- `frontend/src/shared/i18n/language-switcher.tsx` — o `select` nativo da troca de
+  idioma.
+- `frontend/src/shared/i18n/server.ts` — o tradutor dos Server Components, que não
+  podem ler o contexto do navegador.
+- `frontend/src/shared/api/client.ts` — o middleware que injeta `Accept-Language` em
+  toda requisição.
+- `frontend/src/test/mocks/handlers.ts` e `server.ts` — a API falsa com **MSW**, usada
+  pelos testes: nenhuma requisição sai do processo.
+- `frontend/src/app/navigation.tsx`, `shell.tsx`, `router.tsx`, `pages/home.tsx`,
+  `pages/not-found.tsx`, `src/root.tsx`, `src/framework/entry.rsc.tsx` — as páginas e o
+  shell passam a falar o idioma do servidor.
+
+#### Descobertas e Decisões:
+- **O `i18next` foi fixado em `26.x`, e não em `25.x`.** A série 25 carrega o advisory
+  **GHSA-6jcc-5g8w-32mx** (`deepExtend` recursivo sobre objetos embutidos, DoS),
+  corrigido apenas a partir da `26.3.4`. O `react-i18next@16` aceita
+  `i18next >= 25.10.9`, então a combinação segue suportada. A linha do `APP-STACK.md`
+  foi atualizada e a nota do advisory ficou ao lado dela.
+- **O `MSW` entrou como dependência de desenvolvimento.** A regra do projeto proíbe
+  mock de `fetch`: a API dos testes é falsa no nível do HTTP, com os handlers
+  respondendo o formato do contrato público. O postinstall do `msw` é dispensável
+  (imprime apenas uma mensagem de boas-vindas) e segue fora da lista `allowScripts`.
+- **O idioma é resolvido no servidor, não no cliente.** As páginas são Server
+  Components e não podem ler o contexto do navegador; o `entry.rsc.tsx` lê o cookie e
+  o `Root` monta a página no idioma pedido, com o `<html lang>` correto. A troca de
+  idioma no browser grava o cookie e dispara um novo render do servidor — o
+  `entry.browser.tsx` escuta o `replaceState` — para que o servidor e as folhas
+  clientes falem o mesmo idioma.
+- **O `useEffect` do provedor não pode sincronizar estado.** A regra
+  `react-hooks/set-state-in-effect` do ESLint recusa `setState` dentro de efeito: o
+  provedor ajusta o estado durante o render, quando o idioma que o servidor entregou
+  muda, e usa o efeito apenas para o sistema externo (`Accept-Language`).
+- **O `openapi-fetch` consome o corpo da resposta de erro.** Nele, `error` já vem
+  parseado (JSON quando possível); `parseErrorResponse` continua existindo para
+  respostas cruas. O `ApiError` continua sendo a porta de entrada da UI.
+- **O `theme.css` segue cópia verbatim** de `SDD/themes/matrix/tokens.css`; nenhum
+  token novo foi necessário nesta task.
+- **O contrato público não foi alterado.** `contracts/consigport-api.yaml` segue igual.
+
+#### Arquivos Tocados:
+- `frontend/src/shared/i18n/pt-BR.json`
+- `frontend/src/shared/i18n/en.json`
+- `frontend/src/shared/i18n/es.json`
+- `frontend/src/shared/i18n/locales.ts`
+- `frontend/src/shared/i18n/i18n.ts`
+- `frontend/src/shared/i18n/provider.tsx`
+- `frontend/src/shared/i18n/language-switcher.tsx`
+- `frontend/src/shared/i18n/server.ts`
+- `frontend/src/shared/i18n/i18n.test.ts`
+- `frontend/src/shared/i18n/server.test.ts`
+- `frontend/src/shared/api/client.ts`
+- `frontend/src/shared/api/client.msw.test.ts`
+- `frontend/src/test/mocks/handlers.ts`
+- `frontend/src/test/mocks/server.ts`
+- `frontend/src/app/navigation.tsx`
+- `frontend/src/app/shell.tsx`
+- `frontend/src/app/router.tsx`
+- `frontend/src/app/router.test.tsx`
+- `frontend/src/app/pages/home.tsx`
+- `frontend/src/app/pages/not-found.tsx`
+- `frontend/src/root.tsx`
+- `frontend/src/framework/entry.rsc.tsx`
+- `frontend/package.json`
+- `frontend/package-lock.json`
+- `SDD/APP-STACK.md`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 3.3 — Primitivas de UI
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/033-frontend-ui-primitives`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** entregar as primitivas de UI que as fatias seguintes consomem —
+  tokens da Matrix, foco visível, contraste AA e nenhuma cor literal em componente.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Portão 3.4 do `GATES.md` (frontend):**
+   ```text
+   $ npm run --prefix frontend lint
+   > eslint .
+   EXIT=0
+
+   $ npm run --prefix frontend typecheck
+   > tsc --noEmit
+   EXIT=0
+
+   $ npm run --prefix frontend test:unit
+   > vitest run
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  13 passed (13)
+         Tests  56 passed (56)
+    Duration  17.09s
+   EXIT=0
+
+   $ npm run --prefix frontend build
+   [5/5] build ssr environment...
+   ✓ 90 modules transformed.
+   dist/ssr/assets/entry.rsc-7L_sN9Di.js     36.56 kB
+   dist/ssr/index.js                      1,582.37 kB
+   ✓ built in 2.44s
+   EXIT=0
+   ```
+2. **Portão 3.1 (documentação e SDD):**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 66 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ Exactly 1 task in flight in SDD/specs/PLAN.md.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos passaram.
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css.
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 47 sessions, structure valid.
+   ```
+3. **Prova de vida — as classes novas entraram no bundle:**
+   ```text
+   $ ls -la dist/client/assets/*.css
+   -rw-r--r-- 1 ec2-user ec2-user 24137 Nov 28 05:10 dist/client/assets/index-Da78kLM6.css
+
+   $ for c in outline-primary bg-error\/8 border-error\/40 text-tertiary min-h-11 overflow-x-auto; do grep -c -- "$c" dist/client/assets/*.css; done
+   1
+   1
+   1
+   1
+   1
+   1
+   ```
+   O CSS saiu de 20,54 kB para 24,14 kB: o Tailwind encontrou as classes dos
+   componentes novos e as gerou.
+
+#### Conteúdo Entregue:
+- `frontend/src/shared/ui/field.tsx` — o `Field`, que é o dono da acessibilidade do
+  formulário (rótulo, dica e erro ligados por `aria-describedby`, `aria-invalid` no
+  controle, `required` no controle e o asterisco só para os olhos), e o `TextField`
+  por cima dele.
+- `frontend/src/shared/ui/table.tsx` — a `Table` como **região de rolagem nomeada e
+  focável** (`role="region"`, `aria-label`, `tabIndex={0}`), mais `TableHead`,
+  `TableBody`, `TableRow`, `TableHeader` e `TableCell`.
+- `frontend/src/shared/ui/status-badge.tsx` — o conjunto fechado de estados (neutro,
+  em andamento, sucesso, técnico, erro) com ponto decorativo.
+- `frontend/src/shared/ui/button.tsx` — anel de foco visível em todas as variantes,
+  estado `disabled` e estado `loading` (`aria-busy`, sem segundo clique).
+- `frontend/src/shared/ui/contrast.test.ts` — o teste que lê `src/theme.css` e
+  calcula o contraste de cada par que a interface usa.
+- Os testes de componente: `button.test.tsx`, `field.test.tsx`, `table.test.tsx` e
+  `status-badge.test.tsx`.
+
+#### Descobertas e Decisões:
+- **O contraste AA é verificado, não presumido.** O teste lê os tokens de
+  `src/theme.css` — a cópia guardada pelo `check-theme-tokens` — e calcula a razão do
+  WCAG. Corpo, botões preenchidos e badges passam dos 4,5:1. O `text-muted`
+  (`#56657A`) fica em 3,28:1 sobre `surface-base`: o `DESIGN.md` §2 o reserva ao
+  texto decorativo (placeholder e chrome desativada) e §"Inputs & terminal fields"
+  fixa o placeholder em `#56657A`, então o piso dele é 3:1, o limiar de texto grande
+  e de contraste de UI — e o teste fixa esse limite para que ninguém o promova a
+  texto de corpo sem perceber.
+- **O `role="region"` com `tabIndex={0}` é o que torna a tabela rolável acessível.**
+  Sem ele, quem navega pelo teclado não consegue alcançar a rolagem da tabela no
+  celular, e o leitor de tela não anuncia o que a região contém.
+- **O estado `loading` desabilita o botão.** A regra é "zero ações sem resposta": o
+  botão ocupado marca `aria-busy` e recusa o segundo clique, sem esconder o rótulo.
+- **O `StatusBadge` não conhece o domínio.** O significado de um estado pertence à
+  feature que o usa; a primitiva só conhece o conjunto fechado de tons. É a regra de
+  reuso do `DESIGN.md` §"REUSABILITY": nenhum substantivo de domínio no nome.
+- **Nenhum token novo foi necessário** — o `frontend/src/theme.css` segue cópia
+  verbatim de `SDD/themes/matrix/tokens.css`.
+
+#### Arquivos Tocados:
+- `frontend/src/shared/ui/button.tsx`
+- `frontend/src/shared/ui/button.test.tsx`
+- `frontend/src/shared/ui/field.tsx`
+- `frontend/src/shared/ui/field.test.tsx`
+- `frontend/src/shared/ui/table.tsx`
+- `frontend/src/shared/ui/table.test.tsx`
+- `frontend/src/shared/ui/status-badge.tsx`
+- `frontend/src/shared/ui/status-badge.test.tsx`
+- `frontend/src/shared/ui/contrast.test.ts`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 3.4 — Fluxo de autorização
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/034-frontend-authorization-flow`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** registrar o opt-in do beneficiário pela interface — Server Component
+  renderiza, a mutação passa pela Server Action, o erro sai localizado e o sucesso
+  leva à agenda.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Portão 3.4 do `GATES.md` (frontend):**
+   ```text
+   $ npm run --prefix frontend lint
+   > eslint .
+   EXIT=0
+
+   $ npm run --prefix frontend typecheck
+   > tsc --noEmit
+   EXIT=0
+
+   $ npm run --prefix frontend test:unit
+   > vitest run
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  15 passed (15)
+         Tests  68 passed (68)
+    Duration  61.50s
+   EXIT=0
+
+   $ npm run --prefix frontend build
+   [5/5] build ssr environment...
+   dist/ssr/assets/entry.rsc-CiAwc4Jn.js     42.95 kB
+   dist/ssr/index.js                      1,582.63 kB
+   ✓ built in 2.89s
+   EXIT=0
+   ```
+2. **Portão 3.1 (documentação e SDD):**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 66 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ Exactly 1 task in flight in SDD/specs/PLAN.md.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos passaram.
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css.
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 48 sessions, structure valid.
+   ```
+3. **Smoke no build de produção — a página renderiza:**
+   ```text
+   $ npm run --prefix frontend preview -- --host 127.0.0.1 --port 5199
+
+   === /autorizacao (pt-BR) ===
+   <h1 class="text-headline-lg">Autorizar o convênio</h1>
+         4 Autorizar
+         1 name="agreementId"
+         1 name="beneficiaryId"
+         1 name="locale"
+   === /autorizacao (en) ===
+   <h1 class="text-headline-lg">Authorize the agreement</h1>
+   === rota inexistente ===
+   <h1 class="text-headline-lg">Página não encontrada</h1>
+   ```
+4. **Smoke do caminho sem JavaScript — o formulário posta na própria página:**
+   ```text
+   $ curl -s -X POST http://127.0.0.1:5199/autorizacao \
+       -F '$ACTION_REF_1=' \
+       -F '$ACTION_1:0={"id":"f1659cc5ed99#registerAuthorization","bound":"$@1"}' \
+       -F '$ACTION_1:1=[{"status":"idle"}]' \
+       -F '$ACTION_KEY=k1271487363' \
+       -F 'locale=pt-BR' -F 'beneficiaryId=BEN-001' -F 'agreementId=AGR-001'
+
+   resposta: 9802 bytes
+   h1: ['<h1 class="text-headline-lg">Autorizar o convênio</h1>']
+   alert: ['Algo quebrou do nosso lado. Tente de novo.']
+   ```
+   A API não estava no ar durante o smoke, e ainda assim a página respondeu: a ação
+   rodou no servidor, capturou a falha de rede e a interface pintou o erro no idioma
+   do usuário. O `action` do formulário é a própria Server Action, então o opt-in
+   funciona **sem JavaScript**.
+
+#### Conteúdo Entregue:
+- `frontend/src/features/authorization/actions.ts` — a Server Action: valida com Zod,
+  chama a API com o `Accept-Language` da interface e devolve um estado
+  serializável. Uma API fora do ar vira `INTERNAL_ERROR`, nunca uma exceção.
+- `frontend/src/features/authorization/ui/authorization-form.tsx` — a folha cliente:
+  formulário com `useActionState`, estado pendente, erro localizado pelo `code` e
+  navegação para a agenda do beneficiário.
+- `frontend/src/features/authorization/server/page.tsx` — o Server Component da
+  página.
+- `frontend/src/app/router.tsx` e `frontend/src/app/navigation.tsx` — a rota
+  `/autorizacao` e o item de navegação, com a chave `nav.authorization` nos três
+  catálogos.
+- `frontend/src/shared/ui/field.tsx` — o asterisco de obrigatório passou a ser
+  desenhado pelo CSS (`after:content-['*']`): o nome acessível do controle continua
+  sendo exatamente o rótulo.
+- `frontend/src/test/mocks/handlers.ts` — a API falsa agora registra o consentimento
+  e responde `201` na primeira vez e `200` na repetição, como o contrato descreve.
+- `frontend/src/features/authorization/actions.test.ts` e
+  `frontend/src/features/authorization/ui/authorization-form.test.tsx` — os testes.
+
+#### Descobertas e Decisões:
+- **A mutação passa pela Server Action, e não pelo navegador.** A regra do
+  `stacks/react.md` é "mutation from a form → Server Action"; o `useActionState`
+  entrega de graça a **melhoria progressiva** — o `action` do formulário é a própria
+  ação, e o servidor re-renderiza a página com o resultado quando não há JavaScript.
+  O smoke acima postou o formulário na própria URL e a página respondeu com o erro
+  localizado.
+- **A API fora do ar não pode derrubar a página.** A primeira versão da ação deixava
+  a exceção do `fetch` escapar, e o servidor respondia `500 Internal Server Error:
+  server action failed`. Agora a ação captura a falha e devolve `INTERNAL_ERROR` — a
+  regra da interface é "zero ações sem resposta".
+- **O idioma chega à ação por um campo oculto.** A ação não tem acesso ao cookie da
+  requisição (o template RSC não expõe um `cookies()`), então o formulário envia o
+  idioma num campo `locale`, e a ação o valida contra a lista de suportados antes de
+  usá-lo como `Accept-Language`.
+- **O asterisco de obrigatório saiu do texto do rótulo.** O `getByLabelText` do
+  Testing Library compara o `textContent` do rótulo, e o ` *` quebrava a busca por
+  nome. O asterisco agora é decoração do CSS e o `required` do controle é a
+  obrigação — o nome acessível fica limpo.
+- **A rota da autorização é `/autorizacao`.** O opt-in é a primeira etapa da
+  jornada e ganhou um item próprio na navegação, com a chave `nav.authorization` nos
+  três catálogos.
+- **O `zod` entrou como dependência de produção** (`4.x`, dentro da faixa do
+  `APP-STACK.md`); a auditoria segue com zero vulnerabilidades.
+
+#### Arquivos Tocados:
+- `frontend/src/features/authorization/actions.ts`
+- `frontend/src/features/authorization/actions.test.ts`
+- `frontend/src/features/authorization/ui/authorization-form.tsx`
+- `frontend/src/features/authorization/ui/authorization-form.test.tsx`
+- `frontend/src/features/authorization/server/page.tsx`
+- `frontend/src/app/router.tsx`
+- `frontend/src/app/navigation.tsx`
+- `frontend/src/shared/ui/field.tsx`
+- `frontend/src/shared/i18n/pt-BR.json`
+- `frontend/src/shared/i18n/en.json`
+- `frontend/src/shared/i18n/es.json`
+- `frontend/src/test/mocks/handlers.ts`
+- `frontend/package.json`
+- `frontend/package-lock.json`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 3.5 — Agenda e seleção de parcelas
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/035-frontend-agenda-selection`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** ler a agenda do beneficiário no servidor e escolher as parcelas
+  no navegador — apenas `OPEN` selecionável, total recalculado, estado vazio e
+  `403` tratados.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Portão 3.4 do `GATES.md` (frontend):**
+   ```text
+   $ npm run --prefix frontend lint
+   > eslint .
+   EXIT=0
+
+   $ npm run --prefix frontend typecheck
+   > tsc --noEmit
+   EXIT=0
+
+   $ npm run --prefix frontend test:unit
+   > vitest run
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  19 passed (19)
+         Tests  89 passed (89)
+    Duration  25.86s
+   EXIT=0
+
+   $ npm run --prefix frontend build
+   [5/5] build ssr environment...
+   ✓ 102 modules transformed.
+   dist/ssr/assets/entry.rsc-I1-o9DEO.js     54.35 kB
+   dist/ssr/index.js                      1,582.76 kB
+   ✓ built in 2.41s
+   EXIT=0
+   ```
+2. **Portão 3.1 (documentação e SDD):**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 66 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ Exactly 1 task in flight in SDD/specs/PLAN.md.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos passaram.
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css.
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 49 sessions, structure valid.
+   ```
+3. **Smoke no build de produção — a agenda renderiza no servidor:**
+   ```text
+   $ node /tmp/opencode/fake-api.mjs          # API falsa local, fora do repositório
+   [fake-api] ouvindo em http://127.0.0.1:8080
+
+   $ npm run --prefix frontend preview -- --host 127.0.0.1 --port 5199
+
+   === /agenda?beneficiaryId=BEN-001 (pt-BR) ===
+   h1: ['Agenda de descontos']
+   'PAR-001'                              -> 3
+   'PAR-002'                              -> 3
+   'PAR-003'                              -> 3
+   '450,00'     -> 1
+   '120,50'     -> 1
+   '0,00'       -> 3
+   '300,00'     -> 1
+   moeda: ['R$\xa00,00', 'R$\xa0120,50', 'R$\xa0300,00', 'R$\xa0450,00']
+   datas: ['20 de nov. de 2026', '5 de dez. de 2026', '5 de jan. de 2027']
+   checkboxes: 3
+   desabilitados: 1
+
+   === /agenda sem beneficiário ===
+   h1: ['Agenda de descontos']
+   mensagem: ['Informe o beneficiário para ver a agenda.']
+   link: ['Autorizar']
+
+   === /agenda?beneficiaryId=BEN-FORBIDDEN ===
+   mensagem: ['Autorize o convênio para continuar.']
+   link: ['Autorizar']
+
+   === /agenda?beneficiaryId=BEN-EMPTY ===
+   mensagem: ['Nenhuma parcela elegível na agenda.']
+
+   === /agenda?beneficiaryId=BEN-UNKNOWN ===
+   mensagem: ['A Central não conhece este beneficiário.']
+
+   === /agenda (en, cookie) ===
+   h1: ['Discount agenda']
+   moeda: ['R$0.00', 'R$120.50', 'R$300.00', 'R$450.00']
+   summary: ['Eligible', 'Eligible', 'Selection summary']
+   ```
+4. **O idioma chega à API — provado pelo lado do servidor:**
+   ```text
+   $ cat /tmp/opencode/fake-api.log
+   [fake-api] GET /api/v1/beneficiaries/BEN-001/agenda accept-language=pt-BR
+   [fake-api] GET /api/v1/beneficiaries/BEN-FORBIDDEN/agenda accept-language=pt-BR
+   [fake-api] GET /api/v1/beneficiaries/BEN-EMPTY/agenda accept-language=pt-BR
+   [fake-api] GET /api/v1/beneficiaries/BEN-UNKNOWN/agenda accept-language=pt-BR
+   [fake-api] GET /api/v1/beneficiaries/BEN-001/agenda accept-language=en
+   ```
+
+#### Conteúdo Entregue:
+- `frontend/src/features/agenda/server/page.tsx` — o Server Component assíncrono:
+  lê a agenda durante o render, com o `Accept-Language` da interface, e decide o
+  estado pelo `code` do erro.
+- `frontend/src/features/agenda/ui/installment-table.tsx` — a folha cliente: a
+  seleção, o total recalculado e a viagem da seleção para a portabilidade pela
+  URL.
+- `frontend/src/features/agenda/ui/selection-summary.tsx` — o resumo com o total
+  anunciado por `aria-live="polite"`.
+- `frontend/src/shared/format/money.ts`, `date.ts`, `status.ts` — a pasta que o
+  `ARCHITECTURE.md` §5 reserva para "moeda, data, status".
+- `frontend/src/shared/ui/page-header.tsx` — o cabeçalho das páginas, agora uma
+  primitiva compartilhada pela home, pela autorização e pela agenda.
+- `frontend/src/shared/i18n/server.ts` — o tradutor do servidor ganhou o
+  fallback: a mensagem do servidor entra quando o catálogo não conhece o
+  código.
+- `frontend/src/app/router.tsx` e `frontend/src/root.tsx` — a rota recebe a URL
+  inteira: o caminho escolhe a tela, a query carrega o beneficiário.
+- `frontend/src/shared/i18n/pt-BR.json`, `en.json`, `es.json` — a seção `agenda`
+  reescrita, com o mesmo conjunto de chaves nos três idiomas.
+- `frontend/src/test/mocks/handlers.ts` — a API falsa agora tem a agenda:
+  `BEN-001` (duas abertas e uma fechada), `BEN-EMPTY`, `BEN-FORBIDDEN` e o
+  `404` para qualquer outro beneficiário.
+
+#### Descobertas e Decisões:
+- **O estado da agenda é decidido pelo `code`, não pelo status HTTP.** O `403`
+  vira `AUTHORIZATION_REQUIRED` e ganha o atalho para autorizar; o `404` vira
+  `BENEFICIARY_NOT_FOUND` e explica que a Central não conhece o beneficiário;
+  qualquer outra falha oferece "Tentar de novo". A mensagem vem do catálogo da
+  interface, indexada pelo código estável, com a `message` do servidor como
+  fallback — a regra do ADR-0004, agora também no servidor.
+- **A agenda é lida no servidor, e não no navegador.** O `ARCHITECTURE.md` §5
+  manda as leituras para o Server Component; o navegador só escolhe. O smoke
+  mostra a tabela já no HTML, com o `Accept-Language` correto no pedido.
+- **A parcela fechada fica desabilitada, e não escondida.** A regra do aceite é
+  "apenas `OPEN` selecionável": a fechada aparece na tabela com o seu status,
+  com o controle desabilitado — esconder a linha faria o usuário achar que a
+  parcela não existe.
+- **O total é recalculado, nunca guardado.** Ele nasce da seleção a cada
+  render, em centavos (`Math.round(amount * 100)`), para o ponto flutuante não
+  inventar centavos: `0,1 + 0,2` dá `0,3`, não `0,30000000000000004`.
+- **A data é montada pelas partes.** `new Date('2026-12-05')` é meia-noite UTC e
+  vira o dia anterior a oeste de Greenwich; o `date.ts` monta a data no fuso do
+  leitor, e o dia continua sendo o dia que a Central queria.
+- **A moeda é o real, e o formato é do leitor.** A API carrega um decimal puro
+  (o domínio é o consignado brasileiro); `Intl` decide separador e posição do
+  símbolo — `R$ 450,00` em pt-BR, `R$450.00` em en, `450,00 R$` em es.
+- **O estado da tela é uma primitiva compartilhada.** O cabeçalho (eyebrow,
+  título, promessa) estava copiado em três páginas; virou
+  `shared/ui/page-header.tsx`, e a home, a autorização e a agenda usam a mesma
+  peça.
+- **A seleção viaja pela URL.** `/portabilidade?beneficiaryId=…&installments=…`
+  é o contrato entre a agenda e a próxima fatia: o servidor da portabilidade
+  lê exatamente as parcelas que o usuário escolheu.
+
+#### Arquivos Tocados:
+- `frontend/src/features/agenda/server/page.tsx`
+- `frontend/src/features/agenda/server/page.test.tsx`
+- `frontend/src/features/agenda/ui/installment-table.tsx`
+- `frontend/src/features/agenda/ui/installment-table.test.tsx`
+- `frontend/src/features/agenda/ui/selection-summary.tsx`
+- `frontend/src/shared/format/money.ts`
+- `frontend/src/shared/format/money.test.ts`
+- `frontend/src/shared/format/date.ts`
+- `frontend/src/shared/format/date.test.ts`
+- `frontend/src/shared/format/status.ts`
+- `frontend/src/shared/ui/page-header.tsx`
+- `frontend/src/shared/i18n/server.ts`
+- `frontend/src/app/router.tsx`
+- `frontend/src/app/router.test.tsx`
+- `frontend/src/app/pages/section.tsx`
+- `frontend/src/root.tsx`
+- `frontend/src/features/authorization/server/page.tsx`
+- `frontend/src/shared/i18n/pt-BR.json`
+- `frontend/src/shared/i18n/en.json`
+- `frontend/src/shared/i18n/es.json`
+- `frontend/src/test/mocks/handlers.ts`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 3.6 — Conta de recebimento e envio
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/036-frontend-portability-submit`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** validar a conta de recebimento e criar a operação — validação com
+  Zod, `Idempotency-Key` gerada uma vez por tentativa, `409` e `422` exibidos com
+  a mensagem do servidor.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Portão 3.4 do `GATES.md` (frontend):**
+   ```text
+   $ npm run --prefix frontend lint
+   > eslint .
+   EXIT=0
+
+   $ npm run --prefix frontend typecheck
+   > tsc --noEmit
+   EXIT=0
+
+   $ npm run --prefix frontend test:unit
+   > vitest run
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  22 passed (22)
+         Tests  107 passed (107)
+    Duration  32.47s
+   EXIT=0
+
+   $ npm run --prefix frontend build
+   [5/5] build ssr environment...
+   ✓ 106 modules transformed.
+   dist/ssr/assets/entry.rsc-C3xHimkj.js     60.84 kB
+   dist/ssr/index.js                      1,582.89 kB
+   ✓ built in 2.44s
+   EXIT=0
+   ```
+2. **Portão 3.1 (documentação e SDD):**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 66 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ Exactly 1 task in flight in SDD/specs/PLAN.md.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos passaram.
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css.
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 50 sessions, structure valid.
+   ```
+3. **Smoke no build de produção — a página renderiza:**
+   ```text
+   $ npm run --prefix frontend preview -- --host 127.0.0.1 --port 5199
+
+   === /portabilidade com a seleção ===
+   h1: ['Solicitar portabilidade']
+   'PAR-001'                    -> 5
+   'PAR-002'                    -> 5
+   'name="bank"'                -> 1
+   'name="branch"'              -> 1
+   'name="account"'             -> 1
+   'name="assigneeCreditor"'    -> 1
+   'name="installmentIds"'      -> 1
+   'name="idempotencyKey"'      -> 1
+   'Enviar operação'            -> 1
+   'Parcelas selecionadas'      -> 2
+
+   === /portabilidade sem seleção ===
+   mensagem: ['Nenhuma parcela selecionada. Escolha as parcelas na agenda.']
+   link: ['Agenda']
+
+   === /portabilidade (en) ===
+   h1: ['Request portability']
+   'Selected installments'  -> 2
+   'Bank'                   -> 1
+   'Branch'                 -> 1
+   'Account'                -> 2
+   'Creditor'               -> 4
+   'Send operation'         -> 1
+
+   === /portabilidade (es, cookie correto) ===
+   h1: ['Solicitar portabilidad']
+   mensagem: ['Ninguna cuota seleccionada. Elija las cuotas en la agenda.']
+   ```
+4. **Smoke do caminho sem JavaScript — a operação nasce e o protocolo aparece:**
+   ```text
+   $ curl -s -X POST 'http://127.0.0.1:5199/portabilidade?beneficiaryId=BEN-001&agreementId=AGR-001&installments=PAR-001,PAR-002' \
+       -F '$ACTION_REF_1=' -F '$ACTION_1:0=…' -F '$ACTION_1:1=…' -F '$ACTION_KEY=…' \
+       -F 'beneficiaryId=BEN-001' -F 'agreementId=AGR-001' -F 'installmentIds=PAR-001,PAR-002' \
+       -F 'locale=pt-BR' -F 'idempotencyKey=' \
+       -F 'bank=001' -F 'branch=1234' -F 'account=56789-0' -F 'assigneeCreditor=ConsigPort'
+
+   resposta: 13044 bytes
+   h1: ['Solicitar portabilidade']
+   protocolo: ['PRT-20261128-0001', 'PRT-20261128-0001']
+   badge: ['Operação criada']
+   moeda: ['R$ 750,00']
+
+   === fake-api.log ===
+   [fake-api] POST /api/v1/portability-operations idempotency-key=6704d891-0271-4940-b0e3-a92f6f9f0964 accept-language=pt-BR
+   ```
+   Sem JavaScript não há chave para enviar: a ação gerou uma (`6704d891-…`) e a
+   operação foi criada **uma vez só** — o `202` voltou com o protocolo, e a página
+   re-renderizou com o painel de sucesso.
+
+#### Conteúdo Entregue:
+- `frontend/src/features/portability/actions.ts` — a Server Action: valida a conta
+  com Zod, envia a `Idempotency-Key` e devolve o estado da operação.
+- `frontend/src/features/portability/idempotency.ts` — a chave da tentativa
+  (`createIdempotencyKey`) e o reconhecimento de um UUID (`isUuid`).
+- `frontend/src/features/portability/ui/receiving-account-form.tsx` — a folha
+  cliente: os campos da conta, o credor e a chave da tentativa.
+- `frontend/src/features/portability/ui/submit-operation.tsx` — o resultado: o
+  protocolo e o total quando a operação nasce, o erro com a mensagem do servidor
+  quando não.
+- `frontend/src/features/portability/server/page.tsx` — o Server Component da
+  página, com o estado sem seleção.
+- `frontend/src/features/agenda/ui/installment-table.tsx` — a seleção agora leva
+  também o convênio, que o pedido do contrato exige.
+- `frontend/src/app/router.tsx` — a rota `/portabilidade` lê a seleção da URL.
+- `frontend/src/shared/i18n/pt-BR.json`, `en.json`, `es.json` — a seção
+  `portability` reescrita.
+- `frontend/src/test/mocks/handlers.ts` — a API falsa cria operações, repete com
+  a mesma chave e recusa a mesma chave com outro corpo.
+
+#### Descobertas e Decisões:
+- **A chave nomeia a tentativa, não o render.** A primeira versão gerava a chave
+  a cada submissão — e uma repetição de um envio falho criaria uma segunda
+  operação, que é exatamente o que a idempotência existe para impedir. Agora a
+  folha guarda a chave junto com a **impressão digital do conteúdo**: o mesmo
+  conteúdo mantém a chave, outro conteúdo recebe uma nova.
+- **O `409` é uma defesa, não o caminho normal.** Como a chave gira com o
+  conteúdo, a interface raramente chega ao conflito — o `409` aparece quando a
+  mesma chave chega com outro corpo (tentativa adulterada, ou falha do cliente).
+  O painel mostra as duas vozes: o catálogo da interface e a mensagem do
+  servidor.
+- **A mensagem do servidor entra como detalhe, não como substituta.** O ADR-0004
+  diz que a interface usa o `code` como chave estável e a `message` do servidor
+  como fallback; aqui a `message` é a informação **mais específica** ("a parcela
+  PAR-003 não está aberta"), então ela aparece ao lado do texto do catálogo
+  quando acrescenta alguma coisa — e some quando repete.
+- **O formulário funciona sem JavaScript.** O `action` do formulário é a própria
+  Server Action; sem chave no formulário, a ação cria uma e a operação nasce
+  uma vez só. O smoke postou o formulário na própria URL e o painel de sucesso
+  apareceu no HTML de volta.
+- **A conta validada é a conta do contrato.** Banco, agência, conta e credor
+  têm os mesmos limites do `ReceivingAccount` do domínio Java (64, 32, 64 e
+  255) e não podem ser vazios — a regra do Zod é a regra do backend, escrita em
+  um só lugar do lado do navegador.
+- **O convênio passou a viajar na URL.** O pedido do contrato exige
+  `agreementId`, e a tabela da agenda conhece o convênio de cada parcela; a
+  seleção agora carrega o beneficiário, o convênio e as parcelas.
+
+#### Arquivos Tocados:
+- `frontend/src/features/portability/actions.ts`
+- `frontend/src/features/portability/actions.test.ts`
+- `frontend/src/features/portability/idempotency.ts`
+- `frontend/src/features/portability/idempotency.test.ts`
+- `frontend/src/features/portability/ui/receiving-account-form.tsx`
+- `frontend/src/features/portability/ui/receiving-account-form.test.tsx`
+- `frontend/src/features/portability/ui/submit-operation.tsx`
+- `frontend/src/features/portability/server/page.tsx`
+- `frontend/src/features/agenda/ui/installment-table.tsx`
+- `frontend/src/features/agenda/ui/installment-table.test.tsx`
+- `frontend/src/app/router.tsx`
+- `frontend/src/shared/i18n/pt-BR.json`
+- `frontend/src/shared/i18n/en.json`
+- `frontend/src/shared/i18n/es.json`
+- `frontend/src/test/mocks/handlers.ts`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 3.7 — Painel de status com polling
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/037-frontend-operations-polling`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** acompanhar a operação até o terminal — TanStack Query com
+  intervalo de 2 s, parada em estado terminal, `nextPollAt` respeitado, sem
+  ISR.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Portão 3.4 do `GATES.md` (frontend):**
+   ```text
+   $ npm run --prefix frontend lint
+   > eslint .
+   EXIT=0
+
+   $ npm run --prefix frontend typecheck
+   > tsc --noEmit
+   EXIT=0
+
+   $ npm run --prefix frontend test:unit
+   > vitest run
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  25 passed (25)
+         Tests  131 passed (131)
+    Duration  35.01s
+   EXIT=0
+
+   $ npm run --prefix frontend build
+   [5/5] build ssr environment...
+   ✓ 131 modules transformed.
+   dist/ssr/assets/entry.rsc-ClVSkLbq.js     78.10 kB
+   dist/ssr/index.js                      1,583.16 kB
+   ✓ built in 2.50s
+   EXIT=0
+   ```
+2. **Portão 3.1 (documentação e SDD):**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 66 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ Exactly 1 task in flight in SDD/specs/PLAN.md.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos passaram.
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css.
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 51 sessions, structure valid.
+   ```
+3. **Testes da task — timers falsos cobrindo `PENDING`, `COMPLETED` e `REJECTED`:**
+   ```text
+   $ npx --prefix frontend vitest run --root frontend src/features/operations
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  3 passed (3)
+         Tests  21 passed (21)
+    Duration  7.53s
+   EXIT=0
+   ```
+   Os casos da ilha (`features/operations/ui/operation-status.test.tsx`):
+   - `follows the operation until it ends and stops there` — a operação começa
+     `PENDING` (`calls = 1`), depois de **2 s** vem `COMPLETED` (`calls = 2`),
+     e **30 s** depois ainda são `calls = 2`: o estado terminal parou o
+     polling.
+   - `shows the reason of a rejection and stops polling` — `REJECTED` mostra o
+     motivo (`MARGIN_INSUFFICIENT`) e **30 s** depois ainda são `calls = 1`.
+   - `waits for the instant the server declares before asking again` — com
+     `nextPollAt` **10 s** à frente, **2 s** não bastam (`calls = 1`) e a
+     pergunta sai aos **10 s** (`calls = 2`).
+   - `asks the API in the language of the reader` — `Accept-Language: pt-BR`.
+   - `says when the API cannot answer` — a falha vira a tela com o botão
+     "Tentar de novo".
+   E o hook (`features/operations/ui/use-operation-polling.test.ts`) prova a
+   aritmética do ritmo: `2 s` entre duas perguntas, `false` no estado terminal,
+   `false` no `OPERATION_NOT_FOUND`, `10 s` quando o servidor declara
+   `nextPollAt`, e nunca menos que a base de `2 s`.
+4. **Smoke no build de produção — o painel renderiza no servidor:**
+   ```text
+   $ npm run --prefix frontend preview -- --host 127.0.0.1 --port 5199
+
+   === /operacoes com a operação ===
+   h1: ['Status da operação']
+   'Em andamento'                       -> 1
+   'PRT-20261128-0001'                  -> 2
+   'R$\xa0750,00'                       -> 1
+   '2 parcelas'                         -> 1
+   'ConsigPort'                         -> 8
+   'Atualizar agora'                    -> 1
+   'Aguardando a próxima consulta'      -> 1
+   'Última atualização'                 -> 1
+
+   === /operacoes sem a operação ===
+   h1: ['Status da operação']
+   mensagem: ['Informe a operação para acompanhar o status.']
+   link: ['Portabilidade']
+
+   === /operacoes com operação inexistente ===
+   mensagem: ['A operação não existe.']
+   link: ['Portabilidade']
+
+   === /operacoes (en) ===
+   h1: ['Operation status']
+   'In progress'            -> 1
+   'PRT-20261128-0001'      -> 2
+   'Refresh now'            -> 1
+   '2 installments'         -> 1
+   'Last update'            -> 1
+
+   === /operacoes (es) ===
+   h1: ['Estado de la operación']
+   'Actualizar ahora'       -> 1
+   '2 cuotas'               -> 1
+
+   === navegação ===
+   itens: [('autorizacao', 'Autorizar'), ('portabilidade', 'Portabilidade'),
+           ('operacoes', 'Operações'), ('agenda', 'Agenda'), ('auditoria', 'Auditoria')]
+   ```
+5. **Smoke do fluxo completo — a operação criada leva ao painel:**
+   ```text
+   $ curl -s -X POST 'http://127.0.0.1:5199/portabilidade?beneficiaryId=BEN-001&agreementId=AGR-001&installments=PAR-001,PAR-002' \
+       -F '$ACTION_REF_1=' -F '$ACTION_1:0=…' -F '$ACTION_1:1=…' -F '$ACTION_KEY=…' \
+       -F 'beneficiaryId=BEN-001' -F 'agreementId=AGR-001' -F 'installmentIds=PAR-001,PAR-002' \
+       -F 'locale=pt-BR' -F 'idempotencyKey=' \
+       -F 'bank=001' -F 'branch=1234' -F 'account=56789-0' -F 'assigneeCreditor=ConsigPort'
+
+   len: 13896
+   protocolo: ['PRT-20261128-0001']
+   badge: ['Operação criada']
+   link do painel: [('/operacoes?operationId=c1a2b3c4-d5e6-4f70-8a91-b2c3d4e5f601', 'Acompanhar operação')]
+   moeda: ['R$\xa0750,00']
+
+   === fake-api.log ===
+   [fake-api] GET /api/v1/portability-operations/c1a2b3c4-d5e6-4f70-8a91-b2c3d4e5f601 accept-language=pt-BR
+   [fake-api] POST /api/v1/portability-operations idempotency-key=41cb6739-2e1f-412b-95bf-4384df05ef45 accept-language=pt-BR
+   ```
+6. **Processos encerrados:** depois do smoke, as portas 8080 e 5199 ficaram
+   livres e nenhum processo de `vite preview` ou da API falsa restou:
+   ```text
+   portas 8080 e 5199 livres (preview e fake-api encerrados)
+   0
+   ```
+
+#### Conteúdo Entregue:
+- `frontend/src/features/operations/ui/use-operation-polling.ts` — o hook: o
+  ritmo do polling (2 s), a parada no estado terminal, o `nextPollAt` respeitado
+  e a leitura defensiva do `OPERATION_NOT_FOUND`.
+- `frontend/src/features/operations/ui/operation-status.tsx` — a ilha cliente: o
+  estado, o protocolo, o total, as parcelas, o credor, a última atualização, o
+  motivo da rejeição e o botão "Atualizar agora".
+- `frontend/src/features/operations/server/page.tsx` — o Server Component: o
+  primeiro estado lido no render, os estados de operação inexistente e de
+  falha.
+- `frontend/src/shared/api/query-provider.tsx` — o `QueryClient` criado uma vez
+  por sessão e embrulhado pelo Shell.
+- `frontend/src/shared/format/date.ts` — o `formatDateTime`, para a hora da
+  última atualização.
+- `frontend/src/features/portability/ui/submit-operation.tsx` — o caminho da
+  operação criada para o painel.
+- `frontend/src/app/router.tsx`, `navigation.tsx`, `shell.tsx` — a rota
+  `/operacoes`, a entrada na navegação e o provedor do cache.
+- `frontend/src/shared/i18n/pt-BR.json`, `en.json`, `es.json` — a seção
+  `operations` completada e a entrada da navegação.
+- `frontend/src/test/mocks/handlers.ts` — a API falsa responde à consulta da
+  operação.
+
+#### Descobertas e Decisões:
+- **O `nextPollAt` existe no domínio e ainda não no contrato público.** O
+  agregado `PortabilityOperation` tem `nextPollAt` (`ARCHITECTURE.md` §4) e o
+  backend o honra no `Retry-After` (`ARCHITECTURE.md` §11), mas o
+  `OperationDetail` do contrato público não o publica. Como o contrato público
+  só muda com autorização do responsável, a leitura é **defensiva**: o hook
+  usa o campo quando o servidor o envia e segue no intervalo base quando não
+  vem. Publicar `nextPollAt` no contrato é uma tarefa da API, não do frontend.
+- **Terminal não é "deixou de mudar".** Só `COMPLETED` e `REJECTED` encerram o
+  polling; `INTEGRATION_ERROR` é retomável e continua sendo perguntado — é o
+  que a §7 do `ARCHITECTURE.md` diz.
+- **O `OPERATION_NOT_FOUND` também para o polling.** Repetir a cada 2 s uma
+  pergunta que a API já respondeu "não existe" é desperdício: a falha vira
+  tela, com o botão de tentar de novo.
+- **O primeiro estado vem do servidor, o resto da ilha.** A página entrega o
+  estado já lido no render (a tela aparece pronta, e funciona sem JavaScript);
+  a ilha assume o polling dali em diante. É a fronteira do `react.md`: Server
+  Component por padrão, folha cliente só onde há interação.
+- **Timer falso e rede real não falam a mesma língua.** Nos testes, o relógio
+  do polling é falso, mas a resposta da API chega em tempo real: o teste dá
+  um tick real (a resposta chega) e um tick do relógio falso (o render que o
+  React agendou acontece). Sem esse par, o painel atrasaria uma pergunta
+  inteira — foi exatamente o que o primeiro teste mostrou.
+- **O `formatDateTime` é um instante, não um dia.** A data do calendário é
+  montada pelas partes, sem UTC; a hora da operação é um momento e sai com a
+  hora ao lado da data, no fuso do leitor.
+
+#### Arquivos Tocados:
+- `frontend/src/features/operations/ui/use-operation-polling.ts`
+- `frontend/src/features/operations/ui/use-operation-polling.test.ts`
+- `frontend/src/features/operations/ui/operation-status.tsx`
+- `frontend/src/features/operations/ui/operation-status.test.tsx`
+- `frontend/src/features/operations/server/page.tsx`
+- `frontend/src/features/operations/server/page.test.tsx`
+- `frontend/src/shared/api/query-provider.tsx`
+- `frontend/src/shared/format/date.ts`
+- `frontend/src/shared/format/date.test.ts`
+- `frontend/src/features/portability/ui/submit-operation.tsx`
+- `frontend/src/app/router.tsx`
+- `frontend/src/app/router.test.tsx`
+- `frontend/src/app/navigation.tsx`
+- `frontend/src/app/shell.tsx`
+- `frontend/src/shared/i18n/pt-BR.json`
+- `frontend/src/shared/i18n/en.json`
+- `frontend/src/shared/i18n/es.json`
+- `frontend/src/test/mocks/handlers.ts`
+- `frontend/package.json`
+- `frontend/package-lock.json`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 3.8 — Timeline de auditoria
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/038-frontend-audit-timeline`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** exibir a trilha imutável de eventos — ordem cronológica, tipo,
+  status anterior e novo, detalhe e horário, sem ação de edição ou exclusão.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Portão 3.4 do `GATES.md` (frontend):**
+   ```text
+   $ npm run --prefix frontend lint
+   > eslint .
+   EXIT=0
+
+   $ npm run --prefix frontend typecheck
+   > tsc --noEmit
+   EXIT=0
+
+   $ npm run --prefix frontend test:unit
+   > vitest run
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  27 passed (27)
+         Tests  143 passed (143)
+    Duration  39.48s
+   EXIT=0
+
+   $ npm run --prefix frontend build
+   [5/5] build ssr environment...
+   ✓ 131 modules transformed.
+   dist/ssr/assets/entry.rsc-BDILE0ut.js     80.46 kB
+   dist/ssr/index.js                      1,583.16 kB
+   ✓ built in 2.42s
+   EXIT=0
+   ```
+2. **Portão 3.1 (documentação e SDD):**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 66 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ Exactly 1 task in flight in SDD/specs/PLAN.md.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos passaram.
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css.
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 52 sessions, structure valid.
+   ```
+3. **Testes da task — eventos mistos e formatação de data:**
+   ```text
+   $ npx --prefix frontend vitest run --root frontend src/features/audit
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  2 passed (2)
+         Tests  11 passed (11)
+    Duration  5.04s
+   EXIT=0
+   ```
+   Os casos da timeline (`features/audit/ui/event-timeline.test.tsx`):
+   - `shows every event in chronological order` — três eventos fora de ordem
+     (3, 1, 2) chegam à tela na ordem cronológica (1, 2, 3).
+   - `shows the type, the statuses, the detail and the time of an event` —
+     "Operação rejeitada", o detalhe da Central, "Status anterior: Em
+     andamento", "Novo status: Rejeitada" e "28 de nov. de 2026, 10:00".
+   - `says that the trail starts when there is no previous status` — "Início"
+     no lugar do status anterior nulo.
+   - `shows the answer of the Central when the event carries one` — a resposta
+     crua aparece no `<details>`.
+   - `offers no way to edit or delete an event` — nenhum `button`, nenhum
+     `textbox`, nenhum `link` na trilha.
+   - `formats the time in the language of the reader` — "Nov 28, 2026, 10:00
+     AM" e "Operation created" em inglês.
+   E o Server Component (`features/audit/server/page.test.tsx`): a trilha da
+   operação, a operação sem eventos, a operação inexistente, a falha com o
+   caminho de retry e o `Accept-Language` da pergunta.
+4. **Smoke no build de produção — a trilha renderiza no servidor:**
+   ```text
+   $ npm run --prefix frontend preview -- --host 127.0.0.1 --port 5199
+
+   === /auditoria com a operação ===
+   h1: ['Trilha de eventos']
+   'Operação criada'            -> 4
+   'Operação enviada'           -> 2
+   'Tentativa de consulta'      -> 2
+   'Operação confirmada'        -> 2
+   'Operação concluída'         -> 2
+   'Status anterior'            -> 10
+   'Novo status'                -> 10
+   '28 de nov. de 2026, 10:00'  -> 10
+   'Resposta da Central'        -> 4
+   itens da lista: 8
+   botões: 0
+
+   === /auditoria sem a operação ===
+   h1: ['Trilha de eventos']
+   mensagem: ['Informe a operação para ver a trilha de auditoria.']
+
+   === /auditoria com operação inexistente ===
+   mensagem: ['A operação não existe.']
+
+   === /auditoria (en) ===
+   h1: ['Event trail']
+   'Operation created'      -> 2
+   'Status query'           -> 2
+   'Operation completed'    -> 2
+   'Previous status'        -> 10
+   'Central answer'         -> 4
+
+   === /auditoria (es) ===
+   h1: ['Traza de eventos']
+   'Operación creada'           -> 2
+   'Consulta de estado'         -> 2
+   'Operación completada'       -> 2
+   'Respuesta de la Central'    -> 4
+
+   === link do painel para a trilha ===
+   [('/auditoria?operationId=c1a2b3c4-d5e6-4f70-8a91-b2c3d4e5f601', 'Ver a trilha de auditoria')]
+
+   === fake-api.log ===
+   [fake-api] GET /api/v1/portability-operations/c1a2b3c4-d5e6-4f70-8a91-b2c3d4e5f601/events accept-language=pt-BR
+   [fake-api] GET /api/v1/portability-operations/OPERATION-UNKNOWN/events accept-language=pt-BR
+   [fake-api] GET /api/v1/portability-operations/c1a2b3c4-d5e6-4f70-8a91-b2c3d4e5f601/events accept-language=en
+   [fake-api] GET /api/v1/portability-operations/c1a2b3c4-d5e6-4f70-8a91-b2c3d4e5f601/events accept-language=es
+   ```
+5. **Processos encerrados:** depois do smoke, as portas 8080 e 5199 ficaram
+   livres e nenhum processo de `vite preview` ou da API falsa restou:
+   ```text
+   portas 8080 e 5199 livres (preview e fake-api encerrados)
+   0
+   ```
+
+#### Conteúdo Entregue:
+- `frontend/src/features/audit/server/page.tsx` — o Server Component: a trilha
+  lida no render, os estados de operação inexistente e de falha.
+- `frontend/src/features/audit/ui/event-timeline.tsx` — a lista ordenada pelo
+  instante e pelo identificador sequencial.
+- `frontend/src/features/audit/ui/event-item.tsx` — o evento: tipo, status
+  anterior, novo status, detalhe, hora e a resposta crua da Central.
+- `frontend/src/shared/format/status.ts` — o vocabulário do status: o tom e a
+  chave de catálogo de cada estado, agora juntos.
+- `frontend/src/features/operations/ui/operation-status.tsx` — o caminho do
+  painel para a trilha da operação.
+- `frontend/src/app/router.tsx` — a rota `/auditoria` lê a operação da URL.
+- `frontend/src/app/pages/section.tsx` — removido: era o placeholder de uma
+  feature que agora existe.
+- `frontend/src/shared/i18n/pt-BR.json`, `en.json`, `es.json` — a seção
+  `audit` completada (os oito tipos de evento e os estados).
+- `frontend/src/test/mocks/handlers.ts` — a API falsa responde à trilha.
+
+#### Descobertas e Decisões:
+- **A trilha é lida no servidor, não na ilha.** Não há interação: a timeline é
+  uma lista de fatos, e cada fato já está escrito. Um Server Component que lê
+  no render entrega a página pronta, funciona sem JavaScript e não gasta
+  polling com uma auditoria que só muda quando a operação muda de estado.
+- **A ordem não vem do array.** A API promete a ordem cronológica, mas a
+  timeline ordena pelo instante e, no empate, pelo `eventId` — o identificador
+  sequencial do evento. A ordem da tela passa a ser uma propriedade da tela,
+  não uma confiança na resposta.
+- **"Sem edição nem exclusão" é uma afirmação verificável.** O teste da
+  timeline afirma que não existe um único `button`, `textbox` ou `link` na
+  trilha: a ausência de ação não é uma intenção, é uma asserção.
+- **A resposta crua da Central fica escondida, não fora.** O `details` do
+  evento é o texto legível; o `rawPayload` é o que a Central respondeu de
+  verdade — é onde mora o motivo de uma rejeição fora do contrato
+  (`UNMAPPED_REJECTION`, ADR-0003). Um `<details>` nativo mostra um e esconde
+  o outro sem uma linha de JavaScript.
+- **O vocabulário do status ficou num lugar só.** O tom já vivia em
+  `shared/format/status.ts`; a chave de catálogo agora mora ao lado dele. O
+  painel da 3.7 e a trilha da 3.8 falam do mesmo estado com a mesma palavra —
+  "PENDING" é "Em andamento" nos dois lugares, e "REJECTED" é "Rejeitada".
+- **O placeholder saiu.** `SectionPage` existia para as seções da navegação
+  cuja feature ainda não tinha chegado. Com a `/auditoria` real, ele ficou sem
+  leitores: código morto sai junto com a task que o criou.
+
+#### Arquivos Tocados:
+- `frontend/src/features/audit/server/page.tsx`
+- `frontend/src/features/audit/server/page.test.tsx`
+- `frontend/src/features/audit/ui/event-timeline.tsx`
+- `frontend/src/features/audit/ui/event-timeline.test.tsx`
+- `frontend/src/features/audit/ui/event-item.tsx`
+- `frontend/src/shared/format/status.ts`
+- `frontend/src/features/operations/ui/operation-status.tsx`
+- `frontend/src/features/operations/ui/operation-status.test.tsx`
+- `frontend/src/app/router.tsx`
+- `frontend/src/app/router.test.tsx`
+- `frontend/src/app/pages/section.tsx` (removido)
+- `frontend/src/shared/i18n/pt-BR.json`
+- `frontend/src/shared/i18n/en.json`
+- `frontend/src/shared/i18n/es.json`
+- `frontend/src/test/mocks/handlers.ts`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 3.9 — Responsividade, acessibilidade e testes finais
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/039-frontend-responsive-a11y`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** fechar a experiência em mobile e teclado — breakpoints do
+  `DESIGN.md` §4b, navegação por teclado, `prefers-reduced-motion` respeitado e
+  testes de unidade verdes.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Portão 3.4 do `GATES.md` (frontend):**
+   ```text
+   $ npm run --prefix frontend lint
+   > eslint .
+   EXIT=0
+
+   $ npm run --prefix frontend typecheck
+   > tsc --noEmit
+   EXIT=0
+
+   $ npm run --prefix frontend test:unit
+   > vitest run
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  29 passed (29)
+         Tests  159 passed (159)
+    Duration  47.49s
+   EXIT=0
+
+   $ npm run --prefix frontend build
+   [5/5] build ssr environment...
+   ✓ 131 modules transformed.
+   dist/ssr/assets/entry.rsc-Drdohirr.js     81.41 kB
+   dist/ssr/index.js                      1,583.16 kB
+   ✓ built in 2.57s
+   EXIT=0
+   ```
+2. **Portão 3.1 (documentação e SDD):**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 66 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ Exactly 1 task in flight in SDD/specs/PLAN.md.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos passaram com sucesso!
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css (line endings normalized).
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 53 sessions, structure valid.
+   ```
+3. **Testes da task — responsividade e acessibilidade:**
+   ```text
+   $ npx --prefix frontend vitest run --root frontend src/test/responsive.test.ts src/test/accessibility.test.tsx
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  2 passed (2)
+         Tests  15 passed (15)
+    Duration  6.19s
+   EXIT=0
+   ```
+   O **teste responsivo** (`src/test/responsive.test.ts`), com quatro
+   asserções sobre o fonte:
+   - `uses only the breakpoints the design names` — os prefixos de breakpoint
+     que existem no código são exatamente `md:` e `lg:` (768px e 1024px, os
+     limites do `DESIGN.md` §4); o `sm:` do Tailwind saiu.
+   - `hides nothing` — nenhum elemento de conteúdo usa a classe `hidden`.
+   - `keeps the wide content inside its own scroll box` — nenhum elemento
+     pede largura fixa; a tabela e o `rawPayload` rolam dentro da própria caixa.
+   - `keeps every body text at 13px or more` — o único token abaixo do piso é
+     o `label-mono` (11px), que é chrome e nunca corpo de texto.
+
+   O **teste de acessibilidade** (`src/test/accessibility.test.tsx`), com o
+   shell renderizado de verdade:
+   - `names the regions the reader navigates by` — `banner`, `main`,
+     `contentinfo` e a navegação com nome acessível.
+   - `marks the current page in the navigation` — `aria-current="page"`.
+   - `is the first stop of the keyboard and names a target that exists` — o
+     primeiro `tab` cai no skip link, o `href` é `#conteudo` e o `id`
+     apontado existe no documento.
+   - `is out of the way until the keyboard asks for it` — a regra do CSS
+     guarda `top: -100px` e o `:focus` que o traz de volta.
+   - `walks from the skip link to the navigation` — skip link → marca →
+     navegação, na ordem.
+   - `reaches the form controls of the consent page` — o campo do
+     beneficiário é alcançado pelo teclado.
+   - `gives every control a name` — nenhum controle sem nome acessível nas
+     três rotas testadas.
+   - `keeps every tap target at 44px` — nenhum `a` ou `button` abaixo de
+     `min-h-11` (44px).
+   - `shows a visible focus ring on every control` — todo controle focável
+     carrega `focus-visible:outline-primary`.
+   - `links every field to its label` — o campo do beneficiário aponta para
+     o seu `label` e carrega `required`.
+4. **A região viva do painel da operação:**
+   ```text
+   $ npx --prefix frontend vitest run --root frontend src/features/operations
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  3 passed (3)
+         Tests  22 passed (22)
+    Duration  9.03s
+   EXIT=0
+   ```
+   O caso `announces the state of the operation and not the heartbeat`
+   afirma que o badge do estado está dentro de uma região `aria-live` e que o
+   batimento do polling ("Consultando a Central…" / "Aguardando a próxima
+   consulta…") não está.
+5. **Smoke no build de produção — a estrutura acessível no HTML:**
+   ```text
+   $ npm run --prefix frontend preview -- --host 127.0.0.1 --port 5199
+
+   === home ===
+   skip link: ['<a href="#conteudo" class="skip-link focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">']
+   main: ['<main id="conteudo" tabindex="-1" class="mx-auto w-full max-w-[1320px] flex-1 px-gutter py-margin md:px-gutter-desktop md:py-margin-desktop focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">']
+   CTAs: [('/autorizacao', 'Autorizar'), ('/auditoria', 'Auditoria'), ('/autorizacao', 'Nova portabilidade'), ('/auditoria', 'Ver auditoria')]
+   header/footer/nav: 1 1 1
+
+   === operações (polling) ===
+   live region: ['<div aria-live="polite" class="flex flex-wrap items-center justify-between gap-space-sm">']
+   badge: ['Em andamento']
+   heartbeat com aria-live? False
+   heartbeat: ['Aguardando a próxima consulta…']
+   ```
+6. **O CSS emitido carrega a prova:**
+   ```text
+   === CSS emitido ===
+   frontend/dist/client/assets/index-DtmVXB0O.css
+   skip-link
+   skip-link
+   1
+
+   --- .skip-link{ ---
+   .skip-link{top:-100px;left:var(--spacing-gutter);z-index:100;border-radius:var(--radius-DEFAULT);background-color:var(--color-surface-overlay);min-height:2.75rem;padding:var(--spacing-space-sm) var(--spacing-space-md);color:var(--color-text-primary);font-family:var(--font-sans);font-size:var(--text-body-md);align-items
+   --- .skip-link:focus{ ---
+   .skip-link:focus{top:var(--spacing-space-sm)}
+   @media(prefers-reduced-motion:reduce){*,:before,:after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
+   }
+
+   === responsividade no CSS emitido ===
+   'min-width:48rem'            -> 2
+   'min-width:64rem'            -> 2
+   min-h-11 (44px): 1
+   ```
+   As duas media queries do build são `48rem` (768px) e `64rem` (1024px) — os
+   dois limites que o `DESIGN.md` §4 nomeia, e nenhum outro.
+7. **Processos encerrados:** depois do smoke, as portas 8080 e 5199 ficaram
+   livres e nenhum processo de `vite preview` ou da API falsa restou:
+   ```text
+   portas 8080 e 5199 livres (preview e fake-api encerrados)
+   0
+   ```
+
+#### Conteúdo Entregue:
+- `frontend/src/styles.css` — o skip link (fora da tela até o teclado pedir)
+  e a regra global de `prefers-reduced-motion`.
+- `frontend/src/app/shell.tsx` — o skip link no topo do shell, o
+  `<main id="conteudo" tabindex="-1">` como alvo e o anel de foco da marca.
+- `frontend/src/app/navigation.tsx` — anel de foco visível nos itens da
+  navegação.
+- `frontend/src/app/pages/home.tsx` — as chamadas de ação viraram links e o
+  `<header>` da home deixou de ser um segundo *banner*.
+- `frontend/src/shared/ui/table.tsx` — anel de foco na região de rolagem.
+- `frontend/src/shared/i18n/language-switcher.tsx` — o `select` passou do
+  anel de sombra para o contorno de foco do design.
+- `frontend/src/features/agenda/ui/installment-table.tsx` — anel de foco no
+  checkbox das parcelas.
+- `frontend/src/features/operations/ui/operation-status.tsx` — a região viva
+  passou a anunciar o estado e não o batimento do polling.
+- `frontend/src/features/portability/ui/submit-operation.tsx` — o painel de
+  sucesso ganhou `role="status"`: o protocolo e o total são anunciados.
+- `frontend/src/test/responsive.test.ts` — a auditoria responsiva, do fonte.
+- `frontend/src/test/accessibility.test.tsx` — a auditoria de acessibilidade,
+  do DOM renderizado.
+
+#### Descobertas e Decisões:
+- **O `sm` do Tailwind não é o mobile do design.** O `DESIGN.md` §4 dá três
+  larguras: abaixo de 768px, de 768px a 1024px e acima de 1024px. O `sm` do
+  Tailwind é 640px — um limite que o design não nomeia. Com ele, o grid de
+  indicadores e o painel da operação quebravam em 640px, uma largura que
+  ninguém desenhou. O `sm` saiu: os dois grids passaram a usar `md`, e o
+  teste do fonte impede o retorno.
+- **Um link que parece botão continua sendo link.** As chamadas de ação da
+  home eram `<button>`: elas não faziam nada, e o teclado esperava uma ação
+  num elemento que só navega. Viraram `<a>` com a mesma superfície — o
+  `buttonClasses` já existia para isso.
+- **Duas bandeiras na mesma página confundem o leitor de tela.** O `<header>`
+  da home era lido como *banner* — o mesmo papel do cabeçalho do shell. Virou
+  um `<div>`: a semântica da home é conteúdo, e o landmark do shell continua
+  único.
+- **A região viva estava falando sem parar.** O painel da operação tinha o
+  batimento do polling ("Consultando a Central…" alternando com "Aguardando a
+  próxima consulta…") dentro de um `aria-live="polite"`: a cada dois segundos
+  o leitor de tela anunciava uma frase que não era informação. A região viva
+  passou a ser o **estado** — que muda quando a operação muda — e o batimento
+  ficou visível e silencioso.
+- **O `prefers-reduced-motion` é uma regra global, não um par de classes.**
+  A transição da navegação (`transition-colors duration-150`) e o
+  `active:scale-[0.98]` do botão continuam no código — para quem não pediu
+  menos movimento. Para quem pediu, a regra da raiz corta a transição, a
+  animação e o `scroll-behavior` de tudo.
+- **O que ainda falta medir: a geometria.** As quatro regras do `DESIGN.md`
+  §4b.2 têm prova estrutural agora (breakpoints, ausência de conteúdo
+  escondido, nome acessível, alvo de 44px, anel de foco) e prova geométrica
+  em breve: o `scrollWidth` real de 390px, a caixa real de cada alvo e o
+  tamanho real de cada texto pedem um navegador, e o navegador chega na task
+  **4.3**, com o Playwright. A task 3.9 entrega a estrutura; a 4.3 entrega a
+  régua.
+
+#### Arquivos Tocados:
+- `frontend/src/styles.css`
+- `frontend/src/app/shell.tsx`
+- `frontend/src/app/navigation.tsx`
+- `frontend/src/app/pages/home.tsx`
+- `frontend/src/shared/ui/table.tsx`
+- `frontend/src/shared/i18n/language-switcher.tsx`
+- `frontend/src/shared/i18n/pt-BR.json`
+- `frontend/src/shared/i18n/en.json`
+- `frontend/src/shared/i18n/es.json`
+- `frontend/src/features/agenda/ui/installment-table.tsx`
+- `frontend/src/features/operations/ui/operation-status.tsx`
+- `frontend/src/features/operations/ui/operation-status.test.tsx`
+- `frontend/src/features/portability/ui/submit-operation.tsx`
+- `frontend/src/test/responsive.test.ts`
+- `frontend/src/test/accessibility.test.tsx`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`

@@ -369,54 +369,387 @@
 - **Arquivos:** `frontend/openapi-ts.config.ts`, `frontend/src/shared/api/client.ts`, `frontend/src/shared/api/errors.ts`.
 - **Aceite:** tipos gerados de `contracts/consigport-api.yaml`; `openapi-fetch` com base URL por ambiente; erro mapeado por `code`.
 - **Verificação:** `npm run --prefix frontend typecheck` e teste de unidade do parser de erro.
+- **Realizado:** o frontend agora tem um cliente tipado do contrato público, gerado e
+  versionado. O `openapi-ts.config.ts` é o **gerador** — o `openapi-typescript` v7 não
+  lê arquivo de config, então o módulo carrega o caminho da entrada e da saída e chama
+  a API programática (`openapiTS` + `astToString`); `npm run --prefix frontend
+  generate:types` regenera `src/shared/api/schema.ts` byte a byte a partir de
+  `contracts/consigport-api.yaml`. O `client.ts` monta o `openapi-fetch` sobre esses
+  tipos, resolve a base URL por ambiente (`VITE_API_BASE_URL`, com o fallback local
+  `http://localhost:8080` e sem barra final) e expõe `parseErrorResponse`, que
+  transforma uma resposta de erro em `ApiError`. O `errors.ts` é o mapeador por
+  `code`: os dez códigos estáveis do contrato viram uma união `ApiErrorCode`, o corpo
+  da rede é tratado como `unknown` e um corpo quebrado degrada para `INTERNAL_ERROR`
+  em vez de quebrar a tela; a `message` localizada do servidor é preservada e os
+  `details` por campo são filtrados. A UI passa a ramificar por `code`, nunca pelo
+  status HTTP. Arquivos reais:
+  `frontend/openapi-ts.config.ts`,
+  `frontend/src/shared/api/client.ts`,
+  `frontend/src/shared/api/errors.ts`,
+  `frontend/src/shared/api/schema.ts` (gerado),
+  `frontend/src/shared/api/client.test.ts`,
+  `frontend/src/shared/api/errors.test.ts`,
+  `frontend/package.json`,
+  `frontend/package-lock.json`,
+  `frontend/tsconfig.json`.
 
 ### 3.2 — Catálogos i18n
 - **Objetivo:** UI em pt-BR com en e es.
 - **Arquivos:** `frontend/src/shared/i18n/pt-BR.json`, `en.json`, `es.json`, `provider.tsx`.
 - **Aceite:** chaves completas nos três catálogos; fallback pt-BR; troca de idioma persiste; `Accept-Language` enviado.
 - **Verificação:** teste que compara o conjunto de chaves entre catálogos.
+- **Realizado:** a interface fala três idiomas sem sair do RSC. Os catálogos
+  (`pt-BR.json`, `en.json`, `es.json`) têm exatamente o mesmo conjunto de chaves — um
+  teste compara as árvores e falha se um idioma ganhar ou perder uma chave — e cada
+  código de erro do contrato público tem a sua entrada, com a chave estável `code` e a
+  `message` do servidor como fallback. O `locales.ts` resolve qualquer tag de idioma
+  (`pt-BR`, `pt`, `es-AR`) para um dos três suportados, com pt-BR como padrão, e lê a
+  preferência do cookie `consigport-locale`. O servidor resolve o idioma **antes** de
+  renderizar: o `entry.rsc.tsx` lê o cookie e o `Root` monta a página no idioma
+  escolhido, com `<html lang>` correto. O `provider.tsx` é a folha cliente que guarda a
+  escolha, troca o idioma das folhas interativas sem nova ida ao servidor e persiste o
+  cookie por um ano; o `language-switcher.tsx` é um `select` nativo — funciona no
+  teclado, no leitor de tela e sem JavaScript — que, depois de gravar o cookie, pede ao
+  servidor um novo render (o `entry.browser.tsx` escuta o `replaceState`), para que os
+  Server Components também falem o idioma novo. O `Accept-Language` vai em toda
+  requisição: o `client.ts` ganhou um middleware do `openapi-fetch` que injeta o
+  cabeçalho, e um teste com **MSW** prova o cabeçalho e a leitura do corpo de erro.
+  Arquivos reais:
+  `frontend/src/shared/i18n/pt-BR.json`,
+  `frontend/src/shared/i18n/en.json`,
+  `frontend/src/shared/i18n/es.json`,
+  `frontend/src/shared/i18n/locales.ts`,
+  `frontend/src/shared/i18n/i18n.ts`,
+  `frontend/src/shared/i18n/provider.tsx`,
+  `frontend/src/shared/i18n/language-switcher.tsx`,
+  `frontend/src/shared/i18n/server.ts`,
+  `frontend/src/shared/i18n/i18n.test.ts`,
+  `frontend/src/shared/i18n/server.test.ts`,
+  `frontend/src/shared/api/client.ts`,
+  `frontend/src/shared/api/client.msw.test.ts`,
+  `frontend/src/test/mocks/handlers.ts`,
+  `frontend/src/test/mocks/server.ts`,
+  `frontend/src/app/navigation.tsx`,
+  `frontend/src/app/shell.tsx`,
+  `frontend/src/app/router.tsx`,
+  `frontend/src/app/router.test.tsx`,
+  `frontend/src/app/pages/home.tsx`,
+  `frontend/src/app/pages/not-found.tsx`,
+  `frontend/src/root.tsx`,
+  `frontend/src/framework/entry.rsc.tsx`,
+  `frontend/package.json`,
+  `frontend/package-lock.json`.
 
 ### 3.3 — Primitivas de UI
 - **Objetivo:** componentes base fiéis ao design Matrix.
 - **Arquivos:** `frontend/src/shared/ui/button.tsx`, `card.tsx`, `field.tsx`, `table.tsx`, `status-badge.tsx`.
 - **Aceite:** tokens de `theme.css`; foco visível; contraste AA; variantes sem valores mágicos.
 - **Verificação:** testes com Testing Library e checagem de `aria` nos componentes.
+- **Realizado:** as primitivas que as fatias seguintes consomem. O `field.tsx` é o
+  dono da acessibilidade do formulário: o `Field` liga o rótulo, a dica e o erro ao
+  controle (`aria-describedby`), marca a invalidez (`aria-invalid`) e exige o
+  asterisco de obrigatório apenas para os olhos — o `required` é do controle; o
+  `TextField` monta o `input` por cima dele. O `table.tsx` entrega a tabela como uma
+  **região de rolagem nomeada e focável** (`role="region"`, `tabIndex={0}`): no
+  celular a tabela rola dentro da própria caixa em vez de empurrar a página, e quem
+  navega pelo teclado consegue chegar à rolagem. O `status-badge.tsx` é um conjunto
+  **fechado de estados** — neutro, em andamento, sucesso, técnico e erro — com um
+  ponto decorativo (`aria-hidden`) ao lado da palavra; o que um estado *significa*
+  pertence à feature que o usa, não à primitiva. O `button.tsx` ganhou o anel de
+  foco visível em todas as variantes (`focus-visible:outline-primary`, sem
+  deslocamento de layout), o estado `disabled` e o estado `loading`, que marca
+  `aria-busy` e recusa o segundo clique — nenhuma ação sem resposta. Nenhum
+  componente carrega literal de cor: as classes saem dos tokens e o teste de
+  contraste lê `src/theme.css` e prova, com o cálculo do WCAG, que **todo par de
+  texto que a interface usa** passa dos 4,5:1 do AA — corpo, botões preenchidos e
+  badges — com o piso de 3:1 apenas para o token decorativo `text-muted`, que o
+  `DESIGN.md` §2 reserva ao placeholder e à chrome desativada. Arquivos reais:
+  `frontend/src/shared/ui/button.tsx`,
+  `frontend/src/shared/ui/button.test.tsx`,
+  `frontend/src/shared/ui/field.tsx`,
+  `frontend/src/shared/ui/field.test.tsx`,
+  `frontend/src/shared/ui/table.tsx`,
+  `frontend/src/shared/ui/table.test.tsx`,
+  `frontend/src/shared/ui/status-badge.tsx`,
+  `frontend/src/shared/ui/status-badge.test.tsx`,
+  `frontend/src/shared/ui/contrast.test.ts`.
 
 ### 3.4 — Fluxo de autorização
 - **Objetivo:** registrar o opt-in pela interface.
 - **Arquivos:** `frontend/src/features/authorization/server/page.tsx`, `ui/authorization-form.tsx`, `actions.ts`.
 - **Aceite:** Server Component renderiza; ilha cliente envia `POST /authorizations`; erro localizado; sucesso leva à agenda.
 - **Verificação:** teste de componente com `msw` e smoke no build de produção.
+- **Realizado:** o opt-in do beneficiário, do começo ao fim. A página
+  (`features/authorization/server/page.tsx`) é um **Server Component**: ela desenha o
+  cabeçalho da jornada e entrega o formulário para a folha cliente — não busca
+  nada e não guarda estado. A **Server Action** (`features/authorization/actions.ts`)
+  é a única porta da mutação: o navegador nunca fala com a API. A ação valida com
+  **Zod** (o par beneficiário/convênio), chama `POST /api/v1/authorizations` com o
+  `Accept-Language` da interface e devolve um estado serializável — nunca uma
+  exceção. A folha (`features/authorization/ui/authorization-form.tsx`) usa
+  `useActionState`, o que mantém o **formulário funcionando sem JavaScript**: o
+  `action` do formulário é a própria ação, e o servidor re-renderiza a página com o
+  resultado. O erro é **localizado** pelo `code` estável — a interface procura a chave
+  no catálogo (`errors.<CODE>`) e usa a `message` do servidor como fallback — e o
+  sucesso leva à **agenda** do beneficiário (`/agenda?beneficiaryId=…`). A API
+  fora do ar não derruba a página: a ação devolve `INTERNAL_ERROR` e a tela explica
+  em português. Arquivos reais:
+  `frontend/src/features/authorization/actions.ts`,
+  `frontend/src/features/authorization/actions.test.ts`,
+  `frontend/src/features/authorization/ui/authorization-form.tsx`,
+  `frontend/src/features/authorization/ui/authorization-form.test.tsx`,
+  `frontend/src/features/authorization/server/page.tsx`,
+  `frontend/src/app/router.tsx`,
+  `frontend/src/app/navigation.tsx`,
+  `frontend/src/shared/ui/field.tsx`,
+  `frontend/src/shared/i18n/pt-BR.json`,
+  `frontend/src/shared/i18n/en.json`,
+  `frontend/src/shared/i18n/es.json`,
+  `frontend/src/test/mocks/handlers.ts`,
+  `frontend/package.json`,
+  `frontend/package-lock.json`.
 
 ### 3.5 — Agenda e seleção de parcelas
 - **Objetivo:** listar parcelas elegíveis e permitir seleção.
 - **Arquivos:** `frontend/src/features/agenda/server/page.tsx`, `ui/installment-table.tsx`, `ui/selection-summary.tsx`.
 - **Aceite:** apenas `OPEN` selecionável; total recalculado; estado vazio e `403` tratados.
 - **Verificação:** testes de componente para seleção, total e estado vazio.
+- **Realizado:** a agenda do beneficiário, lida no servidor e escolhida no
+  navegador. A página (`features/agenda/server/page.tsx`) é um **Server Component
+  assíncrono**: durante o render ela pergunta
+  `GET /api/v1/beneficiaries/{beneficiaryId}/agenda` com o `Accept-Language` da
+  interface, e decide o estado pelo **`code` do erro**, não pelo status HTTP. Os
+  estados são honestos e todos nomeados: **vazio** ("Nenhuma parcela elegível na
+  agenda."), **sem consentimento** (o `403` vira `AUTHORIZATION_REQUIRED`, com o
+  atalho para autorizar), **beneficiário desconhecido** (o `404` vira
+  `BENEFICIARY_NOT_FOUND`) e **falha da consulta** (com o link de "Tentar de
+  novo"). A mensagem é sempre a do catálogo da interface, indexada pelo código
+  estável, com a `message` do servidor como fallback — a regra do ADR-0004.
+  A **folha cliente** (`features/agenda/ui/installment-table.tsx`) é a dona da
+  seleção: só uma parcela **`OPEN`** pode ser escolhida — a fechada está
+  desabilitada, porque oferecer uma parcela que a API recusa seria oferecer uma
+  operação impossível —, o total é **recalculado a cada mudança** a partir da
+  seleção (em centavos, para o ponto flutuante não mentir), e a seleção viaja
+  para a portabilidade pela URL (`/portabilidade?beneficiaryId=…&installments=…`).
+  O resumo (`features/agenda/ui/selection-summary.tsx`) anuncia o total com
+  `aria-live="polite"`: quem navega pelo teclado ouve o número se mover. O
+  **`shared/format/`** — a pasta que o `ARCHITECTURE.md` §5 reserva para
+  "moeda, data, status" — nasceu aqui: `money.ts` (reais no formato do leitor e
+  soma sem deriva), `date.ts` (a data do calendário no dia que a Central
+  queria, montada pelas partes, nunca por `new Date('2026-12-05')`, que seria
+  meia-noite UTC) e `status.ts` (o tom da Plataforma: elegível é sucesso,
+  concluída é sucesso, recusada é erro). O cabeçalho das páginas virou a
+  primitiva `shared/ui/page-header.tsx`, usada pelas três páginas que já existem.
+  Arquivos reais:
+  `frontend/src/features/agenda/server/page.tsx`,
+  `frontend/src/features/agenda/server/page.test.tsx`,
+  `frontend/src/features/agenda/ui/installment-table.tsx`,
+  `frontend/src/features/agenda/ui/installment-table.test.tsx`,
+  `frontend/src/features/agenda/ui/selection-summary.tsx`,
+  `frontend/src/shared/format/money.ts`,
+  `frontend/src/shared/format/money.test.ts`,
+  `frontend/src/shared/format/date.ts`,
+  `frontend/src/shared/format/date.test.ts`,
+  `frontend/src/shared/format/status.ts`,
+  `frontend/src/shared/ui/page-header.tsx`,
+  `frontend/src/shared/i18n/server.ts`,
+  `frontend/src/app/router.tsx`,
+  `frontend/src/app/router.test.tsx`,
+  `frontend/src/app/pages/section.tsx`,
+  `frontend/src/root.tsx`,
+  `frontend/src/features/authorization/server/page.tsx`,
+  `frontend/src/shared/i18n/pt-BR.json`,
+  `frontend/src/shared/i18n/en.json`,
+  `frontend/src/shared/i18n/es.json`,
+  `frontend/src/test/mocks/handlers.ts`.
 
 ### 3.6 — Conta de recebimento e envio
 - **Objetivo:** validar a conta e criar a operação.
 - **Arquivos:** `frontend/src/features/portability/ui/receiving-account-form.tsx`, `ui/submit-operation.tsx`, `actions.ts`.
 - **Aceite:** validação com Zod; `Idempotency-Key` gerada uma vez por tentativa; `409` e `422` exibidos com mensagem do servidor.
 - **Verificação:** teste de formulário cobrindo válido, inválido e conflito.
+- **Realizado:** a criação da operação de portabilidade, do formulário ao protocolo.
+  A **Server Action** (`features/portability/actions.ts`) é a única porta da
+  mutação: ela valida a conta de recebimento com **Zod** — as mesmas regras do
+  contrato (banco até 64, agência até 32, conta até 64, credor até 255, todas
+  não vazias) — envia a **`Idempotency-Key`** e devolve um estado serializável.
+  A **`Idempotency-Key` nomeia a tentativa, não o render**: a folha cliente
+  (`features/portability/ui/receiving-account-form.tsx`) calcula a impressão
+  digital do conteúdo (beneficiário, convênio, parcelas e conta) e guarda a chave
+  num `ref`; o mesmo conteúdo **mantém a chave** — uma repetição de um envio
+  falho não pode criar uma segunda operação — e outro conteúdo **recebe uma
+  chave nova**, porque a API recusa uma chave que chega com outro corpo. Sem
+  JavaScript não há chave para enviar, e a ação cria uma: a operação nasce
+  mesmo assim, uma vez só. O **resultado** (`features/portability/ui/submit-operation.tsx`)
+  fala com duas vozes: o catálogo da interface, indexado pelo `code` estável do
+  contrato, e a **mensagem do servidor** — o motivo que a API deu de fato ("a
+  parcela PAR-003 não está aberta") — que aparece como detalhe quando diz algo
+  que a primeira voz não diz. O `409` e o `422` aparecem assim, com a mensagem do
+  servidor visível. A página (`features/portability/server/page.tsx`) é um
+  **Server Component**: mostra as parcelas que vieram da agenda e entrega o
+  formulário à folha cliente; sem seleção, ela aponta de volta para a agenda.
+  A seleção viaja pela URL — `/portabilidade?beneficiaryId=…&agreementId=…&installments=…`
+  — e o **convênio** passou a fazer parte dela, porque o pedido do contrato o
+  exige. Arquivos reais:
+  `frontend/src/features/portability/actions.ts`,
+  `frontend/src/features/portability/actions.test.ts`,
+  `frontend/src/features/portability/idempotency.ts`,
+  `frontend/src/features/portability/idempotency.test.ts`,
+  `frontend/src/features/portability/ui/receiving-account-form.tsx`,
+  `frontend/src/features/portability/ui/receiving-account-form.test.tsx`,
+  `frontend/src/features/portability/ui/submit-operation.tsx`,
+  `frontend/src/features/portability/server/page.tsx`,
+  `frontend/src/features/agenda/ui/installment-table.tsx`,
+  `frontend/src/features/agenda/ui/installment-table.test.tsx`,
+  `frontend/src/app/router.tsx`,
+  `frontend/src/shared/i18n/pt-BR.json`,
+  `frontend/src/shared/i18n/en.json`,
+  `frontend/src/shared/i18n/es.json`,
+  `frontend/src/test/mocks/handlers.ts`.
 
 ### 3.7 — Painel de status com polling
 - **Objetivo:** acompanhar a operação até o terminal.
 - **Arquivos:** `frontend/src/features/operations/server/page.tsx`, `ui/operation-status.tsx`, `ui/use-operation-polling.ts`.
 - **Aceite:** TanStack Query com intervalo de 2 s; para em estado terminal; `nextPollAt` respeitado; sem ISR.
 - **Verificação:** teste com timers falsos cobrindo `PENDING`, `COMPLETED` e `REJECTED`.
+- **Realizado:** o painel que acompanha a operação até o estado terminal.
+  A **ilha cliente** (`features/operations/ui/operation-status.tsx`) é a única
+  dona do polling; o resto da tela é **Server Component**: o primeiro estado
+  da operação é lido **durante o render**, com o `Accept-Language` da cookie, e
+  a ilha assume dali em diante — **sem ISR** em lugar nenhum. O **hook**
+  (`features/operations/ui/use-operation-polling.ts`) é o único lugar onde o
+  **ritmo** mora: `TanStack Query` pergunta a cada **2 s** pelo
+  `GET /api/v1/portability-operations/{operationId}`, **para no estado
+  terminal** (`COMPLETED` e `REJECTED` — `INTEGRATION_ERROR` é retomável e
+  continua sendo perguntado) e **respeita o `nextPollAt`** quando o servidor o
+  declara: a espera nunca é menor que a base de 2 s nem menor que o instante
+  pedido. O `nextPollAt` pertence ao domínio, mas o contrato público ainda
+  não o publica — a leitura é defensiva e o contrato não foi tocado; o mesmo
+  vale para o `OPERATION_NOT_FOUND`, que **encerra** o polling em vez de
+  repetir uma pergunta sem resposta. O **provedor do cache**
+  (`shared/api/query-provider.tsx`) cria o `QueryClient` uma vez por sessão, e
+  o **Shell** o embrulha: o navegador guarda o estado do servidor só ali. O
+  **`formatDateTime`** (`shared/format/date.ts`) entrou para a hora da última
+  atualização — um instante é um momento, não um dia de calendário, então sai
+  com a hora ao lado da data. A **operação criada** na 3.6 agora oferece o
+  caminho para o painel (`/operacoes?operationId=…`), e a rota `/operacoes`
+  entrou no roteador e na navegação. Arquivos reais:
+  `frontend/src/shared/api/query-provider.tsx`,
+  `frontend/src/features/operations/ui/use-operation-polling.ts`,
+  `frontend/src/features/operations/ui/use-operation-polling.test.ts`,
+  `frontend/src/features/operations/ui/operation-status.tsx`,
+  `frontend/src/features/operations/ui/operation-status.test.tsx`,
+  `frontend/src/features/operations/server/page.tsx`,
+  `frontend/src/features/operations/server/page.test.tsx`,
+  `frontend/src/shared/format/date.ts`,
+  `frontend/src/shared/format/date.test.ts`,
+  `frontend/src/features/portability/ui/submit-operation.tsx`,
+  `frontend/src/app/router.tsx`,
+  `frontend/src/app/router.test.tsx`,
+  `frontend/src/app/navigation.tsx`,
+  `frontend/src/app/shell.tsx`,
+  `frontend/src/shared/i18n/pt-BR.json`,
+  `frontend/src/shared/i18n/en.json`,
+  `frontend/src/shared/i18n/es.json`,
+  `frontend/src/test/mocks/handlers.ts`.
 
 ### 3.8 — Timeline de auditoria
 - **Objetivo:** exibir a trilha imutável de eventos.
 - **Arquivos:** `frontend/src/features/audit/server/page.tsx`, `ui/event-timeline.tsx`, `ui/event-item.tsx`.
 - **Aceite:** ordem cronológica; tipo, status anterior e novo, detalhe e horário; sem ação de edição ou exclusão.
 - **Verificação:** teste de componente com eventos mistos e formatação de data.
+- **Realizado:** a trilha de auditoria da operação, lida no servidor e mostrada
+  como uma lista de fatos. O **Server Component**
+  (`features/audit/server/page.tsx`) pergunta o
+  `GET /api/v1/portability-operations/{operationId}/events` **durante o render**,
+  com o `Accept-Language` da cookie; o navegador nunca busca a trilha. A
+  **timeline** (`features/audit/ui/event-timeline.tsx`) ordena os eventos pelo
+  instante e, no empate, pelo identificador sequencial — a ordem da tela nunca
+  depende da ordem do array — e entrega cada evento ao **item**
+  (`features/audit/ui/event-item.tsx`), que mostra o **tipo**, o **status
+  anterior**, o **novo status**, o **detalhe** e a **hora**. O evento traz
+  também a resposta crua da Central quando existe, num `<details>` nativo:
+  nenhuma biblioteca, nenhum JavaScript, e o pasto continua legível. A trilha
+  é **append-only** e a tela não oferece botão nenhum — nem editar, nem
+  excluir: o teste afirma que não existe um único `button`, `textbox` ou
+  `link` na trilha. O **vocabulário do status** subiu para
+  `shared/format/status.ts`: o tom e a chave de catálogo de cada estado
+  passaram a morar juntos, e o painel da 3.7 usa a mesma tabela — assim a
+  operação e a sua trilha falam do mesmo estado com a mesma palavra. O
+  **placeholder** `SectionPage` saiu do código: era a página de espera de uma
+  feature que agora existe, e a rota `/auditoria` lê a operação da URL.
+  Arquivos reais:
+  `frontend/src/features/audit/server/page.tsx`,
+  `frontend/src/features/audit/server/page.test.tsx`,
+  `frontend/src/features/audit/ui/event-timeline.tsx`,
+  `frontend/src/features/audit/ui/event-timeline.test.tsx`,
+  `frontend/src/features/audit/ui/event-item.tsx`,
+  `frontend/src/shared/format/status.ts`,
+  `frontend/src/features/operations/ui/operation-status.tsx`,
+  `frontend/src/features/operations/ui/operation-status.test.tsx`,
+  `frontend/src/app/router.tsx`,
+  `frontend/src/app/router.test.tsx`,
+  `frontend/src/app/pages/section.tsx` (removido),
+  `frontend/src/shared/i18n/pt-BR.json`,
+  `frontend/src/shared/i18n/en.json`,
+  `frontend/src/shared/i18n/es.json`,
+  `frontend/src/test/mocks/handlers.ts`.
 
 ### 3.9 — Responsividade, acessibilidade e testes finais
 - **Objetivo:** fechar a experiência em mobile e teclado.
 - **Arquivos:** `frontend/src/styles.css`, `frontend/src/app/shell.tsx`, testes de integração.
 - **Aceite:** breakpoints do `DESIGN.md` §4b; navegação por teclado; `prefers-reduced-motion` respeitado; testes de unidade verdes.
 - **Verificação:** `npm run --prefix frontend lint && npm run --prefix frontend typecheck && npm run --prefix frontend test:unit -- --run`.
+- **Realizado:** a experiência fecha no **mobile** e no **teclado**, com a
+  prova no código. O **skip link** (`app/shell.tsx` + `styles.css`) é o
+  primeiro alvo do tabulador: ele fica fora da tela (`top: -100px`) e aparece
+  quando o teclado o alcança; o alvo é o `<main id="conteudo" tabindex="-1">`,
+  e o link existe — o teste afirma que o `id` apontado está no documento. O
+  **`prefers-reduced-motion`** foi respeitado na raiz: a regra global corta
+  animação, transição e `scroll-behavior` de tudo que se move. Os
+  **breakpoints** são os do `DESIGN.md` §4: o `sm` do Tailwind (640px) saiu do
+  código — ele partia o layout do mobile antes de a hora — e restaram
+  apenas `md` (768px) e `lg` (1024px), os dois limites que o design nomeia; o
+  teste do fonte afirma que nenhum outro prefixo aparece. O **teste de
+  integração** (`src/test/accessibility.test.tsx`) renderiza o shell de verdade
+  e prova o que o olho não alcança: o **ordem do tabulador** (skip link →
+  marca → navegação), o **nome acessível** de todo controle, o **piso de
+  44px** de todo alvo de toque, o **anel de foco** visível em todo controle e
+  os **landmarks** (`banner`, `main`, `contentinfo` e a navegação com nome).
+  O **teste responsivo** (`src/test/responsive.test.ts`) prova, do fonte, o
+  que a geometria ainda vai medir no navegador: os breakpoints, a ausência
+  de conteúdo escondido, o piso de 13px do texto de corpo e a ausência de
+  largura fixa que empurre a página de lado. Duas correções de semântica
+  vieram junto: os **botões da home** viraram **links** (um botão que muda
+  endereço mente para o teclado e para o leitor de tela) e o `<header>` da
+  home deixou de ser um segundo *banner* na mesma página. E a **região viva**
+  do painel da operação passou a anunciar o **estado** e não o **batimento**:
+  antes o texto "Consultando a Central…" / "Aguardando a próxima consulta…"
+  alternava dentro de um `aria-live` a cada dois segundos — o leitor de tela
+  falava sem parar; agora o badge do estado é a região viva e o batimento
+  fica visível e silencioso. Arquivos reais:
+  `frontend/src/styles.css`,
+  `frontend/src/app/shell.tsx`,
+  `frontend/src/app/navigation.tsx`,
+  `frontend/src/app/pages/home.tsx`,
+  `frontend/src/shared/ui/table.tsx`,
+  `frontend/src/shared/ui/button.tsx`,
+  `frontend/src/shared/i18n/language-switcher.tsx`,
+  `frontend/src/shared/i18n/pt-BR.json`,
+  `frontend/src/shared/i18n/en.json`,
+  `frontend/src/shared/i18n/es.json`,
+  `frontend/src/features/agenda/ui/installment-table.tsx`,
+  `frontend/src/features/operations/ui/operation-status.tsx`,
+  `frontend/src/features/operations/ui/operation-status.test.tsx`,
+  `frontend/src/features/portability/ui/submit-operation.tsx`,
+  `frontend/src/test/responsive.test.ts`,
+  `frontend/src/test/accessibility.test.tsx`.
+
+### 3.10 — Promoção da release `v0.4.0` e arquivamento da Fase 3
+- **Objetivo:** promover, publicar e arquivar a Fase 3.
+- **Arquivos:** `SDD/specs/history/phases/phase-3-finished.md`, `SDD/specs/PLAN.md`, `SDD/specs/ROADMAP.md`, `SDD/docs/EVIDENCE.md`, `docs/ai-harness/AI_USAGE_LOG.md`.
+- **Aceite:** `develop` promovido para `staging` e `main` por PR; tag `v0.4.0` criada pelo release-please; release no GitHub com o CHANGELOG; imagens no GHCR com `v0.4.0`; run de staging verde; fase arquivada.
+- **Verificação:** `git tag --list "v*"` mostra `v0.4.0`; `gh release view v0.4.0`; run do `cd-staging` verde; `node scripts/check-specs.mjs` com exit 0.
 
 ---
 

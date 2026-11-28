@@ -67,12 +67,10 @@
 
 ---
 
-## Fase atual: 2 — Backend core
+## Fase 2 — Backend core: concluída ✅
 
-> Objetivo: core DDD/hexagonal na porta `8080`, com PostgreSQL, Flyway, ACL, i18n,
-> polling resiliente e Swagger.
-> Task em voo: **nenhuma** — a Fase 2 terminou com a 2.18; o arquivamento da fase e a
-> tag `v0.3.0` vêm no fechamento, depois da promoção `develop` → `staging` → `main`.
+> Arquivada em [`history/phases/phase-2-finished.md`](./history/phases/phase-2-finished.md).
+> Tag `v0.3.0` publicada com as três imagens no GHCR e o staging validado.
 
 ### Tasks
 
@@ -137,6 +135,46 @@
 - [x] **2.18 — Fluxo completo com o banco real**
       `CREATED` → `COMPLETED` e `CREATED` → `REJECTED` comprovados com o PostgreSQL real
       e a trilha completa de eventos.
+
+---
+
+## Fase atual: 3 — Frontend RSC
+
+> Objetivo: UI React 19 RSC na porta `5173`, design Matrix, i18n e fluxo completo.
+> Task em voo: **3.10 — Promoção da release `v0.4.0` e arquivamento da Fase 3**.
+
+### Tasks
+
+- [x] **3.1 — Cliente OpenAPI tipado**
+      Tipos gerados de `contracts/consigport-api.yaml`; `openapi-fetch` com base URL por
+      ambiente; erro mapeado por `code`.
+- [x] **3.2 — Catálogos i18n**
+      Catálogos pt-BR/en/es com o mesmo conjunto de chaves; fallback pt-BR; troca de
+      idioma persistida; `Accept-Language` enviado à API.
+- [x] **3.3 — Primitivas de UI**
+      Componentes base fiéis ao design Matrix: tokens de `theme.css`, foco visível,
+      contraste AA e variantes sem valores mágicos.
+- [x] **3.4 — Fluxo de autorização**
+      Server Component renderiza; ilha cliente envia `POST /authorizations`; erro
+      localizado; sucesso leva à agenda.
+- [x] **3.5 — Agenda e seleção de parcelas**
+      Apenas `OPEN` selecionável; total recalculado; estado vazio e `403` tratados.
+- [x] **3.6 — Conta de recebimento e envio**
+      Validação com Zod; `Idempotency-Key` gerada uma vez por tentativa; `409` e `422`
+      exibidos com mensagem do servidor.
+- [x] **3.7 — Painel de status com polling**
+      TanStack Query com intervalo de 2 s; para em estado terminal; `nextPollAt`
+      respeitado; sem ISR.
+- [x] **3.8 — Timeline de auditoria**
+      Trilha imutável em ordem cronológica: tipo, status anterior e novo, detalhe
+      e horário; sem edição nem exclusão.
+- [x] **3.9 — Responsividade, acessibilidade e testes finais**
+      Breakpoints do `DESIGN.md` §4b; navegação por teclado;
+      `prefers-reduced-motion` respeitado; testes de unidade verdes.
+- [-] **3.10 — Promoção da release `v0.4.0` e arquivamento da Fase 3**
+      `develop` promovido para `staging` e `main` por PR; tag `v0.4.0` criada pelo
+      release-please; release no GitHub com o CHANGELOG; imagens no GHCR com
+      `v0.4.0`; run de staging verde; fase arquivada em `specs/history/phases/`.
 
 ### Como usar este arquivo
 

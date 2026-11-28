@@ -13,14 +13,17 @@
 | Bootstrap do repositório | ✅ `main` com commit inicial |
 | Fase 0 — Fundação | ✅ concluída e arquivada, tag `v0.1.0` |
 | Fase 1 — Central mock | ✅ concluída e arquivada, tag `v0.2.0` |
-| Fase em andamento | Fase 2 — Backend core (18 tasks concluídas; fechamento e tag em andamento) |
-| Próxima task | Fechamento da Fase 2 — promoção `develop` → `staging` → `main`, tag `v0.3.0` e arquivamento |
-| Versão | `v0.2.0` (a Fase 2 fecha em `v0.3.0`) |
+| Fase 2 — Backend core | ✅ concluída e arquivada, tag `v0.3.0` |
+| Fase em andamento | Fase 3 — Frontend RSC (10 tasks; task 3.10 em voo) |
+| Próxima task | 3.10 — Promoção da release `v0.4.0` e arquivamento da Fase 3 |
+| Versão | `v0.3.0` (a Fase 3 fecha em `v0.4.0`) |
 
 A Fase 0 entregou specs, ADRs, harness, gates, contratos, scaffolds, CI/CD e a
 release `v0.1.0`. A Fase 1 entregou a Central de Convênios simulada, com HMAC,
-idempotência, caos determinístico e contrato publicado. O código de aplicação do
-backend começa na Fase 2, sempre em branch própria e via PR.
+idempotência, caos determinístico e contrato publicado. A Fase 2 entregou o core do
+backend — domínio puro, persistência Flyway, ACL, polling resiliente, trilha imutável,
+i18n e contrato publicado — na release `v0.3.0`. A Fase 3 começa a interface web, sempre
+em branch própria e via PR.
 
 ---
 
@@ -30,11 +33,11 @@ backend começa na Fase 2, sempre em branch própria e via PR.
 |---|---|---|---|---|
 | 0 — Fundação | Specs, contratos, CI/CD, Docker base, scaffolds | 12 | `docs/000-sdd-foundation`, `feat/00x-*` | `v0.1.0` ✅ |
 | 1 — Central mock | Simular a Central com HMAC, idempotência, caos e admin | 7 | `feat/01x-central-mock` | `v0.2.0` ✅ |
-| 2 — Backend core | DDD + hexagonal + ACL + Flyway + i18n + polling + Swagger | 18 | `feat/02x-backend-*` | `v0.3.0` |
-| 3 — Frontend RSC | React 19 RSC, design Matrix, i18n, fluxo completo | 9 | `feat/03x-frontend-*` | `v0.4.0` |
+| 2 — Backend core | DDD + hexagonal + ACL + Flyway + i18n + polling + Swagger | 18 | `feat/02x-backend-*` | `v0.3.0` ✅ |
+| 3 — Frontend RSC | React 19 RSC, design Matrix, i18n, fluxo completo | 10 | `feat/03x-frontend-*` | `v0.4.0` |
 | 4 — Qualidade | Contratos, E2E, k6, Docker full, CD, release, README | 7 | `feat/04x-quality-*` | `v1.0.0` |
 
-Total: **53 tasks**, cada uma com 2–4 arquivos e um commit.
+Total: **54 tasks**, cada uma com 2–4 arquivos e um commit.
 
 ---
 
@@ -101,17 +104,41 @@ CI/CD real e governança de branch.
 
 ---
 
-## 5. Fase 2 — Backend core
+## 5. Fase 2 — Backend core (concluída)
 
 **Objetivo:** core DDD/hexagonal na porta `8080`, com PostgreSQL, Flyway, ACL, i18n,
 polling resiliente e Swagger.
 
+**Tasks**
+
+| ID | Entrega | Estado |
+|---|---|---|
+| 2.1 | Esqueleto hexagonal e regras ArchUnit | `[x]` |
+| 2.2 | Value objects compartilhados | `[x]` |
+| 2.3 | Agregado de autorização | `[x]` |
+| 2.4 | Agregado de portabilidade e máquina de estados | `[x]` |
+| 2.5 | Evento de auditoria append-only | `[x]` |
+| 2.6 | Registro e consulta de autorização | `[x]` |
+| 2.7 | Consulta de agenda com ACL | `[x]` |
+| 2.8 | Persistência e migração V1 | `[x]` |
+| 2.9 | Início da operação com idempotência | `[x]` |
+| 2.10 | Assinatura HMAC e envio à Central | `[x]` |
+| 2.11 | Polling resiliente | `[x]` |
+| 2.12 | Auto-transição de integração e respostas tipadas da Central | `[x]` |
+| 2.13 | Confirmação e atualização de conta | `[x]` |
+| 2.14 | Consulta de operações e trilha | `[x]` |
+| 2.15 | Recursos REST e tratamento de erros | `[x]` |
+| 2.16 | i18n, Swagger e snapshot OpenAPI | `[x]` |
+| 2.17 | Gate de cobertura do núcleo | `[x]` |
+| 2.18 | Fluxo completo com o banco real | `[x]` |
+
 **Saída**
-- Domínio puro + ArchUnit + JaCoCo verdes.
+- Domínio puro + ArchUnit + JaCoCo verdes (99,71% de branches e 98,12% de linhas no
+  núcleo).
 - Migração V1 aplicada em Testcontainers.
 - `POST /portability-operations` idempotente; polling até terminal; conta atualizada.
 - Erros localizados em pt-BR/en/es; OpenAPI sem drift.
-- Tag `v0.3.0`.
+- Tag `v0.3.0` com as três imagens no GHCR e staging validado.
 
 **Riscos**
 - Drift entre `contracts/consigport-api.yaml` e springdoc; o CI compara os dois.
