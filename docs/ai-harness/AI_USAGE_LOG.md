@@ -1955,3 +1955,53 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
       em pt-BR, en e es, os estados sem operação e de operação inexistente
       aparecem, e a trilha não oferece nenhum botão
    - preview e API falsa encerrados: 0 processos e 0 portas presas
+
+## Sessão #54 — Task 3.9 (Responsividade, acessibilidade e testes finais)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/039-frontend-responsive-a11y`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** fechar a experiência em mobile e teclado — breakpoints do
+  `DESIGN.md` §4b, navegação por teclado, `prefers-reduced-motion` respeitado e
+  testes de unidade verdes.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** o `DESIGN.md` §4 (os três breakpoints) e §4b (as
+   quatro regras duras e a prova), o `PLAN.md` (task 3.9), o `BACKLOG.md` (o
+   aceite da 3.9) e o `frontend/src/styles.css` (os tokens e a folha de estilo
+   global).
+2. **Skip link e teclado:** o link "Pular para o conteúdo" no topo do shell,
+   fora da tela até o foco chegar, apontando para o `<main id="conteudo"
+   tabindex="-1">`; o anel de foco visível nos itens da navegação, na marca,
+   na região de rolagem da tabela, no `select` do idioma e no checkbox das
+   parcelas.
+3. **Breakpoints:** o `sm` do Tailwind (640px) saiu do código — o design
+   nomeia 768px e 1024px, e só esses; os grids da home e do painel da
+   operação passaram a usar `md`.
+4. **`prefers-reduced-motion`:** a regra global na raiz corta animação,
+   transição e `scroll-behavior` de tudo que se move.
+5. **Semântica corrigida:** as chamadas de ação da home viraram links (um
+   botão que navega mente para o teclado), o `<header>` da home deixou de
+   ser um segundo *banner* e o painel de sucesso da portabilidade ganhou
+   `role="status"`.
+6. **Região viva corrigida:** o painel da operação passou a anunciar o
+   **estado** da operação; o batimento do polling — que mudava a cada dois
+   segundos dentro de um `aria-live` — ficou visível e silencioso.
+7. **Testes:** `src/test/responsive.test.ts` (breakpoints, conteúdo
+   escondido, largura fixa e piso de 13px, lidos do fonte) e
+   `src/test/accessibility.test.tsx` (ordem do tabulador com o teclado de
+   verdade, landmarks, nome acessível de todo controle, alvo de 44px, anel de
+   foco e ligação entre campo e rótulo).
+8. **Validação:**
+   - `npm run --prefix frontend lint` → EXIT=0
+   - `npm run --prefix frontend typecheck` → EXIT=0
+   - `npm run --prefix frontend test:unit` → 29 arquivos, 159 testes verdes
+   - `npm run --prefix frontend build` → os três ambientes (rsc, ssr, client) verdes
+   - 5 gates locais de documentação verdes
+   - smoke no build de produção: o skip link, o `main` com `id` e
+     `tabindex`, as CTAs como links, os landmarks e a região viva do painel
+     da operação conferidos no HTML; o CSS emitido carrega a regra do
+     `prefers-reduced-motion` e as media queries de 48rem e 64rem
+   - preview e API falsa encerrados: 0 processos e 0 portas presas

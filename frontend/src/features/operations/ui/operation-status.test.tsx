@@ -188,6 +188,24 @@ describe('OperationStatus', () => {
     expect(acceptLanguage).toBe('pt-BR')
   })
 
+  it('announces the state of the operation and not the heartbeat', async () => {
+    server.use(http.get(URL_OPERATION, () => HttpResponse.json(detail('PENDING'))))
+
+    renderPanel()
+    await advance(0)
+    await settle()
+
+    // The state lives in the live region: when it changes, the screen reader
+    // hears it.
+    const state = screen.getByText('Em andamento').closest('[aria-live]')
+    expect(state).not.toBeNull()
+    expect(state).toHaveAttribute('aria-live', 'polite')
+
+    // The heartbeat changes every two seconds: it stays silent.
+    const heartbeat = screen.getByText(/Consultando a Central|Aguardando a próxima consulta/)
+    expect(heartbeat.closest('[aria-live]')).toBeNull()
+  })
+
   it('says when the API cannot answer', async () => {
     server.use(
       http.get(URL_OPERATION, () =>

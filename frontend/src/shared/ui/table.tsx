@@ -20,7 +20,12 @@ export function Table({ label, className, children, ...props }: TableProps) {
       role="region"
       aria-label={label}
       tabIndex={0}
-      className={['w-full overflow-x-auto rounded-lg border border-border-subtle', className]
+      className={[
+        'w-full overflow-x-auto rounded-lg border border-border-subtle',
+        // The scroll region is focusable, so it needs a visible focus ring too.
+        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+        className,
+      ]
         .filter(Boolean)
         .join(' ')}
       {...props}

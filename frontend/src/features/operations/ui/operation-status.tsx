@@ -66,7 +66,14 @@ export function OperationStatus({ operationId, initialOperation }: OperationStat
 
   return (
     <Card className='flex flex-col gap-space-md p-space-lg'>
-      <div className='flex flex-wrap items-center justify-between gap-space-sm'>
+      {/* The live region speaks the state of the operation and nothing else:
+          the badge changes when the operation moves, and the protocol arrives
+          once. The heartbeat below is visible but silent — a region that
+          speaks every two seconds is noise, not information. */}
+      <div
+        aria-live='polite'
+        className='flex flex-wrap items-center justify-between gap-space-sm'
+      >
         <StatusBadge tone={statusTone(operation.status)}>
           {labelKey === undefined ? operation.status : t(labelKey)}
         </StatusBadge>
@@ -75,7 +82,7 @@ export function OperationStatus({ operationId, initialOperation }: OperationStat
         </span>
       </div>
 
-      <dl className='grid gap-space-md sm:grid-cols-2'>
+      <dl className='grid gap-space-md md:grid-cols-2'>
         <Detail label={t('operations.totalAmount')} value={formatMoney(operation.totalAmount, locale)} />
         <Detail
           label={t('operations.installments')}
@@ -103,7 +110,9 @@ export function OperationStatus({ operationId, initialOperation }: OperationStat
         </p>
       ) : null}
 
-      <p aria-live='polite' className='text-body-sm text-text-secondary'>
+      {/* The heartbeat of the polling: visible for the eye, silent for the
+          ear. The live region above already speaks the state. */}
+      <p className='text-body-sm text-text-secondary'>
         {terminal ? t('operations.terminal') : isFetching ? t('operations.polling') : t('operations.waiting')}
       </p>
 

@@ -700,6 +700,56 @@
 - **Arquivos:** `frontend/src/styles.css`, `frontend/src/app/shell.tsx`, testes de integração.
 - **Aceite:** breakpoints do `DESIGN.md` §4b; navegação por teclado; `prefers-reduced-motion` respeitado; testes de unidade verdes.
 - **Verificação:** `npm run --prefix frontend lint && npm run --prefix frontend typecheck && npm run --prefix frontend test:unit -- --run`.
+- **Realizado:** a experiência fecha no **mobile** e no **teclado**, com a
+  prova no código. O **skip link** (`app/shell.tsx` + `styles.css`) é o
+  primeiro alvo do tabulador: ele fica fora da tela (`top: -100px`) e aparece
+  quando o teclado o alcança; o alvo é o `<main id="conteudo" tabindex="-1">`,
+  e o link existe — o teste afirma que o `id` apontado está no documento. O
+  **`prefers-reduced-motion`** foi respeitado na raiz: a regra global corta
+  animação, transição e `scroll-behavior` de tudo que se move. Os
+  **breakpoints** são os do `DESIGN.md` §4: o `sm` do Tailwind (640px) saiu do
+  código — ele partia o layout do mobile antes de a hora — e restaram
+  apenas `md` (768px) e `lg` (1024px), os dois limites que o design nomeia; o
+  teste do fonte afirma que nenhum outro prefixo aparece. O **teste de
+  integração** (`src/test/accessibility.test.tsx`) renderiza o shell de verdade
+  e prova o que o olho não alcança: o **ordem do tabulador** (skip link →
+  marca → navegação), o **nome acessível** de todo controle, o **piso de
+  44px** de todo alvo de toque, o **anel de foco** visível em todo controle e
+  os **landmarks** (`banner`, `main`, `contentinfo` e a navegação com nome).
+  O **teste responsivo** (`src/test/responsive.test.ts`) prova, do fonte, o
+  que a geometria ainda vai medir no navegador: os breakpoints, a ausência
+  de conteúdo escondido, o piso de 13px do texto de corpo e a ausência de
+  largura fixa que empurre a página de lado. Duas correções de semântica
+  vieram junto: os **botões da home** viraram **links** (um botão que muda
+  endereço mente para o teclado e para o leitor de tela) e o `<header>` da
+  home deixou de ser um segundo *banner* na mesma página. E a **região viva**
+  do painel da operação passou a anunciar o **estado** e não o **batimento**:
+  antes o texto "Consultando a Central…" / "Aguardando a próxima consulta…"
+  alternava dentro de um `aria-live` a cada dois segundos — o leitor de tela
+  falava sem parar; agora o badge do estado é a região viva e o batimento
+  fica visível e silencioso. Arquivos reais:
+  `frontend/src/styles.css`,
+  `frontend/src/app/shell.tsx`,
+  `frontend/src/app/navigation.tsx`,
+  `frontend/src/app/pages/home.tsx`,
+  `frontend/src/shared/ui/table.tsx`,
+  `frontend/src/shared/ui/button.tsx`,
+  `frontend/src/shared/i18n/language-switcher.tsx`,
+  `frontend/src/shared/i18n/pt-BR.json`,
+  `frontend/src/shared/i18n/en.json`,
+  `frontend/src/shared/i18n/es.json`,
+  `frontend/src/features/agenda/ui/installment-table.tsx`,
+  `frontend/src/features/operations/ui/operation-status.tsx`,
+  `frontend/src/features/operations/ui/operation-status.test.tsx`,
+  `frontend/src/features/portability/ui/submit-operation.tsx`,
+  `frontend/src/test/responsive.test.ts`,
+  `frontend/src/test/accessibility.test.tsx`.
+
+### 3.10 — Promoção da release `v0.4.0` e arquivamento da Fase 3
+- **Objetivo:** promover, publicar e arquivar a Fase 3.
+- **Arquivos:** `SDD/specs/history/phases/phase-3-finished.md`, `SDD/specs/PLAN.md`, `SDD/specs/ROADMAP.md`, `SDD/docs/EVIDENCE.md`, `docs/ai-harness/AI_USAGE_LOG.md`.
+- **Aceite:** `develop` promovido para `staging` e `main` por PR; tag `v0.4.0` criada pelo release-please; release no GitHub com o CHANGELOG; imagens no GHCR com `v0.4.0`; run de staging verde; fase arquivada.
+- **Verificação:** `git tag --list "v*"` mostra `v0.4.0`; `gh release view v0.4.0`; run do `cd-staging` verde; `node scripts/check-specs.mjs` com exit 0.
 
 ---
 

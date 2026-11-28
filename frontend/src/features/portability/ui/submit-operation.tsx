@@ -33,7 +33,9 @@ export function SubmitOperation({ state }: SubmitOperationProps) {
 
   if (state.status === 'success') {
     return (
-      <Card className='flex flex-col gap-space-sm p-space-md'>
+      // The status speaks the outcome of the submission: the protocol and the
+      // total arrive without the reader hunting for them.
+      <Card role='status' className='flex flex-col gap-space-sm p-space-md'>
         <StatusBadge tone='success'>{t('portability.created')}</StatusBadge>
         <p className='text-body-md text-text-secondary'>
           {t('portability.protocol')}:{' '}

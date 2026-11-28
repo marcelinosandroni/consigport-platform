@@ -5582,3 +5582,230 @@
 - `SDD/specs/ROADMAP.md`
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 3.9 — Responsividade, acessibilidade e testes finais
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/039-frontend-responsive-a11y`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** fechar a experiência em mobile e teclado — breakpoints do
+  `DESIGN.md` §4b, navegação por teclado, `prefers-reduced-motion` respeitado e
+  testes de unidade verdes.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Portão 3.4 do `GATES.md` (frontend):**
+   ```text
+   $ npm run --prefix frontend lint
+   > eslint .
+   EXIT=0
+
+   $ npm run --prefix frontend typecheck
+   > tsc --noEmit
+   EXIT=0
+
+   $ npm run --prefix frontend test:unit
+   > vitest run
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  29 passed (29)
+         Tests  159 passed (159)
+    Duration  47.49s
+   EXIT=0
+
+   $ npm run --prefix frontend build
+   [5/5] build ssr environment...
+   ✓ 131 modules transformed.
+   dist/ssr/assets/entry.rsc-Drdohirr.js     81.41 kB
+   dist/ssr/index.js                      1,583.16 kB
+   ✓ built in 2.57s
+   EXIT=0
+   ```
+2. **Portão 3.1 (documentação e SDD):**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 66 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ Exactly 1 task in flight in SDD/specs/PLAN.md.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos passaram com sucesso!
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css (line endings normalized).
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 53 sessions, structure valid.
+   ```
+3. **Testes da task — responsividade e acessibilidade:**
+   ```text
+   $ npx --prefix frontend vitest run --root frontend src/test/responsive.test.ts src/test/accessibility.test.tsx
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  2 passed (2)
+         Tests  15 passed (15)
+    Duration  6.19s
+   EXIT=0
+   ```
+   O **teste responsivo** (`src/test/responsive.test.ts`), com quatro
+   asserções sobre o fonte:
+   - `uses only the breakpoints the design names` — os prefixos de breakpoint
+     que existem no código são exatamente `md:` e `lg:` (768px e 1024px, os
+     limites do `DESIGN.md` §4); o `sm:` do Tailwind saiu.
+   - `hides nothing` — nenhum elemento de conteúdo usa a classe `hidden`.
+   - `keeps the wide content inside its own scroll box` — nenhum elemento
+     pede largura fixa; a tabela e o `rawPayload` rolam dentro da própria caixa.
+   - `keeps every body text at 13px or more` — o único token abaixo do piso é
+     o `label-mono` (11px), que é chrome e nunca corpo de texto.
+
+   O **teste de acessibilidade** (`src/test/accessibility.test.tsx`), com o
+   shell renderizado de verdade:
+   - `names the regions the reader navigates by` — `banner`, `main`,
+     `contentinfo` e a navegação com nome acessível.
+   - `marks the current page in the navigation` — `aria-current="page"`.
+   - `is the first stop of the keyboard and names a target that exists` — o
+     primeiro `tab` cai no skip link, o `href` é `#conteudo` e o `id`
+     apontado existe no documento.
+   - `is out of the way until the keyboard asks for it` — a regra do CSS
+     guarda `top: -100px` e o `:focus` que o traz de volta.
+   - `walks from the skip link to the navigation` — skip link → marca →
+     navegação, na ordem.
+   - `reaches the form controls of the consent page` — o campo do
+     beneficiário é alcançado pelo teclado.
+   - `gives every control a name` — nenhum controle sem nome acessível nas
+     três rotas testadas.
+   - `keeps every tap target at 44px` — nenhum `a` ou `button` abaixo de
+     `min-h-11` (44px).
+   - `shows a visible focus ring on every control` — todo controle focável
+     carrega `focus-visible:outline-primary`.
+   - `links every field to its label` — o campo do beneficiário aponta para
+     o seu `label` e carrega `required`.
+4. **A região viva do painel da operação:**
+   ```text
+   $ npx --prefix frontend vitest run --root frontend src/features/operations
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  3 passed (3)
+         Tests  22 passed (22)
+    Duration  9.03s
+   EXIT=0
+   ```
+   O caso `announces the state of the operation and not the heartbeat`
+   afirma que o badge do estado está dentro de uma região `aria-live` e que o
+   batimento do polling ("Consultando a Central…" / "Aguardando a próxima
+   consulta…") não está.
+5. **Smoke no build de produção — a estrutura acessível no HTML:**
+   ```text
+   $ npm run --prefix frontend preview -- --host 127.0.0.1 --port 5199
+
+   === home ===
+   skip link: ['<a href="#conteudo" class="skip-link focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">']
+   main: ['<main id="conteudo" tabindex="-1" class="mx-auto w-full max-w-[1320px] flex-1 px-gutter py-margin md:px-gutter-desktop md:py-margin-desktop focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">']
+   CTAs: [('/autorizacao', 'Autorizar'), ('/auditoria', 'Auditoria'), ('/autorizacao', 'Nova portabilidade'), ('/auditoria', 'Ver auditoria')]
+   header/footer/nav: 1 1 1
+
+   === operações (polling) ===
+   live region: ['<div aria-live="polite" class="flex flex-wrap items-center justify-between gap-space-sm">']
+   badge: ['Em andamento']
+   heartbeat com aria-live? False
+   heartbeat: ['Aguardando a próxima consulta…']
+   ```
+6. **O CSS emitido carrega a prova:**
+   ```text
+   === CSS emitido ===
+   frontend/dist/client/assets/index-DtmVXB0O.css
+   skip-link
+   skip-link
+   1
+
+   --- .skip-link{ ---
+   .skip-link{top:-100px;left:var(--spacing-gutter);z-index:100;border-radius:var(--radius-DEFAULT);background-color:var(--color-surface-overlay);min-height:2.75rem;padding:var(--spacing-space-sm) var(--spacing-space-md);color:var(--color-text-primary);font-family:var(--font-sans);font-size:var(--text-body-md);align-items
+   --- .skip-link:focus{ ---
+   .skip-link:focus{top:var(--spacing-space-sm)}
+   @media(prefers-reduced-motion:reduce){*,:before,:after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
+   }
+
+   === responsividade no CSS emitido ===
+   'min-width:48rem'            -> 2
+   'min-width:64rem'            -> 2
+   min-h-11 (44px): 1
+   ```
+   As duas media queries do build são `48rem` (768px) e `64rem` (1024px) — os
+   dois limites que o `DESIGN.md` §4 nomeia, e nenhum outro.
+7. **Processos encerrados:** depois do smoke, as portas 8080 e 5199 ficaram
+   livres e nenhum processo de `vite preview` ou da API falsa restou:
+   ```text
+   portas 8080 e 5199 livres (preview e fake-api encerrados)
+   0
+   ```
+
+#### Conteúdo Entregue:
+- `frontend/src/styles.css` — o skip link (fora da tela até o teclado pedir)
+  e a regra global de `prefers-reduced-motion`.
+- `frontend/src/app/shell.tsx` — o skip link no topo do shell, o
+  `<main id="conteudo" tabindex="-1">` como alvo e o anel de foco da marca.
+- `frontend/src/app/navigation.tsx` — anel de foco visível nos itens da
+  navegação.
+- `frontend/src/app/pages/home.tsx` — as chamadas de ação viraram links e o
+  `<header>` da home deixou de ser um segundo *banner*.
+- `frontend/src/shared/ui/table.tsx` — anel de foco na região de rolagem.
+- `frontend/src/shared/i18n/language-switcher.tsx` — o `select` passou do
+  anel de sombra para o contorno de foco do design.
+- `frontend/src/features/agenda/ui/installment-table.tsx` — anel de foco no
+  checkbox das parcelas.
+- `frontend/src/features/operations/ui/operation-status.tsx` — a região viva
+  passou a anunciar o estado e não o batimento do polling.
+- `frontend/src/features/portability/ui/submit-operation.tsx` — o painel de
+  sucesso ganhou `role="status"`: o protocolo e o total são anunciados.
+- `frontend/src/test/responsive.test.ts` — a auditoria responsiva, do fonte.
+- `frontend/src/test/accessibility.test.tsx` — a auditoria de acessibilidade,
+  do DOM renderizado.
+
+#### Descobertas e Decisões:
+- **O `sm` do Tailwind não é o mobile do design.** O `DESIGN.md` §4 dá três
+  larguras: abaixo de 768px, de 768px a 1024px e acima de 1024px. O `sm` do
+  Tailwind é 640px — um limite que o design não nomeia. Com ele, o grid de
+  indicadores e o painel da operação quebravam em 640px, uma largura que
+  ninguém desenhou. O `sm` saiu: os dois grids passaram a usar `md`, e o
+  teste do fonte impede o retorno.
+- **Um link que parece botão continua sendo link.** As chamadas de ação da
+  home eram `<button>`: elas não faziam nada, e o teclado esperava uma ação
+  num elemento que só navega. Viraram `<a>` com a mesma superfície — o
+  `buttonClasses` já existia para isso.
+- **Duas bandeiras na mesma página confundem o leitor de tela.** O `<header>`
+  da home era lido como *banner* — o mesmo papel do cabeçalho do shell. Virou
+  um `<div>`: a semântica da home é conteúdo, e o landmark do shell continua
+  único.
+- **A região viva estava falando sem parar.** O painel da operação tinha o
+  batimento do polling ("Consultando a Central…" alternando com "Aguardando a
+  próxima consulta…") dentro de um `aria-live="polite"`: a cada dois segundos
+  o leitor de tela anunciava uma frase que não era informação. A região viva
+  passou a ser o **estado** — que muda quando a operação muda — e o batimento
+  ficou visível e silencioso.
+- **O `prefers-reduced-motion` é uma regra global, não um par de classes.**
+  A transição da navegação (`transition-colors duration-150`) e o
+  `active:scale-[0.98]` do botão continuam no código — para quem não pediu
+  menos movimento. Para quem pediu, a regra da raiz corta a transição, a
+  animação e o `scroll-behavior` de tudo.
+- **O que ainda falta medir: a geometria.** As quatro regras do `DESIGN.md`
+  §4b.2 têm prova estrutural agora (breakpoints, ausência de conteúdo
+  escondido, nome acessível, alvo de 44px, anel de foco) e prova geométrica
+  em breve: o `scrollWidth` real de 390px, a caixa real de cada alvo e o
+  tamanho real de cada texto pedem um navegador, e o navegador chega na task
+  **4.3**, com o Playwright. A task 3.9 entrega a estrutura; a 4.3 entrega a
+  régua.
+
+#### Arquivos Tocados:
+- `frontend/src/styles.css`
+- `frontend/src/app/shell.tsx`
+- `frontend/src/app/navigation.tsx`
+- `frontend/src/app/pages/home.tsx`
+- `frontend/src/shared/ui/table.tsx`
+- `frontend/src/shared/i18n/language-switcher.tsx`
+- `frontend/src/shared/i18n/pt-BR.json`
+- `frontend/src/shared/i18n/en.json`
+- `frontend/src/shared/i18n/es.json`
+- `frontend/src/features/agenda/ui/installment-table.tsx`
+- `frontend/src/features/operations/ui/operation-status.tsx`
+- `frontend/src/features/operations/ui/operation-status.test.tsx`
+- `frontend/src/features/portability/ui/submit-operation.tsx`
+- `frontend/src/test/responsive.test.ts`
+- `frontend/src/test/accessibility.test.tsx`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`

@@ -14,8 +14,8 @@
 | Fase 0 — Fundação | ✅ concluída e arquivada, tag `v0.1.0` |
 | Fase 1 — Central mock | ✅ concluída e arquivada, tag `v0.2.0` |
 | Fase 2 — Backend core | ✅ concluída e arquivada, tag `v0.3.0` |
-| Fase em andamento | Fase 3 — Frontend RSC (9 tasks; task 3.9 em voo) |
-| Próxima task | 3.9 — Responsividade, acessibilidade e testes finais |
+| Fase em andamento | Fase 3 — Frontend RSC (10 tasks; task 3.10 em voo) |
+| Próxima task | 3.10 — Promoção da release `v0.4.0` e arquivamento da Fase 3 |
 | Versão | `v0.3.0` (a Fase 3 fecha em `v0.4.0`) |
 
 A Fase 0 entregou specs, ADRs, harness, gates, contratos, scaffolds, CI/CD e a
@@ -34,10 +34,10 @@ em branch própria e via PR.
 | 0 — Fundação | Specs, contratos, CI/CD, Docker base, scaffolds | 12 | `docs/000-sdd-foundation`, `feat/00x-*` | `v0.1.0` ✅ |
 | 1 — Central mock | Simular a Central com HMAC, idempotência, caos e admin | 7 | `feat/01x-central-mock` | `v0.2.0` ✅ |
 | 2 — Backend core | DDD + hexagonal + ACL + Flyway + i18n + polling + Swagger | 18 | `feat/02x-backend-*` | `v0.3.0` ✅ |
-| 3 — Frontend RSC | React 19 RSC, design Matrix, i18n, fluxo completo | 9 | `feat/03x-frontend-*` | `v0.4.0` |
+| 3 — Frontend RSC | React 19 RSC, design Matrix, i18n, fluxo completo | 10 | `feat/03x-frontend-*` | `v0.4.0` |
 | 4 — Qualidade | Contratos, E2E, k6, Docker full, CD, release, README | 7 | `feat/04x-quality-*` | `v1.0.0` |
 
-Total: **53 tasks**, cada uma com 2–4 arquivos e um commit.
+Total: **54 tasks**, cada uma com 2–4 arquivos e um commit.
 
 ---
 

@@ -100,7 +100,7 @@ export function InstallmentTable({ installments, beneficiaryId }: InstallmentTab
                     <label className='flex min-h-11 min-w-11 items-center justify-center'>
                       <input
                         type='checkbox'
-                        className='size-5 accent-primary'
+                        className='size-5 accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
                         checked={checked}
                         disabled={!open}
                         onChange={() => toggle(installment.installmentId)}

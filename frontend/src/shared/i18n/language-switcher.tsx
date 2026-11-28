@@ -25,7 +25,7 @@ export const LanguageSwitcher = () => {
       <span>{t('language.label')}</span>
       <select
         aria-label={t('language.label')}
-        className='min-h-11 rounded border border-border-subtle bg-surface-raised px-space-sm font-mono text-label-mono uppercase tracking-[0.06em] text-text-primary focus-visible:ring-2 focus-visible:ring-primary'
+        className='min-h-11 rounded border border-border-subtle bg-surface-raised px-space-sm font-mono text-label-mono uppercase tracking-[0.06em] text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
         value={locale}
         onChange={(event) => {
           const next = event.target.value
