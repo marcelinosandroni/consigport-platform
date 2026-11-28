@@ -5387,3 +5387,198 @@
 - `SDD/specs/ROADMAP.md`
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 3.8 — Timeline de auditoria
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/038-frontend-audit-timeline`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** exibir a trilha imutável de eventos — ordem cronológica, tipo,
+  status anterior e novo, detalhe e horário, sem ação de edição ou exclusão.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Portão 3.4 do `GATES.md` (frontend):**
+   ```text
+   $ npm run --prefix frontend lint
+   > eslint .
+   EXIT=0
+
+   $ npm run --prefix frontend typecheck
+   > tsc --noEmit
+   EXIT=0
+
+   $ npm run --prefix frontend test:unit
+   > vitest run
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  27 passed (27)
+         Tests  143 passed (143)
+    Duration  39.48s
+   EXIT=0
+
+   $ npm run --prefix frontend build
+   [5/5] build ssr environment...
+   ✓ 131 modules transformed.
+   dist/ssr/assets/entry.rsc-BDILE0ut.js     80.46 kB
+   dist/ssr/index.js                      1,583.16 kB
+   ✓ built in 2.42s
+   EXIT=0
+   ```
+2. **Portão 3.1 (documentação e SDD):**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 66 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ Exactly 1 task in flight in SDD/specs/PLAN.md.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos passaram.
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css.
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 52 sessions, structure valid.
+   ```
+3. **Testes da task — eventos mistos e formatação de data:**
+   ```text
+   $ npx --prefix frontend vitest run --root frontend src/features/audit
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  2 passed (2)
+         Tests  11 passed (11)
+    Duration  5.04s
+   EXIT=0
+   ```
+   Os casos da timeline (`features/audit/ui/event-timeline.test.tsx`):
+   - `shows every event in chronological order` — três eventos fora de ordem
+     (3, 1, 2) chegam à tela na ordem cronológica (1, 2, 3).
+   - `shows the type, the statuses, the detail and the time of an event` —
+     "Operação rejeitada", o detalhe da Central, "Status anterior: Em
+     andamento", "Novo status: Rejeitada" e "28 de nov. de 2026, 10:00".
+   - `says that the trail starts when there is no previous status` — "Início"
+     no lugar do status anterior nulo.
+   - `shows the answer of the Central when the event carries one` — a resposta
+     crua aparece no `<details>`.
+   - `offers no way to edit or delete an event` — nenhum `button`, nenhum
+     `textbox`, nenhum `link` na trilha.
+   - `formats the time in the language of the reader` — "Nov 28, 2026, 10:00
+     AM" e "Operation created" em inglês.
+   E o Server Component (`features/audit/server/page.test.tsx`): a trilha da
+   operação, a operação sem eventos, a operação inexistente, a falha com o
+   caminho de retry e o `Accept-Language` da pergunta.
+4. **Smoke no build de produção — a trilha renderiza no servidor:**
+   ```text
+   $ npm run --prefix frontend preview -- --host 127.0.0.1 --port 5199
+
+   === /auditoria com a operação ===
+   h1: ['Trilha de eventos']
+   'Operação criada'            -> 4
+   'Operação enviada'           -> 2
+   'Tentativa de consulta'      -> 2
+   'Operação confirmada'        -> 2
+   'Operação concluída'         -> 2
+   'Status anterior'            -> 10
+   'Novo status'                -> 10
+   '28 de nov. de 2026, 10:00'  -> 10
+   'Resposta da Central'        -> 4
+   itens da lista: 8
+   botões: 0
+
+   === /auditoria sem a operação ===
+   h1: ['Trilha de eventos']
+   mensagem: ['Informe a operação para ver a trilha de auditoria.']
+
+   === /auditoria com operação inexistente ===
+   mensagem: ['A operação não existe.']
+
+   === /auditoria (en) ===
+   h1: ['Event trail']
+   'Operation created'      -> 2
+   'Status query'           -> 2
+   'Operation completed'    -> 2
+   'Previous status'        -> 10
+   'Central answer'         -> 4
+
+   === /auditoria (es) ===
+   h1: ['Traza de eventos']
+   'Operación creada'           -> 2
+   'Consulta de estado'         -> 2
+   'Operación completada'       -> 2
+   'Respuesta de la Central'    -> 4
+
+   === link do painel para a trilha ===
+   [('/auditoria?operationId=c1a2b3c4-d5e6-4f70-8a91-b2c3d4e5f601', 'Ver a trilha de auditoria')]
+
+   === fake-api.log ===
+   [fake-api] GET /api/v1/portability-operations/c1a2b3c4-d5e6-4f70-8a91-b2c3d4e5f601/events accept-language=pt-BR
+   [fake-api] GET /api/v1/portability-operations/OPERATION-UNKNOWN/events accept-language=pt-BR
+   [fake-api] GET /api/v1/portability-operations/c1a2b3c4-d5e6-4f70-8a91-b2c3d4e5f601/events accept-language=en
+   [fake-api] GET /api/v1/portability-operations/c1a2b3c4-d5e6-4f70-8a91-b2c3d4e5f601/events accept-language=es
+   ```
+5. **Processos encerrados:** depois do smoke, as portas 8080 e 5199 ficaram
+   livres e nenhum processo de `vite preview` ou da API falsa restou:
+   ```text
+   portas 8080 e 5199 livres (preview e fake-api encerrados)
+   0
+   ```
+
+#### Conteúdo Entregue:
+- `frontend/src/features/audit/server/page.tsx` — o Server Component: a trilha
+  lida no render, os estados de operação inexistente e de falha.
+- `frontend/src/features/audit/ui/event-timeline.tsx` — a lista ordenada pelo
+  instante e pelo identificador sequencial.
+- `frontend/src/features/audit/ui/event-item.tsx` — o evento: tipo, status
+  anterior, novo status, detalhe, hora e a resposta crua da Central.
+- `frontend/src/shared/format/status.ts` — o vocabulário do status: o tom e a
+  chave de catálogo de cada estado, agora juntos.
+- `frontend/src/features/operations/ui/operation-status.tsx` — o caminho do
+  painel para a trilha da operação.
+- `frontend/src/app/router.tsx` — a rota `/auditoria` lê a operação da URL.
+- `frontend/src/app/pages/section.tsx` — removido: era o placeholder de uma
+  feature que agora existe.
+- `frontend/src/shared/i18n/pt-BR.json`, `en.json`, `es.json` — a seção
+  `audit` completada (os oito tipos de evento e os estados).
+- `frontend/src/test/mocks/handlers.ts` — a API falsa responde à trilha.
+
+#### Descobertas e Decisões:
+- **A trilha é lida no servidor, não na ilha.** Não há interação: a timeline é
+  uma lista de fatos, e cada fato já está escrito. Um Server Component que lê
+  no render entrega a página pronta, funciona sem JavaScript e não gasta
+  polling com uma auditoria que só muda quando a operação muda de estado.
+- **A ordem não vem do array.** A API promete a ordem cronológica, mas a
+  timeline ordena pelo instante e, no empate, pelo `eventId` — o identificador
+  sequencial do evento. A ordem da tela passa a ser uma propriedade da tela,
+  não uma confiança na resposta.
+- **"Sem edição nem exclusão" é uma afirmação verificável.** O teste da
+  timeline afirma que não existe um único `button`, `textbox` ou `link` na
+  trilha: a ausência de ação não é uma intenção, é uma asserção.
+- **A resposta crua da Central fica escondida, não fora.** O `details` do
+  evento é o texto legível; o `rawPayload` é o que a Central respondeu de
+  verdade — é onde mora o motivo de uma rejeição fora do contrato
+  (`UNMAPPED_REJECTION`, ADR-0003). Um `<details>` nativo mostra um e esconde
+  o outro sem uma linha de JavaScript.
+- **O vocabulário do status ficou num lugar só.** O tom já vivia em
+  `shared/format/status.ts`; a chave de catálogo agora mora ao lado dele. O
+  painel da 3.7 e a trilha da 3.8 falam do mesmo estado com a mesma palavra —
+  "PENDING" é "Em andamento" nos dois lugares, e "REJECTED" é "Rejeitada".
+- **O placeholder saiu.** `SectionPage` existia para as seções da navegação
+  cuja feature ainda não tinha chegado. Com a `/auditoria` real, ele ficou sem
+  leitores: código morto sai junto com a task que o criou.
+
+#### Arquivos Tocados:
+- `frontend/src/features/audit/server/page.tsx`
+- `frontend/src/features/audit/server/page.test.tsx`
+- `frontend/src/features/audit/ui/event-timeline.tsx`
+- `frontend/src/features/audit/ui/event-timeline.test.tsx`
+- `frontend/src/features/audit/ui/event-item.tsx`
+- `frontend/src/shared/format/status.ts`
+- `frontend/src/features/operations/ui/operation-status.tsx`
+- `frontend/src/features/operations/ui/operation-status.test.tsx`
+- `frontend/src/app/router.tsx`
+- `frontend/src/app/router.test.tsx`
+- `frontend/src/app/pages/section.tsx` (removido)
+- `frontend/src/shared/i18n/pt-BR.json`
+- `frontend/src/shared/i18n/en.json`
+- `frontend/src/shared/i18n/es.json`
+- `frontend/src/test/mocks/handlers.ts`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`

@@ -658,6 +658,42 @@
 - **Arquivos:** `frontend/src/features/audit/server/page.tsx`, `ui/event-timeline.tsx`, `ui/event-item.tsx`.
 - **Aceite:** ordem cronológica; tipo, status anterior e novo, detalhe e horário; sem ação de edição ou exclusão.
 - **Verificação:** teste de componente com eventos mistos e formatação de data.
+- **Realizado:** a trilha de auditoria da operação, lida no servidor e mostrada
+  como uma lista de fatos. O **Server Component**
+  (`features/audit/server/page.tsx`) pergunta o
+  `GET /api/v1/portability-operations/{operationId}/events` **durante o render**,
+  com o `Accept-Language` da cookie; o navegador nunca busca a trilha. A
+  **timeline** (`features/audit/ui/event-timeline.tsx`) ordena os eventos pelo
+  instante e, no empate, pelo identificador sequencial — a ordem da tela nunca
+  depende da ordem do array — e entrega cada evento ao **item**
+  (`features/audit/ui/event-item.tsx`), que mostra o **tipo**, o **status
+  anterior**, o **novo status**, o **detalhe** e a **hora**. O evento traz
+  também a resposta crua da Central quando existe, num `<details>` nativo:
+  nenhuma biblioteca, nenhum JavaScript, e o pasto continua legível. A trilha
+  é **append-only** e a tela não oferece botão nenhum — nem editar, nem
+  excluir: o teste afirma que não existe um único `button`, `textbox` ou
+  `link` na trilha. O **vocabulário do status** subiu para
+  `shared/format/status.ts`: o tom e a chave de catálogo de cada estado
+  passaram a morar juntos, e o painel da 3.7 usa a mesma tabela — assim a
+  operação e a sua trilha falam do mesmo estado com a mesma palavra. O
+  **placeholder** `SectionPage` saiu do código: era a página de espera de uma
+  feature que agora existe, e a rota `/auditoria` lê a operação da URL.
+  Arquivos reais:
+  `frontend/src/features/audit/server/page.tsx`,
+  `frontend/src/features/audit/server/page.test.tsx`,
+  `frontend/src/features/audit/ui/event-timeline.tsx`,
+  `frontend/src/features/audit/ui/event-timeline.test.tsx`,
+  `frontend/src/features/audit/ui/event-item.tsx`,
+  `frontend/src/shared/format/status.ts`,
+  `frontend/src/features/operations/ui/operation-status.tsx`,
+  `frontend/src/features/operations/ui/operation-status.test.tsx`,
+  `frontend/src/app/router.tsx`,
+  `frontend/src/app/router.test.tsx`,
+  `frontend/src/app/pages/section.tsx` (removido),
+  `frontend/src/shared/i18n/pt-BR.json`,
+  `frontend/src/shared/i18n/en.json`,
+  `frontend/src/shared/i18n/es.json`,
+  `frontend/src/test/mocks/handlers.ts`.
 
 ### 3.9 — Responsividade, acessibilidade e testes finais
 - **Objetivo:** fechar a experiência em mobile e teclado.

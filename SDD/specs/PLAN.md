@@ -141,7 +141,7 @@
 ## Fase atual: 3 — Frontend RSC
 
 > Objetivo: UI React 19 RSC na porta `5173`, design Matrix, i18n e fluxo completo.
-> Task em voo: **3.8 — Timeline de auditoria**.
+> Task em voo: **3.9 — Responsividade, acessibilidade e testes finais**.
 
 ### Tasks
 
@@ -165,9 +165,12 @@
 - [x] **3.7 — Painel de status com polling**
       TanStack Query com intervalo de 2 s; para em estado terminal; `nextPollAt`
       respeitado; sem ISR.
-- [-] **3.8 — Timeline de auditoria**
+- [x] **3.8 — Timeline de auditoria**
       Trilha imutável em ordem cronológica: tipo, status anterior e novo, detalhe
       e horário; sem edição nem exclusão.
+- [-] **3.9 — Responsividade, acessibilidade e testes finais**
+      Breakpoints do `DESIGN.md` §4b; navegação por teclado;
+      `prefers-reduced-motion` respeitado; testes de unidade verdes.
 
 ### Como usar este arquivo
 

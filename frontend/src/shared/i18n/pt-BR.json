@@ -142,7 +142,8 @@
     "terminal": "Operação encerrada.",
     "waiting": "Aguardando a próxima consulta…",
     "loading": "Carregando a operação…",
-    "unavailable": "A operação não pôde ser consultada."
+    "unavailable": "A operação não pôde ser consultada.",
+    "audit": "Ver a trilha de auditoria"
   },
   "audit": {
     "eyebrow": "Auditoria",
@@ -153,7 +154,24 @@
     "previousStatus": "Status anterior",
     "newStatus": "Novo status",
     "details": "Detalhe",
-    "createdAt": "Quando"
+    "createdAt": "Quando",
+    "stateEmpty": "Trilha",
+    "stateUnknown": "Operação",
+    "stateError": "Consulta",
+    "missingOperation": "Informe a operação para ver a trilha de auditoria.",
+    "create": "Solicitar portabilidade",
+    "noPreviousStatus": "Início",
+    "rawPayload": "Resposta da Central",
+    "eventTypes": {
+      "OPERATION_CREATED": "Operação criada",
+      "OPERATION_SUBMITTED": "Operação enviada",
+      "POLL_ATTEMPT": "Tentativa de consulta",
+      "OPERATION_CONFIRMED": "Operação confirmada",
+      "OPERATION_REJECTED": "Operação rejeitada",
+      "ACCOUNT_UPDATED": "Conta atualizada",
+      "OPERATION_COMPLETED": "Operação concluída",
+      "INTEGRATION_FAILED": "Falha de integração"
+    }
   },
   "errors": {
     "VALIDATION_ERROR": "Os dados enviados não passaram na validação.",
