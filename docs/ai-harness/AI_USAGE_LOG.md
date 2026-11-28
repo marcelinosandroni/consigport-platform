@@ -2172,3 +2172,60 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
 7. **A medição da latência:** a primeira requisição de uma stack leva 7,4 s
    (a JVM aquece) e a primeira criação de operação 1,0 s. O `request-timeout`
    do portão é de 30 s por causa disso.
+
+## Sessão #59 — Task 4.3 (E2E com Playwright no CI)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/043-quality-playwright-e2e`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** provar o fluxo completo no navegador — a interface real, o backend
+  real, o PostgreSQL real e a Central simulada — dentro do CI, com relatório
+  publicado.
+
+### Atividades Realizadas:
+1. **O estado do portão:** o job `e2e` do CI instalava o navegador e rodava a
+   suíte sem API, sem Central e sem banco; o job `e2e-full` do nightly repetia o
+   mesmo erro. A suíte não existia, e mesmo que existisse os dois jobs
+   reprovariam por falta de stack.
+2. **A suíte** (`frontend/e2e/`): cinco provas em três arquivos, com os passos
+   compartilhados em `frontend/e2e/support/journey.ts`. As provas leem os rótulos
+   que o leitor lê e clicam nos botões que a tela oferece — nada sabe de classe
+   de CSS. Os cenários são o consentimento, a agenda sem consentimento, o caminho
+   feliz (com a trilha de auditoria), a idempotência e a rejeição da Central.
+3. **A configuração** (`frontend/playwright.config.ts`): o build de produção
+   servido por `vite preview` — o mesmo artefato que o contêiner publica —, um
+   worker só (a Central simulada guarda o estado da operação em memória), 120 s
+   de timeout para a JVM fria e os artefatos de falha (trace, captura, vídeo).
+4. **O primeiro defeito: o CORS que faltava.** O navegador da interface pergunta
+   a API diretamente ao acompanhar a operação; a API não respondia com
+   `Access-Control-Allow-Origin` e o navegador bloqueava a resposta. A
+   `ARCHITECTURE.md` §13 já exigia o CORS restrito ao front de desenvolvimento — a
+   exigência existia no papel. A allowlist entrou no backend, com
+   `cors.allowed-origins` por cima, e o preflight foi medido: 200 com os headers
+   para a origem permitida, 403 `Invalid CORS request` para a outra.
+5. **O segundo defeito: o circuito contava recusa como falha.** Cinco consultas
+   de agenda de um beneficiário sem consentimento abriam o circuito por dez
+   segundos; nesse tempo a agenda de quem tinha consentimento respondia `503`.
+   A Central respondia: recusando. O 403 e o 404 passaram a contar como resposta,
+   e um teste novo prova que seis recusas seguidas não abrem o circuito.
+6. **O terceiro defeito: a troca de payload perdia a tela.** A agenda era buscada,
+   a resposta chegava com 200, o endereço mudava — e a tela continuava no
+   formulário. A troca dentro de uma transição (`startTransition`) reagindo a um
+   efeito do React é descartada. A correção é a troca urgente do payload, com o
+   motivo escrito no código; cinco execuções seguidas fecharam com as cinco
+   provas verdes.
+7. **O ambiente da suíte:** o tempo de leitura da Central (3 s, `ARCHITECTURE.md`
+   §11) é curto quando o navegador e as duas JVMs disputam o mesmo runner de 2
+   vCPUs — a chamada morria por tempo esgotado. O limite da aplicação não muda;
+   o ambiente da suíte dá 20 s por `CENTRAL_TIMEOUT_READ`.
+8. **O CI e o nightly:** os dois jobs sobem a stack real (PostgreSQL 16, Central
+   simulada e backend compilados pelo próprio workflow), esperam as sondas de
+   saúde, aquecem as duas JVMs, rodam a suíte e publicam o relatório HTML, os
+   traces, as capturas e os vídeos. O job do nightly, que rodava a suíte sem API,
+   recebe a mesma stack.
+9. **A navegação fora do trabalho do React:** a mudança de endereço passou a sair
+   em uma microtarefa (`frontend/src/framework/navigation.ts`), porque uma
+   navegação agendada de dentro de um efeito se embaraça com o render que o React
+   está terminando.

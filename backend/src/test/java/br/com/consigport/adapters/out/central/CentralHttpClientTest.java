@@ -255,8 +255,53 @@ class CentralHttpClientTest {
   }
 
   @Test
-  void answersCentralUnavailableWhenTheAgendaCannotBeRead() {
-    server
+  void doesNotOpenTheCircuitWhenTheBeneficiaryHasNoConsent() {
+    CircuitBreaker shortCircuit =
+        new CircuitBreaker(
+            2,
+            0.5,
+            Duration.ofSeconds(10),
+            3,
+            Clock.fixed(Instant.ofEpochSecond(TIMESTAMP), ZoneOffset.UTC));
+    RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
+    server = MockRestServiceServer.bindTo(builder).build();
+    CentralHttpClient protectedClient =
+        new CentralHttpClient(
+            builder.build(),
+            new HmacSigner(SECRET),
+            new PortabilityAcl(),
+            new CentralAcl(),
+            Clock.fixed(Instant.ofEpochSecond(TIMESTAMP), ZoneOffset.UTC),
+            new CentralProperties(
+                BASE_URL,
+                SECRET,
+                3,
+                Duration.ZERO,
+                Duration.ofSeconds(2),
+                Duration.ofSeconds(3),
+                Duration.ofSeconds(2)),
+            shortCircuit);
+    for (int attempt = 0; attempt < 6; attempt++) {
+      server
+          .expect(requestTo(BASE_URL + "/beneficiarios/BEN-001/agenda"))
+          .andRespond(
+              withStatus(HttpStatus.FORBIDDEN)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .body("{\"codigo\":\"SEM_AUTORIZACAO\",\"mensagem\":\"Sem autorização.\"}"));
+    }
+
+    // The Central answered every time: it is available, so the circuit never opens.
+    for (int attempt = 0; attempt < 6; attempt++) {
+      assertThatThrownBy(() -> protectedClient.findAgenda(new BeneficiaryId("BEN-001")))
+          .isInstanceOf(DomainError.AuthorizationRequired.class);
+    }
+
+    assertThat(shortCircuit.isOpen()).isFalse();
+    server.verify();
+  }
+
+  @Test
+  void answersCentralUnavailableWhenTheAgendaCannotBeRead() {    server
         .expect(requestTo(BASE_URL + "/beneficiarios/BEN-001/agenda"))
         .andRespond(
             withStatus(HttpStatus.OK)

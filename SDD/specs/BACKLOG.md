@@ -869,11 +869,47 @@
     contrato não declara. O portão de hoje usa as fases `examples` e `coverage`,
     que medem o contrato.
 
-### 4.3 — E2E com Playwright no CI
+### 4.3 — E2E com Playwright no CI — Realizado
 - **Objetivo:** provar o fluxo completo no navegador.
-- **Arquivos:** `frontend/e2e/authorization.spec.ts`, `frontend/e2e/portability.spec.ts`, `frontend/e2e/rejection.spec.ts`, `frontend/playwright.config.ts`.
+- **Arquivos:** `.github/workflows/ci.yml`,
+  `backend/src/main/java/br/com/consigport/config/CorsConfig.java`,
+  `backend/src/main/java/br/com/consigport/adapters/out/central/CentralHttpClient.java`,
+  `backend/src/main/resources/application.yml`,
+  `backend/src/test/java/br/com/consigport/adapters/out/central/CentralHttpClientTest.java`,
+  `frontend/e2e/authorization.spec.ts`, `frontend/e2e/portability.spec.ts`,
+  `frontend/e2e/rejection.spec.ts`, `frontend/e2e/support/journey.ts`,
+  `frontend/playwright.config.ts`, `frontend/package.json`,
+  `frontend/package-lock.json`, `frontend/tsconfig.json`,
+  `frontend/src/features/authorization/ui/authorization-form.tsx`,
+  `frontend/src/framework/entry.browser.tsx`, `frontend/src/framework/navigation.ts`,
+  `docs/quality/GATES.md`, `SDD/specs/PLAN.md`, `SDD/specs/ROADMAP.md`,
+  `SDD/specs/BACKLOG.md`, `SDD/docs/EVIDENCE.md`, `docs/ai-harness/AI_USAGE_LOG.md`.
 - **Aceite:** três cenários cobrindo caminho feliz, rejeição e idempotência; execução contra build de produção e compose; artefatos de trace e vídeo.
 - **Verificação:** job `e2e` verde no GitHub Actions com relatório HTML.
+- **Realizado:** a suíte tem cinco testes em três arquivos e roda contra o build de
+  produção servido por `vite preview` — o mesmo artefato que o contêiner publica.
+  O job `e2e` do CI sobe a stack real (PostgreSQL 16, Central simulada e backend),
+  espera as sondas de saúde, aquece as duas JVMs, roda a suíte e publica o
+  relatório HTML, os traces, as capturas e os vídeos. Os testes leem os rótulos que
+  o leitor lê e clicam nos botões que a tela oferece: nada sabe de classe de CSS.
+  A suíte encontrou dois defeitos reais, corrigidos aqui: a API não respondia ao
+  navegador da interface (faltava o CORS que a `ARCHITECTURE.md` §13 exige) e o
+  circuit breaker contava a recusa legítima da Central como falha, abrindo o
+  circuito por dez segundos e derrubando a agenda de quem tinha consentimento.
+- **Dívidas da Fase 4 (E2E):**
+  - **A troca de payload da navegação perdia a tela.** A agenda era buscada, a
+    resposta chegava e o endereço mudava, mas o React descartava a troca do
+    payload: a URL apontava para a agenda e a tela continuava no formulário.
+    A causa é a troca estar dentro de uma transição (`startTransition`) reagindo
+    a um efeito do React — uma transição desse tipo é descartada. A correção é
+    a troca urgente do payload, com o motivo escrito no próprio código.
+  - **O tempo de leitura da Central (3 s) é curto para o ambiente da suíte.** O
+    limite vem da `ARCHITECTURE.md` §11 e continua valendo para a aplicação; o
+    ambiente da suíte (navegador e duas JVMs no mesmo runner) dá 20 s ao backend
+    por `CENTRAL_TIMEOUT_READ`. É ajuste de ambiente, não de contrato.
+  - **A suíte cobre cinco cenários, não a tela de listagem.** Não existe tela de
+    listagem de operações na interface — a trilha e o painel são por operação —
+    e as operações pendentes e concluídas já são provadas pelo caminho feliz.
 
 ### 4.4 — Performance com k6
 - **Objetivo:** medir o fluxo sob carga com limites explícitos.

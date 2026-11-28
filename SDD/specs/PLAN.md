@@ -183,7 +183,7 @@
 
 > Objetivo: provar o sistema no CI/CD — contratos, E2E no navegador, performance,
 > segurança, entrega contínua e a vitrine do repositório.
-> Task em voo: **4.3 — E2E com Playwright no CI**.
+> Task em voo: **4.4 — Performance com k6**.
 
 ### Tasks
 
@@ -193,8 +193,11 @@
 - [x] **4.2 — Testes de propriedade com Schemathesis**
       Schemathesis roda contra o compose; qualquer resposta fora do contrato falha o
       job; relatório anexado.
-- [-] **4.3 — E2E com Playwright no CI**
+- [x] **4.3 — E2E com Playwright no CI**
       Suíte E2E no navegador contra a stack completa; relatório publicado.
+- [-] **4.4 — Performance com k6**
+      Smoke com 5 VUs no PR e load com 50 VUs no nightly e no release; thresholds
+      `http_req_failed < 1%` e `p95 < 800 ms`; resumo HTML publicado.
 
 ### Como usar este arquivo
 

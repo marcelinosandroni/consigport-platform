@@ -4,6 +4,7 @@ import { useActionState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { registerAuthorization, type AuthorizationState } from '../actions.ts'
+import { navigate } from '../../../framework/navigation.ts'
 import { useLocale } from '../../../shared/i18n/provider.tsx'
 import { Button } from '../../../shared/ui/button.tsx'
 import { TextField } from '../../../shared/ui/field.tsx'
@@ -28,7 +29,7 @@ export function AuthorizationForm() {
   useEffect(() => {
     if (state.status === 'success' && state.beneficiaryId !== undefined) {
       const target = `/agenda?beneficiaryId=${encodeURIComponent(state.beneficiaryId)}`
-      window.history.pushState(null, '', target)
+      navigate(target)
     }
   }, [state])
 

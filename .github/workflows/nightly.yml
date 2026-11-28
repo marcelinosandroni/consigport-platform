@@ -94,6 +94,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
@@ -110,6 +117,55 @@ jobs:
       - name: Install the browsers
         run: npm exec --prefix frontend -- playwright install --with-deps chromium
 
+      # The suite drives the interface against the running stack: the API, the
+      # Central and the PostgreSQL are the ones the nightly builds.
+      - name: Start PostgreSQL 16
+        run: docker compose up -d --wait postgres
+
+      - name: Build the jars
+        run: ./mvnw -B -DskipTests package
+
+      - name: Boot the mock and the backend
+        run: |
+          nohup java -jar central-convenios-mock/target/central-convenios-mock-0.1.0-SNAPSHOT.jar \
+            --server.port=8081 > mock.log 2>&1 &
+          mock_pid=$!
+          nohup env CENTRAL_TIMEOUT_READ=20s \
+            java -jar backend/target/consigport-backend-0.1.0-SNAPSHOT.jar \
+            --server.port=8080 > backend.log 2>&1 &
+          backend_pid=$!
+          echo "mock_pid=${mock_pid}" >> "$GITHUB_ENV"
+          echo "backend_pid=${backend_pid}" >> "$GITHUB_ENV"
+
+      - name: Wait for the health probes
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://localhost:8081/actuator/health > mock-health.json \
+              && curl -fsS http://localhost:8080/actuator/health > backend-health.json; then
+              cat mock-health.json backend-health.json
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "the stack did not become healthy" >&2
+          tail -n 100 mock.log backend.log >&2 || true
+          exit 1
+
+      - name: Warm up the stack
+        run: |
+          for attempt in $(seq 1 15); do
+            if curl -sSf --max-time 180 -X POST http://localhost:8080/api/v1/authorizations \
+              -H 'Content-Type: application/json' \
+              -d '{"beneficiaryId":"BEN-001","agreementId":"AGR-001"}' > /dev/null; then
+              echo "the stack answered after ${attempt} attempts"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "the stack did not answer the first call" >&2
+          tail -n 100 mock.log backend.log >&2 || true
+          exit 1
+
       - name: Run the end-to-end suite
         run: npm run --prefix frontend test:e2e
 
@@ -120,6 +176,22 @@ jobs:
           name: nightly-playwright-report
           path: frontend/playwright-report
           if-no-files-found: ignore
+
+      - name: Upload the traces, the screenshots and the videos
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-playwright-traces
+          path: frontend/test-results
+          if-no-files-found: ignore
+
+      - name: Stop the services
+        if: always()
+        run: kill "${{ env.mock_pid }}" "${{ env.backend_pid }}" || true
+
+      - name: Stop PostgreSQL 16
+        if: always()
+        run: docker compose down -v
 
   k6-load:
     name: Performance — sustained load
