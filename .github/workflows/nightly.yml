@@ -79,17 +79,10 @@ jobs:
           oasdiff --version
 
       - name: Compare the contracts with main
-        run: |
-          if git cat-file -e origin/main:contracts/consigport-api.yaml 2>/dev/null; then
-            git show origin/main:contracts/consigport-api.yaml > "$RUNNER_TEMP/main-consigport-api.yaml"
-            git show origin/main:contracts/central-api.yaml > "$RUNNER_TEMP/main-central-api.yaml"
-            oasdiff breaking "$RUNNER_TEMP/main-consigport-api.yaml" \
-              contracts/consigport-api.yaml --fail-on ERR
-            oasdiff breaking "$RUNNER_TEMP/main-central-api.yaml" \
-              contracts/central-api.yaml --fail-on ERR
-          else
-            echo "::notice::main has no contract yet; nothing to compare."
-          fi
+        run: node scripts/check-contract-drift.mjs --base main
+
+      - name: Prove that the contract gate is armed
+        run: node scripts/check-contract-drift.mjs --self-test
 
   e2e-full:
     name: E2E — full suite

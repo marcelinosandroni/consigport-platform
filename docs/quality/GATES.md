@@ -28,7 +28,7 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
 | **Backend Unit & Arch** | JUnit 5 + AssertJ + ArchUnit | `backend` | ✅ | ✅ | — |
 | **Backend Integration** | Testcontainers (PostgreSQL 16) + JaCoCo | `backend` | ✅ | ✅ | — |
 | **Mock Unit** | JUnit 5 da Central simulada | `mock` | ✅ | ✅ | — |
-| **Contratos OpenAPI** | Spectral + HMAC + oasdiff (breaking change) | `contracts` | ✅ | ✅ | ✅ (contra `main`) |
+| **Contratos OpenAPI** | Spectral + HMAC + oasdiff (breaking change contra `main`) + documento publicado | `contracts` e `smoke` | ✅ | ✅ | ✅ (contra `main`) |
 | **Frontend Checks** | ESLint + TypeScript (`tsc`) + Vitest + Build | `frontend` | ✅ | ✅ | — |
 | **Docker Compose** | Validação sintática e compose config | `compose` | ✅ | ✅ | — |
 | **Stack Smoke** | Backend e mock contra PostgreSQL 16 | `smoke` | ❌ | ✅ | — |
@@ -95,17 +95,42 @@ O ConsigPort adota uma política rigorosa de **Portões de Qualidade** para asse
 - **Workflow:** [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml), job `contracts` (e `contract-drift` no nightly, comparando com `main`).
 - **Comandos:**
   ```bash
-  npx --yes @stoplight/spectral-cli@6 lint contracts/*.yaml --fail-severity=warn
+  npx --yes @stoplight/spectral-cli@6 lint contracts/consigport-api.yaml contracts/central-api.yaml --fail-severity=warn
   node scripts/hmac-vector.mjs
-  oasdiff breaking <contrato da branch base> contracts/consigport-api.yaml --fail-on ERR
-  oasdiff breaking <contrato da branch base> contracts/central-api.yaml --fail-on ERR
+  node scripts/check-contract-drift.mjs --base main
+  node scripts/check-contract-drift.mjs --self-test
+  node scripts/check-contract-drift.mjs --document tests/contracts/springdoc-consigport.json
   ```
+  E, no job `smoke`, com o backend em execução:
+  ```bash
+  node scripts/check-contract-drift.mjs \
+    --live http://localhost:8080/v3/api-docs \
+    --snapshot tests/contracts/springdoc-consigport.json
+  ```
+- **O que o script [`check-contract-drift.mjs`](../../scripts/check-contract-drift.mjs) faz:**
+  - `--base <ref>`: extrai o contrato da ref (`main`, por padrão) e roda
+    `oasdiff breaking <baseline> <contrato> --fail-on ERR` nos dois contratos.
+  - `--self-test`: prova que o portão está armado — o par de fixtures com a resposta
+    removida **tem** de falhar, e o fixture comparado com ele mesmo **tem** de passar.
+    Um portão que nunca falha não é portão.
+  - `--document <path>`: compara o documento OpenAPI armazenado com o contrato
+    versionado (rotas, métodos, `operationId`, parâmetros, corpo da requisição e
+    status das respostas).
+  - `--live <url>`: compara o documento publicado pelo backend em execução com o
+    contrato versionado e com o snapshot armazenado.
 - **Critérios de Aceite:**
   - Contratos `contracts/consigport-api.yaml` e `contracts/central-api.yaml` válidos e sem erros no linter Spectral.
-  - Ausência de breaking changes em relação ao contrato da branch base; a primeira introdução
+  - Ausência de breaking changes em relação ao contrato de `main`; a primeira introdução
     do contrato é aceita e o diff é pulado com aviso no log do workflow (`oasdiff`).
   - Coerência estrita entre endpoints expostos pelo Springdoc (`/v3/api-docs`) e o contrato versionado.
+  - O portão armado: as fixtures da task 4.1 provam que uma resposta removida falha a comparação.
   - Vetor de assinatura HMAC validado deterministicamente contra `contracts/hmac-vector.json`.
+- **Por que a comparação do documento publicado é estrutural:** o `oasdiff` acusa
+  diferenças de representação — `format: uuid` que o springdoc não publica,
+  `minimum` e `maxLength` dos limites que só o contrato declara — e não de contrato.
+  O que importa para quem consome a API é a superfície: as rotas, os métodos, o
+  `operationId`, os parâmetros, o corpo da requisição e os status das respostas.
+  Essa é a mesma comparação do `ContractComparator` do backend, portada para Node.
 
 ---
 

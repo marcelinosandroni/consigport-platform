@@ -5977,3 +5977,198 @@
 - `SDD/specs/BACKLOG.md`
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 4.1 — Gates de contrato
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/041-quality-contract-gates`
+- **PR:** #70 (a abrir para develop)
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** impedir drift e quebra de compatibilidade — o job `contracts` passa a
+  comparar o contrato com a versão de `main`, a provar que o portão está armado e a
+  comparar o documento publicado pelo springdoc com o contrato versionado.
+
+#### Comandos de Verificação e Saídas:
+
+1. **O portão completo, localmente:**
+   ```text
+   $ node scripts/check-contract-drift.mjs
+   ✓ contracts/consigport-api.yaml: no breaking change against main
+   ✓ contracts/central-api.yaml: no breaking change against main
+   ✓ the gate is armed: the fixture with the removed answer fails the comparison
+   ✓ the gate is quiet: the fixture compared with itself passes
+   ✓ tests/contracts/springdoc-consigport.json honours contracts/consigport-api.yaml
+   ✓ Contract drift: every check passed.
+   exit: 0
+   ```
+2. **O lint do contrato, com as regras reforçadas do `.spectral.yaml`:**
+   ```text
+   $ npx --yes @stoplight/spectral-cli@6 lint contracts/consigport-api.yaml contracts/central-api.yaml --fail-severity=warn
+   No results with a severity of 'warn' or higher found!
+   exit: 0
+   ```
+3. **O vetor HMAC (gate que já existia, sem alteração):**
+   ```text
+   $ node scripts/hmac-vector.mjs
+   ✓ HMAC vector: 3 vectors reproduced with HMAC-SHA256.
+   exit: 0
+   ```
+4. **O documento publicado pelo backend em execução (PostgreSQL 16 real, Central
+   fake), comparado com o contrato e com o snapshot armazenado:**
+   ```text
+   $ node scripts/check-contract-drift.mjs --live http://localhost:8080/v3/api-docs --snapshot tests/contracts/springdoc-consigport.json
+   ✓ http://localhost:8080/v3/api-docs honours contracts/consigport-api.yaml
+   ✓ http://localhost:8080/v3/api-docs honours tests/contracts/springdoc-consigport.json
+   ✓ Contract drift: every check passed.
+   exit: 0
+   ```
+5. **Prova vermelha 1 — o breaking change proposital (a resposta `202` de
+   `POST /api/v1/portability-operations` removida do contrato, como faria um PR
+   que quebrasse a compatibilidade):**
+   ```text
+   $ node scripts/check-contract-drift.mjs --base main
+   ✗ contracts/consigport-api.yaml: breaking change against main
+   1 changes: 1 error, 0 warning, 0 info
+   error	[response-success-status-removed] at /tmp/consigport-contract-w02hUw/consigport-api.yaml
+   	in API POST /api/v1/portability-operations
+   		removed the success response with the status `202`
+   ✓ contracts/central-api.yaml: no breaking change against main
+   ✗ Contract drift: 1 check(s) failed.
+   exit: 1
+   ```
+6. **Prova vermelha 2 — o drift entre o contrato e o snapshot publicado (o mesmo
+   contrato quebrado, agora pela comparação de documentos):**
+   ```text
+   $ node scripts/check-contract-drift.mjs --document tests/contracts/springdoc-consigport.json
+   ✗ tests/contracts/springdoc-consigport.json does not honour contracts/consigport-api.yaml
+     - POST /api/v1/portability-operations: the published document answers 202, and the contract does not
+   ✗ Contract drift: 1 check(s) failed.
+   exit: 1
+   ```
+7. **O contrato restaurado depois das provas:**
+   ```text
+   $ git status --short contracts/
+   $ node scripts/check-contract-drift.mjs --base main --document tests/contracts/springdoc-consigport.json
+   ✓ contracts/consigport-api.yaml: no breaking change against main
+   ✓ contracts/central-api.yaml: no breaking change against main
+   ✓ tests/contracts/springdoc-consigport.json honours contracts/consigport-api.yaml
+   ✓ Contract drift: every check passed.
+   exit: 0
+   ```
+8. **Os portões de documentação e especificação:**
+   ```text
+   $ node SDD/SKILLS/check-docs/check-docs.mjs .
+   ✓ 67 documents, every relative link resolves.
+   $ node scripts/check-specs.mjs
+     - Required core documents and ADRs present.
+     - Exactly 1 task in flight in SDD/specs/PLAN.md.
+     - Tasks in PLAN.md are cataloged in BACKLOG.md.
+   $ node scripts/check-architecture.mjs
+   🎉 Todos os 22 testes de validação dos desenhos passaram com sucesso!
+   $ node scripts/check-theme-tokens.mjs
+   ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css (line endings normalized).
+   $ node scripts/check-ai-log.mjs
+   ✓ AI usage log: 56 sessions, structure valid.
+   ```
+9. **Os workflows, com o YAML validado:**
+   ```text
+   $ npx --yes js-yaml@4.1.0 .github/workflows/ci.yml > /dev/null
+   .github/workflows/ci.yml: YAML válido
+   .github/workflows/nightly.yml: YAML válido
+   .spectral.yaml: YAML válido
+   $ npx --yes js-yaml@4.1.0 .github/workflows/ci.yml | node -e "..."
+   detect → Detect the suites available in this commit
+   docs → Docs, Specs, Architecture and AI Log
+   backend → Backend — build, unit tests and coverage report
+   mock → Central Mock — build and unit tests
+   frontend → Frontend — lint, typecheck, unit tests and build
+   contracts → Contracts — Spectral, HMAC vector and breaking changes against main
+   compose → Docker Compose — configuration
+   smoke → Stack Smoke — backend and mock against PostgreSQL 16
+   e2e → E2E — Playwright
+   k6-smoke → Performance Smoke — k6
+   security → Security — dependency audit and vulnerability scan
+   ```
+
+#### Conteúdo Entregue:
+- `scripts/check-contract-drift.mjs` (novo) — o portão de drift em um script só:
+  comparação com a ref de baseline (`--base`), prova de que o portão está armado
+  (`--self-test`), comparação de um documento armazenado (`--document`) e comparação
+  do documento publicado por um backend em execução (`--live`). O binário do
+  `oasdiff` sai do `PATH`, de `--oasdiff`, de `OASDIFF_BIN` ou é baixado para o
+  cache do usuário; o script não deixa arquivo temporário para trás.
+- `tests/contracts/breaking-change-base.yaml` e `tests/contracts/breaking-change.yaml`
+  (novos) — o par de fixtures que prova, a cada execução, que uma resposta removida
+  falha a comparação.
+- `tests/contracts/springdoc-consigport.json` (novo) — o documento publicado pelo
+  backend, guardado para que o job `contracts` compare a superfície do contrato sem
+  precisar subir a aplicação.
+- `.spectral.yaml` — as regras da casa agora são explícitas: `operationId` único,
+  tag definida, descrição da operação e servidores declarados.
+- `.github/workflows/ci.yml` — o job `contracts` compara com `main` (antes comparava
+  com a branch base), prova que o portão está armado e compara o snapshot com o
+  contrato; o job `smoke` compara o documento publicado pelo backend em execução com
+  o contrato e com o snapshot, e publica o documento lido como artefato
+  `springdoc-document`.
+- `.github/workflows/nightly.yml` — o job `contract-drift` usa o mesmo script, e
+  ganha a prova de que o portão está armado.
+- `docs/quality/GATES.md` — §3.3 reescrito com os comandos reais, o que cada opção
+  do script faz e o porquê da comparação estrutural.
+
+#### Descobertas e Decisões:
+- **O `oasdiff` não serve para comparar o contrato com o documento publicado.** Ele
+  acusa 20 erros e 1 aviso na comparação entre `contracts/consigport-api.yaml` e o
+  `/v3/api-docs` do backend, e nenhum deles é quebra de contrato: `format: uuid`
+  que o springdoc não publica, `minimum` e `maxLength` dos limites que só o
+  contrato declara, `format: int32` que o contrato não traz. A comparação do
+  documento publicado com o contrato é, portanto, **estrutural** — rotas, métodos,
+  `operationId`, parâmetros, corpo da requisição e status das respostas — a mesma
+  comparação do `ContractComparator` do backend, portada para Node no script.
+  A comparação do backend (`GeneratedContractTest`) continua no job `backend` e
+  continua verde: as duas implementações concordam.
+- **Remover uma resposta de erro não é breaking change.** A primeira prova vermelha
+  removeu a resposta `422` e o `oasdiff` aprovou: para quem consome a API, deixar de
+  receber um `4xx` não quebra ninguém. A prova que derruba o portão remove a
+  resposta de sucesso `202`, e o `oasdiff` acusa `response-success-status-removed`.
+- **O contrato da Central não é comparado com o springdoc do mock.** O mock publica
+  uma cópia byte a byte de `contracts/central-api.yaml` como recurso estático, e o
+  documento que ele gera a partir das anotações é outra visão (o `x-signature`, o
+  `x-timestamp` e os limites são do contrato, não do código). A garantia do mock é o
+  teste `ContractTest`, que compara os dois bytes.
+- **O snapshot do springdoc é determinístico.** Duas leituras do `/v3/api-docs` do
+  mesmo backend produzem o mesmo documento, então ele pode ser versionado. O job
+  `smoke` publica o documento que leu como artefato: quando o contrato muda, é
+  esse arquivo que vai para o commit, regerado por
+  `node scripts/check-contract-drift.mjs --live <url> --write-snapshot tests/contracts/springdoc-consigport.json`.
+- **A baseline do `oasdiff` passou de `github.base_ref` para `main`.** A branch base
+  de um PR de `develop` é o próprio `develop`, e o `develop` recebe o contrato do
+  `main` por merges: comparar com `main` é comparar com o contrato que os
+  consumidores já usam. O nightly já comparava com `main`, e agora usa o mesmo
+  script.
+- **O portão que nunca falha não é portão.** O `--self-test` roda o `oasdiff` contra
+  o par de fixtures: a revisão sem a resposta **tem** de falhar e o fixture
+  comparado com ele mesmo **tem** de passar. As duas expectativas são verificadas a
+  cada execução do job `contracts` e do nightly.
+- **O commit da fase é `ci(...)` e o changelog não mostra a seção `ci`.** O
+  `release-please` publica por padrão só `feat`, `fix`, `perf` e `deps`. A task 4.6,
+  que já tem no aceite o changelog em pt-BR, precisa cadastrar a seção no
+  `release-please-config.json` para que os portões de qualidade apareçam na
+  release `v1.0.0`.
+
+#### Arquivos Tocados:
+- `scripts/check-contract-drift.mjs` (novo)
+- `tests/contracts/breaking-change-base.yaml` (novo)
+- `tests/contracts/breaking-change.yaml` (novo)
+- `tests/contracts/springdoc-consigport.json` (novo)
+- `.spectral.yaml`
+- `.github/workflows/ci.yml`
+- `.github/workflows/nightly.yml`
+- `docs/quality/GATES.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/specs/BACKLOG.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`

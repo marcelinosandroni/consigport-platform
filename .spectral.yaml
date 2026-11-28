@@ -2,7 +2,17 @@ extends:
   - spectral:oas
 
 rules:
-  # O contato e a licença vivem no README e no package; o contrato foca na API.
+  # The contact and the license live in the README and in the package; the
+  # contract focuses on the API.
   info-contact: off
   info-license: off
   license-url: off
+
+  # The generated client calls every operation by its operationId: a duplicate
+  # breaks the frontend, and an undefined tag breaks the documentation.
+  operation-operationId-unique: error
+  operation-tag-defined: error
+
+  # Every operation says what it does, and the contract says where it runs.
+  operation-description: warn
+  oas3-api-servers: warn

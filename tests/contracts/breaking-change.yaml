@@ -1,0 +1,16 @@
+openapi: 3.1.0
+info:
+  title: ConsigPort contract fixture
+  version: 1.0.0
+  description: >-
+    The revision of the self-test of the contract gate: the answer `200` of the
+    operation is gone, and a consumer of the baseline would break. The gate
+    must catch this.
+paths:
+  /api/v1/fixtures:
+    get:
+      operationId: listFixtures
+      summary: Lists the fixtures.
+      responses:
+        '204':
+          description: There is nothing to list.
