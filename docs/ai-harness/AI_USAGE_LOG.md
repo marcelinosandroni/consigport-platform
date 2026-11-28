@@ -1905,3 +1905,53 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
       em pt-BR, en e es, os estados sem operação e de operação inexistente
       aparecem, e o fluxo da criação leva ao painel com o `operationId` na URL
     - preview e API falsa encerrados: 0 processos e 0 portas presas
+
+## Sessão #53 — Task 3.8 (Timeline de auditoria)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/038-frontend-audit-timeline`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** exibir a trilha imutável de eventos — ordem cronológica, tipo,
+  status anterior e novo, detalhe e horário, sem ação de edição ou exclusão.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** o contrato público
+   (`GET /api/v1/portability-operations/{operationId}/events`, o
+   `OperationEvent` com os sete campos e o `EventType` com os oito tipos), o
+   `ADR-0003` (a trilha é append-only, lida em ordem cronológica e exibida na
+   timeline do frontend), o `ARCHITECTURE.md` §5 (`features/audit/` com
+   `server/` e `ui/`) e o `SDD/stacks/react.md` (Server Component por padrão).
+2. **Server Component** (`features/audit/server/page.tsx`): a trilha lida no
+   render, com o `Accept-Language` da cookie; os estados de operação
+   inexistente e de falha com o caminho de saída.
+3. **Timeline** (`features/audit/ui/event-timeline.tsx`): a lista ordenada pelo
+   instante e, no empate, pelo identificador sequencial do evento — a ordem
+   da tela não depende da ordem do array.
+4. **Item do evento** (`features/audit/ui/event-item.tsx`): o tipo, o status
+   anterior, o novo status, o detalhe, a hora e a resposta crua da Central num
+   `<details>` nativo.
+5. **Vocabulário do status** (`shared/format/status.ts`): o tom e a chave de
+   catálogo de cada estado passaram a morar juntos, e o painel da 3.7 usa a
+   mesma tabela.
+6. **Integração:** o painel da operação passou a oferecer o caminho para a
+   trilha (`/auditoria?operationId=…`); a rota `/auditoria` lê a operação da
+   URL; o placeholder `SectionPage` saiu do código.
+7. **Catálogos e API falsa:** a seção `audit` completada nos três idiomas (os
+   oito tipos de evento e os estados) e a trilha na API falsa.
+8. **Testes:** `event-timeline.test.tsx` (eventos mistos fora de ordem, o tipo,
+   os dois status, o detalhe, a hora, o status anterior nulo, a resposta da
+   Central, a ausência de botão, campo e link, e a formatação em inglês) e
+   `server/page.test.tsx` (a trilha, a operação sem eventos, a operação
+   inexistente, a falha e o idioma da pergunta).
+9. **Validação:**
+   - `npm run --prefix frontend lint` → EXIT=0
+   - `npm run --prefix frontend typecheck` → EXIT=0
+   - `npm run --prefix frontend test:unit` → 27 arquivos, 143 testes verdes
+   - `npm run --prefix frontend build` → os três ambientes (rsc, ssr, client) verdes
+   - 5 gates locais de documentação verdes
+   - smoke no build de produção contra uma API falsa local: a trilha renderiza
+      em pt-BR, en e es, os estados sem operação e de operação inexistente
+      aparecem, e a trilha não oferece nenhum botão
+   - preview e API falsa encerrados: 0 processos e 0 portas presas

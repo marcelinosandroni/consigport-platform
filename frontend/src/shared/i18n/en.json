@@ -142,7 +142,8 @@
     "terminal": "The operation has ended.",
     "waiting": "Waiting for the next query…",
     "loading": "Loading the operation…",
-    "unavailable": "The operation could not be queried."
+    "unavailable": "The operation could not be queried.",
+    "audit": "See the audit trail"
   },
   "audit": {
     "eyebrow": "Audit",
@@ -153,7 +154,24 @@
     "previousStatus": "Previous status",
     "newStatus": "New status",
     "details": "Details",
-    "createdAt": "When"
+    "createdAt": "When",
+    "stateEmpty": "Trail",
+    "stateUnknown": "Operation",
+    "stateError": "Query",
+    "missingOperation": "Tell us which operation to audit.",
+    "create": "Request portability",
+    "noPreviousStatus": "Start",
+    "rawPayload": "Central answer",
+    "eventTypes": {
+      "OPERATION_CREATED": "Operation created",
+      "OPERATION_SUBMITTED": "Operation submitted",
+      "POLL_ATTEMPT": "Status query",
+      "OPERATION_CONFIRMED": "Operation confirmed",
+      "OPERATION_REJECTED": "Operation rejected",
+      "ACCOUNT_UPDATED": "Account updated",
+      "OPERATION_COMPLETED": "Operation completed",
+      "INTEGRATION_FAILED": "Integration failure"
+    }
   },
   "errors": {
     "VALIDATION_ERROR": "The submitted data did not pass validation.",

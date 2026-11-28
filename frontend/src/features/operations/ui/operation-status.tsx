@@ -5,9 +5,9 @@ import { useTranslation } from 'react-i18next'
 import { useOperationPolling, type OperationDetail } from './use-operation-polling.ts'
 import { formatDateTime } from '../../../shared/format/date.ts'
 import { formatMoney } from '../../../shared/format/money.ts'
-import { statusTone } from '../../../shared/format/status.ts'
+import { statusLabelKey, statusTone } from '../../../shared/format/status.ts'
 import { useLocale } from '../../../shared/i18n/provider.tsx'
-import { Button } from '../../../shared/ui/button.tsx'
+import { Button, buttonClasses } from '../../../shared/ui/button.tsx'
 import { Card } from '../../../shared/ui/card.tsx'
 import { StatusBadge } from '../../../shared/ui/status-badge.tsx'
 
@@ -19,16 +19,6 @@ import { StatusBadge } from '../../../shared/ui/status-badge.tsx'
  * answer the reader sees — the island takes over from there and asks again
  * every two seconds until the operation ends.
  */
-
-/** The catalog key of each status of the contract. */
-const STATUS_LABEL: Record<string, string> = {
-  CREATED: 'operations.created',
-  PENDING: 'operations.pending',
-  CONFIRMED: 'operations.confirmed',
-  COMPLETED: 'operations.completed',
-  REJECTED: 'operations.rejected',
-  INTEGRATION_ERROR: 'operations.integrationError',
-}
 
 export type OperationStatusProps = {
   readonly operationId: string
@@ -72,7 +62,7 @@ export function OperationStatus({ operationId, initialOperation }: OperationStat
   }
 
   const terminal = operation.status === 'COMPLETED' || operation.status === 'REJECTED'
-  const labelKey = STATUS_LABEL[operation.status]
+  const labelKey = statusLabelKey(operation.status)
 
   return (
     <Card className='flex flex-col gap-space-md p-space-lg'>
@@ -121,6 +111,13 @@ export function OperationStatus({ operationId, initialOperation }: OperationStat
         <Button variant='ghost' onClick={refresh} loading={isFetching}>
           {t('operations.refresh')}
         </Button>
+        {/* The trail of the operation: what happened, in order, without edits. */}
+        <a
+          href={`/auditoria?operationId=${encodeURIComponent(operation.operationId)}`}
+          className={buttonClasses({ variant: 'ghost' })}
+        >
+          {t('operations.audit')}
+        </a>
       </div>
     </Card>
   )

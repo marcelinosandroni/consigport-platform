@@ -2,8 +2,8 @@ import type { ReactNode } from 'react'
 
 import { HomePage } from './pages/home.tsx'
 import { NotFoundPage } from './pages/not-found.tsx'
-import { SectionPage } from './pages/section.tsx'
 import { AgendaPage, AgendaWithoutBeneficiary } from '../features/agenda/server/page.tsx'
+import { AuditPage, AuditWithoutOperation } from '../features/audit/server/page.tsx'
 import { AuthorizationPage } from '../features/authorization/server/page.tsx'
 import { OperationPage, OperationWithoutId } from '../features/operations/server/page.tsx'
 import { PortabilityPage, PortabilityWithoutSelection } from '../features/portability/server/page.tsx'
@@ -85,13 +85,15 @@ const ROUTES: Route[] = [
   },
   {
     path: '/auditoria',
-    render: ({ t }) => (
-      <SectionPage
-        eyebrow={t('audit.eyebrow')}
-        title={t('audit.title')}
-        description={t('audit.description')}
-      />
-    ),
+    render: ({ t, locale, searchParams }) => {
+      const operationId = searchParams.get('operationId')?.trim() ?? ''
+
+      return operationId.length > 0 ? (
+        <AuditPage operationId={operationId} locale={locale} t={t} />
+      ) : (
+        <AuditWithoutOperation t={t} />
+      )
+    },
   },
 ]
 

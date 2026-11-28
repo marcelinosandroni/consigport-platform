@@ -98,6 +98,10 @@ describe('OperationStatus', () => {
     expect(screen.getByText('PRT-20261128-0001')).toBeInTheDocument()
     expect(screen.getByText(/R\$\s*750,00/)).toBeInTheDocument()
     expect(screen.getByText('2 parcelas')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Ver a trilha de auditoria' })).toHaveAttribute(
+      'href',
+      '/auditoria?operationId=OP-1',
+    )
     expect(calls).toBe(1)
 
     await advance(2000)

@@ -88,6 +88,58 @@ const operationDetail = (operationId: string) => ({
   updatedAt: '2026-11-28T10:00:05Z',
 })
 
+/** The trail of the operation the fake knows. */
+const operationEvents = (operationId: string) => ({
+  operationId,
+  events: [
+    {
+      eventId: 1,
+      previousStatus: null,
+      newStatus: 'CREATED',
+      eventType: 'OPERATION_CREATED',
+      details: 'Operação criada com 2 parcelas',
+      rawPayload: null,
+      createdAt: '2026-11-28T10:00:05Z',
+    },
+    {
+      eventId: 2,
+      previousStatus: 'CREATED',
+      newStatus: 'PENDING',
+      eventType: 'OPERATION_SUBMITTED',
+      details: 'Central aceitou a operação com o protocolo PRT-20261128-0001',
+      rawPayload: { protocolo: 'PRT-20261128-0001' },
+      createdAt: '2026-11-28T10:00:06Z',
+    },
+    {
+      eventId: 3,
+      previousStatus: 'PENDING',
+      newStatus: 'PENDING',
+      eventType: 'POLL_ATTEMPT',
+      details: 'Central respondeu 204 com Retry-After: 2',
+      rawPayload: null,
+      createdAt: '2026-11-28T10:00:08Z',
+    },
+    {
+      eventId: 4,
+      previousStatus: 'PENDING',
+      newStatus: 'CONFIRMED',
+      eventType: 'OPERATION_CONFIRMED',
+      details: 'Central confirmou a operação',
+      rawPayload: { status: 'CONFIRMADA' },
+      createdAt: '2026-11-28T10:00:10Z',
+    },
+    {
+      eventId: 5,
+      previousStatus: 'CONFIRMED',
+      newStatus: 'COMPLETED',
+      eventType: 'OPERATION_COMPLETED',
+      details: 'Conta de recebimento atualizada e operação concluída',
+      rawPayload: null,
+      createdAt: '2026-11-28T10:00:11Z',
+    },
+  ],
+})
+
 /**
  * The fake of the public API.
  *
@@ -270,5 +322,23 @@ export const handlers = [
     }
 
     return HttpResponse.json(operationDetail(operationId))
+  }),
+
+  http.get(`${API_BASE_URL}/api/v1/portability-operations/:operationId/events`, ({ params }) => {
+    const operationId = String(params.operationId)
+
+    if (operationId === 'OPERATION-UNKNOWN') {
+      return notFound(
+        'OPERATION_NOT_FOUND',
+        `/api/v1/portability-operations/${operationId}/events`,
+        'A operação informada não existe.',
+      )
+    }
+
+    if (operationId === 'OPERATION-WITHOUT-EVENTS') {
+      return HttpResponse.json({ operationId, events: [] })
+    }
+
+    return HttpResponse.json(operationEvents(operationId))
   }),
 ]

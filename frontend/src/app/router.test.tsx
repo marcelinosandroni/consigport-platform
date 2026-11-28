@@ -38,6 +38,12 @@ describe('resolveRoute', () => {
     expect(screen.getByText('Informe a operação para acompanhar o status.')).toBeInTheDocument()
   })
 
+  it('asks for the operation when the audit trail has none', () => {
+    render(resolveRoute(route('/auditoria')))
+
+    expect(screen.getByText('Informe a operação para ver a trilha de auditoria.')).toBeInTheDocument()
+  })
+
   it('renders the not found page for an unknown path', () => {
     render(resolveRoute(route('/rota-inexistente')))
 
