@@ -145,9 +145,12 @@
 
 ### Tasks
 
-- [-] **3.1 — Cliente OpenAPI tipado**
+- [x] **3.1 — Cliente OpenAPI tipado**
       Tipos gerados de `contracts/consigport-api.yaml`; `openapi-fetch` com base URL por
       ambiente; erro mapeado por `code`.
+- [-] **3.2 — Catálogos i18n**
+      Catálogos pt-BR/en/es com o mesmo conjunto de chaves; fallback pt-BR; troca de
+      idioma persistida; `Accept-Language` enviado à API.
 
 ### Como usar este arquivo
 
