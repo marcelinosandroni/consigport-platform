@@ -4548,3 +4548,120 @@
 - `SDD/specs/ROADMAP.md`
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 3.3 — Primitivas de UI
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/033-frontend-ui-primitives`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** entregar as primitivas de UI que as fatias seguintes consomem —
+  tokens da Matrix, foco visível, contraste AA e nenhuma cor literal em componente.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Portão 3.4 do `GATES.md` (frontend):**
+   ```text
+   $ npm run --prefix frontend lint
+   > eslint .
+   EXIT=0
+
+   $ npm run --prefix frontend typecheck
+   > tsc --noEmit
+   EXIT=0
+
+   $ npm run --prefix frontend test:unit
+   > vitest run
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  13 passed (13)
+         Tests  56 passed (56)
+    Duration  17.09s
+   EXIT=0
+
+   $ npm run --prefix frontend build
+   [5/5] build ssr environment...
+   ✓ 90 modules transformed.
+   dist/ssr/assets/entry.rsc-7L_sN9Di.js     36.56 kB
+   dist/ssr/index.js                      1,582.37 kB
+   ✓ built in 2.44s
+   EXIT=0
+   ```
+2. **Portão 3.1 (documentação e SDD):**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 66 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ Exactly 1 task in flight in SDD/specs/PLAN.md.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos passaram.
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css.
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 47 sessions, structure valid.
+   ```
+3. **Prova de vida — as classes novas entraram no bundle:**
+   ```text
+   $ ls -la dist/client/assets/*.css
+   -rw-r--r-- 1 ec2-user ec2-user 24137 Nov 28 05:10 dist/client/assets/index-Da78kLM6.css
+
+   $ for c in outline-primary bg-error\/8 border-error\/40 text-tertiary min-h-11 overflow-x-auto; do grep -c -- "$c" dist/client/assets/*.css; done
+   1
+   1
+   1
+   1
+   1
+   1
+   ```
+   O CSS saiu de 20,54 kB para 24,14 kB: o Tailwind encontrou as classes dos
+   componentes novos e as gerou.
+
+#### Conteúdo Entregue:
+- `frontend/src/shared/ui/field.tsx` — o `Field`, que é o dono da acessibilidade do
+  formulário (rótulo, dica e erro ligados por `aria-describedby`, `aria-invalid` no
+  controle, `required` no controle e o asterisco só para os olhos), e o `TextField`
+  por cima dele.
+- `frontend/src/shared/ui/table.tsx` — a `Table` como **região de rolagem nomeada e
+  focável** (`role="region"`, `aria-label`, `tabIndex={0}`), mais `TableHead`,
+  `TableBody`, `TableRow`, `TableHeader` e `TableCell`.
+- `frontend/src/shared/ui/status-badge.tsx` — o conjunto fechado de estados (neutro,
+  em andamento, sucesso, técnico, erro) com ponto decorativo.
+- `frontend/src/shared/ui/button.tsx` — anel de foco visível em todas as variantes,
+  estado `disabled` e estado `loading` (`aria-busy`, sem segundo clique).
+- `frontend/src/shared/ui/contrast.test.ts` — o teste que lê `src/theme.css` e
+  calcula o contraste de cada par que a interface usa.
+- Os testes de componente: `button.test.tsx`, `field.test.tsx`, `table.test.tsx` e
+  `status-badge.test.tsx`.
+
+#### Descobertas e Decisões:
+- **O contraste AA é verificado, não presumido.** O teste lê os tokens de
+  `src/theme.css` — a cópia guardada pelo `check-theme-tokens` — e calcula a razão do
+  WCAG. Corpo, botões preenchidos e badges passam dos 4,5:1. O `text-muted`
+  (`#56657A`) fica em 3,28:1 sobre `surface-base`: o `DESIGN.md` §2 o reserva ao
+  texto decorativo (placeholder e chrome desativada) e §"Inputs & terminal fields"
+  fixa o placeholder em `#56657A`, então o piso dele é 3:1, o limiar de texto grande
+  e de contraste de UI — e o teste fixa esse limite para que ninguém o promova a
+  texto de corpo sem perceber.
+- **O `role="region"` com `tabIndex={0}` é o que torna a tabela rolável acessível.**
+  Sem ele, quem navega pelo teclado não consegue alcançar a rolagem da tabela no
+  celular, e o leitor de tela não anuncia o que a região contém.
+- **O estado `loading` desabilita o botão.** A regra é "zero ações sem resposta": o
+  botão ocupado marca `aria-busy` e recusa o segundo clique, sem esconder o rótulo.
+- **O `StatusBadge` não conhece o domínio.** O significado de um estado pertence à
+  feature que o usa; a primitiva só conhece o conjunto fechado de tons. É a regra de
+  reuso do `DESIGN.md` §"REUSABILITY": nenhum substantivo de domínio no nome.
+- **Nenhum token novo foi necessário** — o `frontend/src/theme.css` segue cópia
+  verbatim de `SDD/themes/matrix/tokens.css`.
+
+#### Arquivos Tocados:
+- `frontend/src/shared/ui/button.tsx`
+- `frontend/src/shared/ui/button.test.tsx`
+- `frontend/src/shared/ui/field.tsx`
+- `frontend/src/shared/ui/field.test.tsx`
+- `frontend/src/shared/ui/table.tsx`
+- `frontend/src/shared/ui/table.test.tsx`
+- `frontend/src/shared/ui/status-badge.tsx`
+- `frontend/src/shared/ui/status-badge.test.tsx`
+- `frontend/src/shared/ui/contrast.test.ts`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`

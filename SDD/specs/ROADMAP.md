@@ -14,8 +14,8 @@
 | Fase 0 — Fundação | ✅ concluída e arquivada, tag `v0.1.0` |
 | Fase 1 — Central mock | ✅ concluída e arquivada, tag `v0.2.0` |
 | Fase 2 — Backend core | ✅ concluída e arquivada, tag `v0.3.0` |
-| Fase em andamento | Fase 3 — Frontend RSC (9 tasks; task 3.3 em voo) |
-| Próxima task | 3.3 — Primitivas de UI |
+| Fase em andamento | Fase 3 — Frontend RSC (9 tasks; task 3.4 em voo) |
+| Próxima task | 3.4 — Fluxo de autorização |
 | Versão | `v0.3.0` (a Fase 3 fecha em `v0.4.0`) |
 
 A Fase 0 entregou specs, ADRs, harness, gates, contratos, scaffolds, CI/CD e a
