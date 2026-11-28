@@ -445,6 +445,34 @@
 - **Arquivos:** `frontend/src/shared/ui/button.tsx`, `card.tsx`, `field.tsx`, `table.tsx`, `status-badge.tsx`.
 - **Aceite:** tokens de `theme.css`; foco visível; contraste AA; variantes sem valores mágicos.
 - **Verificação:** testes com Testing Library e checagem de `aria` nos componentes.
+- **Realizado:** as primitivas que as fatias seguintes consomem. O `field.tsx` é o
+  dono da acessibilidade do formulário: o `Field` liga o rótulo, a dica e o erro ao
+  controle (`aria-describedby`), marca a invalidez (`aria-invalid`) e exige o
+  asterisco de obrigatório apenas para os olhos — o `required` é do controle; o
+  `TextField` monta o `input` por cima dele. O `table.tsx` entrega a tabela como uma
+  **região de rolagem nomeada e focável** (`role="region"`, `tabIndex={0}`): no
+  celular a tabela rola dentro da própria caixa em vez de empurrar a página, e quem
+  navega pelo teclado consegue chegar à rolagem. O `status-badge.tsx` é um conjunto
+  **fechado de estados** — neutro, em andamento, sucesso, técnico e erro — com um
+  ponto decorativo (`aria-hidden`) ao lado da palavra; o que um estado *significa*
+  pertence à feature que o usa, não à primitiva. O `button.tsx` ganhou o anel de
+  foco visível em todas as variantes (`focus-visible:outline-primary`, sem
+  deslocamento de layout), o estado `disabled` e o estado `loading`, que marca
+  `aria-busy` e recusa o segundo clique — nenhuma ação sem resposta. Nenhum
+  componente carrega literal de cor: as classes saem dos tokens e o teste de
+  contraste lê `src/theme.css` e prova, com o cálculo do WCAG, que **todo par de
+  texto que a interface usa** passa dos 4,5:1 do AA — corpo, botões preenchidos e
+  badges — com o piso de 3:1 apenas para o token decorativo `text-muted`, que o
+  `DESIGN.md` §2 reserva ao placeholder e à chrome desativada. Arquivos reais:
+  `frontend/src/shared/ui/button.tsx`,
+  `frontend/src/shared/ui/button.test.tsx`,
+  `frontend/src/shared/ui/field.tsx`,
+  `frontend/src/shared/ui/field.test.tsx`,
+  `frontend/src/shared/ui/table.tsx`,
+  `frontend/src/shared/ui/table.test.tsx`,
+  `frontend/src/shared/ui/status-badge.tsx`,
+  `frontend/src/shared/ui/status-badge.test.tsx`,
+  `frontend/src/shared/ui/contrast.test.ts`.
 
 ### 3.4 — Fluxo de autorização
 - **Objetivo:** registrar o opt-in pela interface.

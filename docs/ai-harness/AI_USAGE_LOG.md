@@ -1636,3 +1636,49 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
     caractere a mais (`consignport-locale`), o que fez o idioma cair no fallback. O
     diagnóstico comparou os códigos de caractere dos dois lados e mostrou a diferença;
     o código do projeto estava correto desde o início.
+
+## Sessão #48 — Task 3.3 (Primitivas de UI)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `feat/033-frontend-ui-primitives`
+- **PR:** a abrir para `develop`
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** entregar as primitivas de UI que as fatias seguintes consomem —
+  tokens da Matrix, foco visível, contraste AA e nenhuma cor literal em componente.
+
+### Atividades Realizadas:
+1. **Leitura da regra:** `SDD/DESIGN.md` §5 (componentes), §6 (UX), a lista de
+   PROIBIDOS e §4b (as quatro regras duras), `SDD/stacks/react.md`,
+   `SDD/stacks/testing.md` e `docs/quality/GATES.md` (portão 3.4).
+2. **`field.tsx`** — o `Field` é o dono da acessibilidade do formulário: rótulo
+   ligado por `htmlFor`, dica e erro ligados por `aria-describedby`, `aria-invalid`
+   no controle, `required` no controle e o asterisco marcado como decorativo. O
+   `TextField` monta o `input` por cima dele.
+3. **`table.tsx`** — a `Table` é uma região de rolagem nomeada e focável
+   (`role="region"`, `aria-label`, `tabIndex={0}`): no celular a tabela rola dentro
+   da própria caixa, sem empurrar a página, e o teclado consegue alcançar a rolagem.
+4. **`status-badge.tsx`** — conjunto fechado de tons (neutro, em andamento, sucesso,
+   técnico, erro) com ponto decorativo; o significado do estado fica com a feature.
+5. **`button.tsx`** — anel de foco visível em todas as variantes
+   (`focus-visible:outline-primary`, sem deslocamento de layout), estado `disabled`
+   e estado `loading` com `aria-busy` e sem segundo clique.
+6. **Contraste verificado, não presumido.** Um script calculou a razão do WCAG de
+   cada par antes de escrever o teste; o `contrast.test.ts` lê `src/theme.css` e
+   fixa os limiares: 4,5:1 para corpo, botões preenchidos e badges; 3:1 para o
+   `text-muted`, que o `DESIGN.md` §2 reserva ao texto decorativo.
+7. **Testes de componente** para as três primitivas novas e para o botão, com
+   Testing Library e checagem de `aria` (`aria-busy`, `aria-invalid`,
+   `aria-describedby`, `role="region"`, `role="alert"`, `aria-hidden` do ponto).
+8. **Validação:**
+   - `npm run --prefix frontend lint` → EXIT=0
+   - `npm run --prefix frontend typecheck` → EXIT=0
+   - `npm run --prefix frontend test:unit` → 13 arquivos, 56 testes verdes
+   - `npm run --prefix frontend build` → os três ambientes (rsc, ssr, client) verdes
+   - 5 gates locais de documentação verdes
+   - prova de vida: o CSS do bundle saiu de 20,54 kB para 24,14 kB e contém as
+     classes novas (`outline-primary`, `bg-error/8`, `border-error/40`,
+     `text-tertiary`, `min-h-11`, `overflow-x-auto`)
+9. **Ajuste de TypeScript:** o `tsconfig` do projeto tem `noUncheckedIndexedAccess`; a
+   desestruturação das componentes de cor do teste foi escrita com valores padrão
+   para satisfazer o compilador estrito.

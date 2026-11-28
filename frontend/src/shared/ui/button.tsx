@@ -38,6 +38,10 @@ export function buttonClasses({
   return [
     'inline-flex min-h-11 items-center justify-center gap-space-sm rounded px-space-md',
     'transition-[background-color,border-color,box-shadow,transform] duration-150',
+    // The focus ring is a hairline that migrates to the accent colour: no thick
+    // outline, no layout shift, visible on every surface.
+    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+    'disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none',
     VARIANTS[variant],
     className,
   ]
@@ -47,8 +51,25 @@ export function buttonClasses({
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant
+  /** The action is running: the control stays readable but refuses a second click. */
+  loading?: boolean
 }
 
-export function Button({ variant = 'primary', className, type = 'button', ...props }: ButtonProps) {
-  return <button type={type} className={buttonClasses({ variant, className })} {...props} />
+export function Button({
+  variant = 'primary',
+  className,
+  type = 'button',
+  loading = false,
+  disabled,
+  ...props
+}: ButtonProps) {
+  return (
+    <button
+      type={type}
+      className={buttonClasses({ variant, className })}
+      aria-busy={loading || undefined}
+      disabled={disabled || loading}
+      {...props}
+    />
+  )
 }
