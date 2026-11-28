@@ -14,16 +14,17 @@
 | Fase 0 — Fundação | ✅ concluída e arquivada, tag `v0.1.0` |
 | Fase 1 — Central mock | ✅ concluída e arquivada, tag `v0.2.0` |
 | Fase 2 — Backend core | ✅ concluída e arquivada, tag `v0.3.0` |
-| Fase em andamento | Fase 3 — Frontend RSC (10 tasks; task 3.10 em voo) |
-| Próxima task | 3.10 — Promoção da release `v0.4.0` e arquivamento da Fase 3 |
-| Versão | `v0.3.0` (a Fase 3 fecha em `v0.4.0`) |
+| Fase em andamento | Fase 4 — Qualidade e vitrine (7 tasks; task 4.1 em voo) |
+| Próxima task | 4.1 — Gates de contrato |
+| Versão | `v0.4.0` (a Fase 4 fecha em `v1.0.0`) |
 
 A Fase 0 entregou specs, ADRs, harness, gates, contratos, scaffolds, CI/CD e a
 release `v0.1.0`. A Fase 1 entregou a Central de Convênios simulada, com HMAC,
 idempotência, caos determinístico e contrato publicado. A Fase 2 entregou o core do
 backend — domínio puro, persistência Flyway, ACL, polling resiliente, trilha imutável,
-i18n e contrato publicado — na release `v0.3.0`. A Fase 3 começa a interface web, sempre
-em branch própria e via PR.
+i18n e contrato publicado — na release `v0.3.0`. A Fase 3 entregou a interface web:
+cliente OpenAPI tipado, catálogos pt-BR/en/es, primitivas de UI sobre o tema Matrix e o
+fluxo completo do titular, na release `v0.4.0`. A Fase 4 prova o sistema no CI/CD.
 
 ---
 
@@ -34,7 +35,7 @@ em branch própria e via PR.
 | 0 — Fundação | Specs, contratos, CI/CD, Docker base, scaffolds | 12 | `docs/000-sdd-foundation`, `feat/00x-*` | `v0.1.0` ✅ |
 | 1 — Central mock | Simular a Central com HMAC, idempotência, caos e admin | 7 | `feat/01x-central-mock` | `v0.2.0` ✅ |
 | 2 — Backend core | DDD + hexagonal + ACL + Flyway + i18n + polling + Swagger | 18 | `feat/02x-backend-*` | `v0.3.0` ✅ |
-| 3 — Frontend RSC | React 19 RSC, design Matrix, i18n, fluxo completo | 10 | `feat/03x-frontend-*` | `v0.4.0` |
+| 3 — Frontend RSC | React 19 RSC, design Matrix, i18n, fluxo completo | 10 | `feat/03x-frontend-*` | `v0.4.0` ✅ |
 | 4 — Qualidade | Contratos, E2E, k6, Docker full, CD, release, README | 7 | `feat/04x-quality-*` | `v1.0.0` |
 
 Total: **54 tasks**, cada uma com 2–4 arquivos e um commit.
@@ -147,26 +148,57 @@ polling resiliente e Swagger.
 
 ---
 
-## 6. Fase 3 — Frontend RSC
+## 6. Fase 3 — Frontend RSC (concluída)
 
 **Objetivo:** UI React 19 RSC na porta `5173`, design Matrix, i18n e fluxo completo.
+
+**Tasks**
+
+| ID | Entrega | Estado |
+|---|---|---|
+| 3.1 | Cliente OpenAPI tipado | `[x]` |
+| 3.2 | Catálogos i18n | `[x]` |
+| 3.3 | Primitivas de UI | `[x]` |
+| 3.4 | Fluxo de autorização | `[x]` |
+| 3.5 | Agenda e seleção de parcelas | `[x]` |
+| 3.6 | Conta de recebimento e envio | `[x]` |
+| 3.7 | Painel de status com polling | `[x]` |
+| 3.8 | Timeline de auditoria | `[x]` |
+| 3.9 | Responsividade, acessibilidade e testes finais | `[x]` |
+| 3.10 | Promoção da `v0.4.0` e arquivamento da fase | `[x]` |
 
 **Saída**
 - Shell estático + streaming SSR + ilhas interativas.
 - Opt-in, agenda, seleção, conta, status e timeline.
 - Catálogos pt-BR/en/es e troca de idioma.
 - Sem Next.js, sem Redux, sem Axios.
+- 29 arquivos de teste e 159 testes do frontend verdes.
 - Tag `v0.4.0`.
 
 **Riscos**
 - Complexidade do RSC manual; congelar o template oficial na task 0.8.
 - Cache/streaming mal configurado; E2E contra o build de produção.
+- Base da API presa no build: a URL da API é resolvida no bundle, então o frontend
+  implantado ainda não alcança o backend — dívida registrada no `BACKLOG.md`, resolvida
+  na Fase 4 com o E2E no compose e a entrega contínua.
 
 ---
 
 ## 7. Fase 4 — Qualidade e vitrine
 
 **Objetivo:** provar o sistema no CI/CD, com contratos, E2E, performance e release.
+
+**Tasks**
+
+| ID | Entrega | Estado |
+|---|---|---|
+| 4.1 | Gates de contrato | `[-]` |
+| 4.2 | Testes de propriedade com Schemathesis | `[ ]` |
+| 4.3 | E2E com Playwright no CI | `[ ]` |
+| 4.4 | Performance com k6 | `[ ]` |
+| 4.5 | Segurança e dependências | `[ ]` |
+| 4.6 | Entrega contínua e release | `[ ]` |
+| 4.7 | README e vitrine | `[ ]` |
 
 **Saída**
 - Spectral, oasdiff e Schemathesis no CI.

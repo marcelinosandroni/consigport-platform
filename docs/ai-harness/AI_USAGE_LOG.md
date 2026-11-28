@@ -2005,3 +2005,45 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
      da operação conferidos no HTML; o CSS emitido carrega a regra do
      `prefers-reduced-motion` e as media queries de 48rem e 64rem
    - preview e API falsa encerrados: 0 processos e 0 portas presas
+
+## Sessão #55 — Task 3.10 (Promoção da release `v0.4.0` e arquivamento da Fase 3)
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `chore/0310-phase-3-release-archive` (arquivamento) e
+  `chore/0311-sync-release-040` (sincronização do manifesto)
+- **PR:** #65 (`develop` → `staging`), #66 (`staging` → `main`), #67 (release-please),
+  #68 (arquivamento) e #69 (sync do manifesto)
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** promover, publicar e arquivar a Fase 3 — `develop` → `staging` → `main`,
+  tag `v0.4.0` pelo `release-please`, imagens no GHCR, staging verde e fase arquivada.
+
+### Atividades Realizadas:
+1. **Promoção `develop` → `staging` (PR #65):** onze checks verdes (contratos, backend,
+   mock, frontend, segurança, smoke com PostgreSQL 16 e documentação) e merge por
+   merge commit. Nenhum commit direto: o fluxo Gitflow é respeitado.
+2. **Promoção `staging` → `main` (PR #66):** o mesmo portão, onze checks verdes.
+3. **PR de release (PR #67):** o `release-please` abriu `chore(main): release 0.4.0`
+   a partir dos commits promovidos; o merge por merge commit criou a tag `v0.4.0` e a
+   release no GitHub, com o CHANGELOG gerado. Ninguém escreveu a tag à mão.
+4. **CI do `main` (run 46132773593):** onze jobs, todos verdes — `E2E — Playwright` e
+   `Performance Smoke — k6` sem suíte neste commit, como esperado até as tasks 4.3 e
+   4.4.
+5. **Publicação das imagens (run 46132827648):** `workflow_dispatch` em `release.yml`
+   com a tag `v0.4.0`, porque o `release-please` cria a tag pela API e o evento `push`
+   da tag não acontece — o job `publish-images` fica `skipped` no push da branch. As
+   três imagens saíram com `v0.4.0`, `0.4.0` e `latest`, e os digests foram anotados.
+6. **Staging (run 46132952326):** `workflow_dispatch` em `cd-staging.yml` com a tag
+   `v0.4.0`; postgres, backend, mock e frontend `Healthy`; `/actuator/health` respondendo
+   `{"status":"UP","groups":["liveness","readiness"]}` nos dois serviços; o frontend
+   respondendo `200` em `/`; teardown verde.
+7. **Arquivamento da fase:** `SDD/specs/history/phases/phase-3-finished.md` com as 10
+   tasks, os PRs, os critérios de saída, a evidência da release e as dívidas; o `PLAN.md`
+   com a Fase 3 concluída e a Fase 4 aberta com a 4.1 em voo; o `ROADMAP.md` com as
+   tabelas de tasks das duas fases; o `BACKLOG.md` com a 3.10 realizada e as dívidas da
+   fase 3.
+8. **Sincronização do manifesto:** PR próprio Levando `main` (com o manifesto em `0.4.0`
+   e o CHANGELOG) para o `develop`, para que a próxima promoção não leve o manifesto de
+   volta e o `release-please` não publique a `v0.4.0` de novo.
+9. **Validação:** os cinco gates locais de documentação verdes na promoção, no
+   arquivamento e na sincronização.

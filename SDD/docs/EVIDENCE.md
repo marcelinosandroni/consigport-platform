@@ -5809,3 +5809,171 @@
 - `SDD/specs/ROADMAP.md`
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 3.10 — Promoção da release `v0.4.0` e arquivamento da Fase 3
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `chore/0310-phase-3-release-archive` (arquivamento) e `chore/0311-sync-release-040`
+  (sincronização do manifesto)
+- **PR:** #65 (`develop` → `staging`), #66 (`staging` → `main`), #67 (release-please),
+  #68 (arquivamento) e #69 (sync do manifesto)
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** promover, publicar e arquivar a Fase 3 — `develop` → `staging` → `main`,
+  tag `v0.4.0` pelo `release-please`, imagens no GHCR, staging verde e fase arquivada.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Promoção `develop` → `staging` (PR #65):**
+   ```text
+   $ bash /tmp/opencode/promote.sh staging develop "chore(release): promote the phase 3 to staging." /tmp/opencode/pr-body-promote-staging.md
+   === PR develop -> staging ===
+   https://github.com/marcelinosandroni/consigport-platform/pull/65
+   PR #65
+   === waiting for the checks to register ===
+   checks registered: 11
+   === checks ===
+   Backend — build, unit tests and coverage report	pass	46s
+   Central Mock — build and unit tests	pass	21s
+   Contracts — Spectral, HMAC vector and breaking changes	pass	13s
+   Detect the suites available in this commit	pass	5s
+   Docker Compose — configuration	pass	6s
+   Docs, Specs, Architecture and AI Log	pass	6s
+   Frontend — lint, typecheck, unit tests and build	pass	57s
+   Security — dependency audit and vulnerability scan	pass	16s
+   Stack Smoke — backend and mock against PostgreSQL 16	pass	44s
+   checks: 11 | not green: 0
+   === merge ===
+   e9024dd..111c853  staging    -> origin/staging
+   === done: PR #65 merged ===
+   ```
+2. **Promoção `staging` → `main` (PR #66):**
+   ```text
+   $ bash /tmp/opencode/promote.sh main staging "chore(release): promote the phase 3 to main." /tmp/opencode/pr-body-promote-main.md
+   === PR staging -> main ===
+   https://github.com/marcelinosandroni/consigport-platform/pull/66
+   PR #66
+   checks registered: 11
+   Backend — build, unit tests and coverage report	pass	47s
+   Central Mock — build and unit tests	pass	24s
+   Contracts — Spectral, HMAC vector and breaking changes	pass	17s
+   Detect the suites available in this commit	pass	3s
+   Docker Compose — configuration	pass	6s
+   Docs, Specs, Architecture and AI Log	pass	6s
+   Frontend — lint, typecheck, unit tests and build	pass	33s
+   Security — dependency audit and vulnerability scan	pass	20s
+   Stack Smoke — backend and mock against PostgreSQL 16	pass	36s
+   checks: 11 | not green: 0
+   === merge ===
+   c472c6a..06fb267  main       -> origin/main
+   === done: PR #66 merged ===
+   ```
+3. **PR de release e tag (PR #67):**
+   ```text
+   $ gh pr list --state open --json number,title,headRefName
+   {"headRefName":"release-please--branches--main--components--consigport-platform","number":67,"title":"chore(main): release 0.4.0"}
+
+   $ gh pr merge 67 --merge
+    * [new branch]      release-please--branches--main--components--consigport-platform -> origin/release-please--branches--main--components--consigport-platform
+    * [new tag]         v0.4.0     -> v0.4.0
+
+   $ git tag --list "v*"
+   v0.1.0
+   v0.2.0
+   v0.3.0
+   v0.4.0
+
+   $ gh release view v0.4.0 --json tagName,name,publishedAt,url
+   {"name":"v0.4.0","published":"2026-11-28T09:56:18Z","tag":"v0.4.0","url":"https://github.com/marcelinosandroni/consigport-platform/releases/tag/v0.4.0"}
+   ```
+4. **CI do `main` no push da release (run 46132773593):**
+   ```text
+   $ gh run view 46132773593 --json jobs --jq '.jobs[] | "\(.name) | \(.status)/\(.conclusion)"'
+   Central Mock — build and unit tests | completed/success
+   Docker Compose — configuration | completed/success
+   Contracts — Spectral, HMAC vector and breaking changes | completed/success
+   Backend — build, unit tests and coverage report | completed/success
+   Frontend — lint, typecheck, unit tests and build | completed/success
+   Stack Smoke — backend and mock against PostgreSQL 16 | completed/success
+   Docs, Specs, Architecture and AI Log | completed/success
+   Detect the suites available in this commit | completed/success
+   Security — dependency audit and vulnerability scan | completed/success
+   E2E — Playwright | completed/skipped
+   Performance Smoke — k6 | completed/skipped
+   ```
+5. **Publicação das imagens (run 46132827648, `workflow_dispatch` com a tag `v0.4.0`):**
+   ```text
+   $ gh workflow run release.yml -f tag=v0.4.0
+   publish run: 46132827648
+   Publish central-convenios-mock to GHCR | success
+   Publish backend to GHCR | success
+   Publish frontend to GHCR | success
+   Release PR, changelog and SemVer tag | success
+
+   Publish frontend to GHCR  "image.name": "ghcr.io/marcelinosandroni/consigport-platform/frontend:v0.4.0,ghcr.io/marcelinosandroni/consigport-platform/frontend:0.4.0,ghcr.io/marcelinosandroni/consigport-platform/frontend:latest"
+   ```
+6. **Staging com a tag `v0.4.0` (run 46132952326):**
+   ```text
+   $ gh workflow run cd-staging.yml -f tag=v0.4.0
+   staging run: 46132952326
+   ✓ Deploy the tagged images to staging in 51s
+     ✓ Pull the published images
+     ✓ Start the staging stack
+     ✓ Check the deployed services
+     ✓ Print the deployed digests
+     ✓ Tear down the staging stack
+   staging exit: 0
+
+   Start the staging stack  Container consigport-platform-frontend-1 Healthy
+   Start the staging stack  Container consigport-platform-backend-1 Healthy
+   Check the deployed services  {"status":"UP","groups":["liveness","readiness"]}{"status":"UP","groups":["liveness","readiness"]}
+   Print the deployed digests  backend ghcr.io/marcelinosandroni/consigport-platform/backend@sha256:6ea6cac724c9746bcc160c07236609df0bedced9bb2d05cb3dcc7083b5c1ee6c
+   Print the deployed digests  central-convenios-mock ghcr.io/marcelinosandroni/consigport-platform/central-convenios-mock@sha256:40d50903aa7b8460c03b8f7dfa081f40ea6f8f7e9380d7fa462a50482702709d
+   Print the deployed digests  frontend ghcr.io/marcelinosandroni/consigport-platform/frontend@sha256:228d5e761c950643e8a0f8665bf6126d06c471fafa06f3ee9d1f5bd55f32ed95
+   ```
+7. **Portão 3.1 (documentação e SDD) do arquivamento:**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 66 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ Exactly 1 task in flight in SDD/specs/PLAN.md.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos passaram com sucesso!
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css (line endings normalized).
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 55 sessions, structure valid.
+   ```
+
+#### Conteúdo Entregue:
+- `SDD/specs/history/phases/phase-3-finished.md` — o arquivo de arquivamento da fase.
+- `SDD/specs/PLAN.md` — Fase 3 concluída e arquivada; Fase 4 aberta com a 4.1 em voo.
+- `SDD/specs/ROADMAP.md` — a Fase 3 fechada na `v0.4.0`, com a tabela de tasks, e a
+  Fase 4 com a tabela de tasks.
+- `SDD/specs/BACKLOG.md` — a 3.10 realizada, a Fase 3 com 10 tasks e as dívidas da fase.
+- `SDD/docs/EVIDENCE.md` — esta seção.
+- `docs/ai-harness/AI_USAGE_LOG.md` — sessão #55.
+
+#### Descobertas e Decisões:
+- **O `release-please` cria a tag pela API, e a API não dispara evento de push.**
+  Confirmado de novo: o job `publish-images` do `release.yml` ficou `skipped` no push
+  da branch `main`, e as imagens só saíram pelo `workflow_dispatch` com a tag
+  `v0.4.0`. O caminho é o mesmo da `v0.3.0` e está documentado no `RELEASE.md` §6.
+- **O PR de release não tem CI, e isso não é um problema.** O `release-please` cria o
+  PR com o `GITHUB_TOKEN`, e o GitHub não dispara `pull_request` para PRs criados pelo
+  próprio token. O portão real é o CI do push em `main` — que roda o mesmo código
+  promovido e ficou verde no run `46132773593`.
+- **O arquivamento vai para `develop` depois da tag.** Como nas Fases 1 e 2, o arquivo
+  de arquivamento entra na release seguinte (`v1.0.0`) e não na que fecha a fase.
+- **A base da API presa no build é uma dívida real, e ela é do Phase 4.** A URL da
+  API é resolvida no bundle pelo Vite, e o `compose.staging.yaml` só expõe a porta do
+  frontend: o stack de staging sobe com as três imagens `Healthy`, mas as telas que
+  falam com a API não alcançam o backend no ambiente implantado. A dívida ficou
+  registrada no `BACKLOG.md`, com o caminho (URL configurável em tempo de execução) e
+  as tasks que a resolvem (4.3 e 4.6). A `v0.4.0` não a esconde: o arquivamento
+  declara o limite.
+
+#### Arquivos Tocados:
+- `SDD/specs/history/phases/phase-3-finished.md` (novo)
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/specs/BACKLOG.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`
