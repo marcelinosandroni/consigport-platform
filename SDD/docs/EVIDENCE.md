@@ -5984,7 +5984,7 @@
 
 - **Data de Conclusão:** 2026-11-28
 - **Branch:** `feat/041-quality-contract-gates`
-- **PR:** #70 (a abrir para develop)
+- **PR:** #70 — https://github.com/marcelinosandroni/consigport-platform/pull/70
 - **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** impedir drift e quebra de compatibilidade — o job `contracts` passa a
@@ -6073,7 +6073,26 @@
    $ node scripts/check-ai-log.mjs
    ✓ AI usage log: 56 sessions, structure valid.
    ```
-9. **Os workflows, com o YAML validado:**
+9. **O CI do PR #70** (run
+   [`46138679286`](https://github.com/marcelinosandroni/consigport-platform/actions/runs/46138679286),
+   commit `f2c882e`): onze jobs, todos verdes — inclusive o portão novo, que
+   comparou o contrato com `main`, provou que o portão está armado e comparou o
+   snapshot com o contrato; e o `smoke`, que comparou o documento publicado pelo
+   backend em execução com o contrato e com o snapshot:
+   ```text
+   Backend — build, unit tests and coverage report | success
+   Frontend — lint, typecheck, unit tests and build | success
+   Stack Smoke — backend and mock against PostgreSQL 16 | success
+   Contracts — Spectral, HMAC vector and breaking changes against main | success
+   Docs, Specs, Architecture and AI Log | success
+   Detect the suites available in this commit | success
+   Security — dependency audit and vulnerability scan | success
+   Docker Compose — configuration | success
+   Central Mock — build and unit tests | success
+   E2E — Playwright | skipped
+   Performance Smoke — k6 | skipped
+   ```
+10. **Os workflows, com o YAML validado:**
    ```text
    $ npx --yes js-yaml@4.1.0 .github/workflows/ci.yml > /dev/null
    .github/workflows/ci.yml: YAML válido

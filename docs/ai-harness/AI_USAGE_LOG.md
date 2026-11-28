@@ -2053,7 +2053,7 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
 - **Data:** 2026-11-28
 - **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
 - **Branch:** `feat/041-quality-contract-gates`
-- **PR:** #70 (a abrir para develop)
+- **PR:** #70 — https://github.com/marcelinosandroni/consigport-platform/pull/70
 - **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
 - **Objetivo:** impedir drift e quebra de compatibilidade — o job `contracts` passa a
   comparar o contrato com a versão de `main`, a provar que o portão está armado e a
@@ -2095,3 +2095,30 @@ Política completa: [`HARNESS_OVERVIEW.md`](./HARNESS_OVERVIEW.md) §4.
    voltou ao verde.
 9. **Validação:** os cinco portões de documentação verdes, os três YAML validados e
    o snapshot conferido como determinístico.
+
+## Sessão #57 — Registro do PR #70 na evidência da task 4.1
+
+- **Data:** 2026-11-28
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Branch:** `docs/041-reference-pr-70`
+- **PR:** #71 — https://github.com/marcelinosandroni/consigport-platform/pull/71
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** registrar na evidência da task 4.1 o PR que a carregou e o run
+  de CI que a provou no GitHub Actions.
+
+### Atividades Realizadas:
+1. **A referência do PR:** a evidência da task 4.1 citava o PR como "a abrir";
+   agora aponta para o [#70](https://github.com/marcelinosandroni/consigport-platform/pull/70),
+   mergeado em 2026-11-28T11:12:32Z (merge commit `47bcbf1`).
+2. **A evidência do CI:** o run
+   [`46138679286`](https://github.com/marcelinosandroni/consigport-platform/actions/runs/46138679286)
+   (commit `f2c882e`) provou a task no GitHub Actions com onze jobs — os nove
+   verdes e `E2E — Playwright` e `Performance Smoke — k6` sem suíte, que só
+   acendem com as tasks 4.3 e 4.4. O portão novo de contratos aparece no run
+   com o nome novo (`Contracts — Spectral, HMAC vector and breaking changes
+   against main`), e o job `smoke` comparou o documento publicado pelo backend
+   em execução com o contrato e com o snapshot.
+3. **A regra do portão do log:** a primeira versão deste commit mudou só a
+   referência do PR e o portão `check-ai-log` a reprovou — "the log changed but
+   no session was added (base: 56, head: 56)". A regra exige uma sessão nova
+   quando o PR mexe em arquivo de projeto; esta sessão é a resposta.
