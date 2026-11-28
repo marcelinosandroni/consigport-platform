@@ -4812,3 +4812,186 @@
 - `SDD/specs/ROADMAP.md`
 - `SDD/docs/EVIDENCE.md`
 - `docs/ai-harness/AI_USAGE_LOG.md`
+
+---
+
+### Task 3.5 — Agenda e seleção de parcelas
+
+- **Data de Conclusão:** 2026-11-28
+- **Branch:** `feat/035-frontend-agenda-selection`
+- **PR:** a abrir para `develop`
+- **Agente / Modelo:** OpenCode (provider NVIDIA) — MiniMax M3.1 Flash
+- **Ambiente:** harness remoto em EC2 (AWS); operação pelo celular.
+- **Objetivo:** ler a agenda do beneficiário no servidor e escolher as parcelas
+  no navegador — apenas `OPEN` selecionável, total recalculado, estado vazio e
+  `403` tratados.
+
+#### Comandos de Verificação e Saídas:
+
+1. **Portão 3.4 do `GATES.md` (frontend):**
+   ```text
+   $ npm run --prefix frontend lint
+   > eslint .
+   EXIT=0
+
+   $ npm run --prefix frontend typecheck
+   > tsc --noEmit
+   EXIT=0
+
+   $ npm run --prefix frontend test:unit
+   > vitest run
+    RUN  v4.1.12 /home/ec2-user/consigport-platform/frontend
+    Test Files  19 passed (19)
+         Tests  89 passed (89)
+    Duration  25.86s
+   EXIT=0
+
+   $ npm run --prefix frontend build
+   [5/5] build ssr environment...
+   ✓ 102 modules transformed.
+   dist/ssr/assets/entry.rsc-I1-o9DEO.js     54.35 kB
+   dist/ssr/index.js                      1,582.76 kB
+   ✓ built in 2.41s
+   EXIT=0
+   ```
+2. **Portão 3.1 (documentação e SDD):**
+   ```text
+   node SDD/SKILLS/check-docs/check-docs.mjs .  → ✓ 66 documents, every relative link resolves.
+   node scripts/check-specs.mjs                → ✓ Exactly 1 task in flight in SDD/specs/PLAN.md.
+   node scripts/check-architecture.mjs         → 🎉 Todos os 22 testes de validação dos desenhos passaram.
+   node scripts/check-theme-tokens.mjs         → ✓ Theme tokens: frontend/src/theme.css matches SDD/themes/matrix/tokens.css.
+   node scripts/check-ai-log.mjs               → ✓ AI usage log: 49 sessions, structure valid.
+   ```
+3. **Smoke no build de produção — a agenda renderiza no servidor:**
+   ```text
+   $ node /tmp/opencode/fake-api.mjs          # API falsa local, fora do repositório
+   [fake-api] ouvindo em http://127.0.0.1:8080
+
+   $ npm run --prefix frontend preview -- --host 127.0.0.1 --port 5199
+
+   === /agenda?beneficiaryId=BEN-001 (pt-BR) ===
+   h1: ['Agenda de descontos']
+   'PAR-001'                              -> 3
+   'PAR-002'                              -> 3
+   'PAR-003'                              -> 3
+   '450,00'     -> 1
+   '120,50'     -> 1
+   '0,00'       -> 3
+   '300,00'     -> 1
+   moeda: ['R$\xa00,00', 'R$\xa0120,50', 'R$\xa0300,00', 'R$\xa0450,00']
+   datas: ['20 de nov. de 2026', '5 de dez. de 2026', '5 de jan. de 2027']
+   checkboxes: 3
+   desabilitados: 1
+
+   === /agenda sem beneficiário ===
+   h1: ['Agenda de descontos']
+   mensagem: ['Informe o beneficiário para ver a agenda.']
+   link: ['Autorizar']
+
+   === /agenda?beneficiaryId=BEN-FORBIDDEN ===
+   mensagem: ['Autorize o convênio para continuar.']
+   link: ['Autorizar']
+
+   === /agenda?beneficiaryId=BEN-EMPTY ===
+   mensagem: ['Nenhuma parcela elegível na agenda.']
+
+   === /agenda?beneficiaryId=BEN-UNKNOWN ===
+   mensagem: ['A Central não conhece este beneficiário.']
+
+   === /agenda (en, cookie) ===
+   h1: ['Discount agenda']
+   moeda: ['R$0.00', 'R$120.50', 'R$300.00', 'R$450.00']
+   summary: ['Eligible', 'Eligible', 'Selection summary']
+   ```
+4. **O idioma chega à API — provado pelo lado do servidor:**
+   ```text
+   $ cat /tmp/opencode/fake-api.log
+   [fake-api] GET /api/v1/beneficiaries/BEN-001/agenda accept-language=pt-BR
+   [fake-api] GET /api/v1/beneficiaries/BEN-FORBIDDEN/agenda accept-language=pt-BR
+   [fake-api] GET /api/v1/beneficiaries/BEN-EMPTY/agenda accept-language=pt-BR
+   [fake-api] GET /api/v1/beneficiaries/BEN-UNKNOWN/agenda accept-language=pt-BR
+   [fake-api] GET /api/v1/beneficiaries/BEN-001/agenda accept-language=en
+   ```
+
+#### Conteúdo Entregue:
+- `frontend/src/features/agenda/server/page.tsx` — o Server Component assíncrono:
+  lê a agenda durante o render, com o `Accept-Language` da interface, e decide o
+  estado pelo `code` do erro.
+- `frontend/src/features/agenda/ui/installment-table.tsx` — a folha cliente: a
+  seleção, o total recalculado e a viagem da seleção para a portabilidade pela
+  URL.
+- `frontend/src/features/agenda/ui/selection-summary.tsx` — o resumo com o total
+  anunciado por `aria-live="polite"`.
+- `frontend/src/shared/format/money.ts`, `date.ts`, `status.ts` — a pasta que o
+  `ARCHITECTURE.md` §5 reserva para "moeda, data, status".
+- `frontend/src/shared/ui/page-header.tsx` — o cabeçalho das páginas, agora uma
+  primitiva compartilhada pela home, pela autorização e pela agenda.
+- `frontend/src/shared/i18n/server.ts` — o tradutor do servidor ganhou o
+  fallback: a mensagem do servidor entra quando o catálogo não conhece o
+  código.
+- `frontend/src/app/router.tsx` e `frontend/src/root.tsx` — a rota recebe a URL
+  inteira: o caminho escolhe a tela, a query carrega o beneficiário.
+- `frontend/src/shared/i18n/pt-BR.json`, `en.json`, `es.json` — a seção `agenda`
+  reescrita, com o mesmo conjunto de chaves nos três idiomas.
+- `frontend/src/test/mocks/handlers.ts` — a API falsa agora tem a agenda:
+  `BEN-001` (duas abertas e uma fechada), `BEN-EMPTY`, `BEN-FORBIDDEN` e o
+  `404` para qualquer outro beneficiário.
+
+#### Descobertas e Decisões:
+- **O estado da agenda é decidido pelo `code`, não pelo status HTTP.** O `403`
+  vira `AUTHORIZATION_REQUIRED` e ganha o atalho para autorizar; o `404` vira
+  `BENEFICIARY_NOT_FOUND` e explica que a Central não conhece o beneficiário;
+  qualquer outra falha oferece "Tentar de novo". A mensagem vem do catálogo da
+  interface, indexada pelo código estável, com a `message` do servidor como
+  fallback — a regra do ADR-0004, agora também no servidor.
+- **A agenda é lida no servidor, e não no navegador.** O `ARCHITECTURE.md` §5
+  manda as leituras para o Server Component; o navegador só escolhe. O smoke
+  mostra a tabela já no HTML, com o `Accept-Language` correto no pedido.
+- **A parcela fechada fica desabilitada, e não escondida.** A regra do aceite é
+  "apenas `OPEN` selecionável": a fechada aparece na tabela com o seu status,
+  com o controle desabilitado — esconder a linha faria o usuário achar que a
+  parcela não existe.
+- **O total é recalculado, nunca guardado.** Ele nasce da seleção a cada
+  render, em centavos (`Math.round(amount * 100)`), para o ponto flutuante não
+  inventar centavos: `0,1 + 0,2` dá `0,3`, não `0,30000000000000004`.
+- **A data é montada pelas partes.** `new Date('2026-12-05')` é meia-noite UTC e
+  vira o dia anterior a oeste de Greenwich; o `date.ts` monta a data no fuso do
+  leitor, e o dia continua sendo o dia que a Central queria.
+- **A moeda é o real, e o formato é do leitor.** A API carrega um decimal puro
+  (o domínio é o consignado brasileiro); `Intl` decide separador e posição do
+  símbolo — `R$ 450,00` em pt-BR, `R$450.00` em en, `450,00 R$` em es.
+- **O estado da tela é uma primitiva compartilhada.** O cabeçalho (eyebrow,
+  título, promessa) estava copiado em três páginas; virou
+  `shared/ui/page-header.tsx`, e a home, a autorização e a agenda usam a mesma
+  peça.
+- **A seleção viaja pela URL.** `/portabilidade?beneficiaryId=…&installments=…`
+  é o contrato entre a agenda e a próxima fatia: o servidor da portabilidade
+  lê exatamente as parcelas que o usuário escolheu.
+
+#### Arquivos Tocados:
+- `frontend/src/features/agenda/server/page.tsx`
+- `frontend/src/features/agenda/server/page.test.tsx`
+- `frontend/src/features/agenda/ui/installment-table.tsx`
+- `frontend/src/features/agenda/ui/installment-table.test.tsx`
+- `frontend/src/features/agenda/ui/selection-summary.tsx`
+- `frontend/src/shared/format/money.ts`
+- `frontend/src/shared/format/money.test.ts`
+- `frontend/src/shared/format/date.ts`
+- `frontend/src/shared/format/date.test.ts`
+- `frontend/src/shared/format/status.ts`
+- `frontend/src/shared/ui/page-header.tsx`
+- `frontend/src/shared/i18n/server.ts`
+- `frontend/src/app/router.tsx`
+- `frontend/src/app/router.test.tsx`
+- `frontend/src/app/pages/section.tsx`
+- `frontend/src/root.tsx`
+- `frontend/src/features/authorization/server/page.tsx`
+- `frontend/src/shared/i18n/pt-BR.json`
+- `frontend/src/shared/i18n/en.json`
+- `frontend/src/shared/i18n/es.json`
+- `frontend/src/test/mocks/handlers.ts`
+- `SDD/specs/BACKLOG.md`
+- `SDD/specs/PLAN.md`
+- `SDD/specs/ROADMAP.md`
+- `SDD/docs/EVIDENCE.md`
+- `docs/ai-harness/AI_USAGE_LOG.md`

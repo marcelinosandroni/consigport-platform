@@ -3,7 +3,13 @@ import { http, HttpResponse } from 'msw'
 /** The root of the fake API: the tests never reach a real server. */
 export const API_BASE_URL = 'http://localhost:8080'
 
-const notFound = (code: string, path: string, message: string) =>
+const errorResponse = (
+  status: number,
+  code: string,
+  path: string,
+  message: string,
+  details: { field: string; message: string }[] = [],
+) =>
   HttpResponse.json(
     {
       code,
@@ -11,29 +17,52 @@ const notFound = (code: string, path: string, message: string) =>
       locale: 'pt-BR',
       timestamp: '2026-11-28T10:00:00Z',
       path,
-      details: [],
-    },
-    { status: 404 },
-  )
-
-const badRequest = (message: string, details: { field: string; message: string }[] = []) =>
-  HttpResponse.json(
-    {
-      code: 'VALIDATION_ERROR',
-      message,
-      locale: 'pt-BR',
-      timestamp: '2026-11-28T10:00:00Z',
-      path: '/api/v1/authorizations',
       details,
     },
-    { status: 400 },
+    { status },
   )
+
+const notFound = (code: string, path: string, message: string) =>
+  errorResponse(404, code, path, message)
+
+const badRequest = (message: string, details: { field: string; message: string }[] = []) =>
+  errorResponse(400, 'VALIDATION_ERROR', '/api/v1/authorizations', message, details)
 
 /**
  * The consent already registered by the fake, so the replay answers 200 the
  * way the contract describes.
  */
 const registered = new Map<string, { authorizationId: string; createdAt: string }>()
+
+/** The agenda of the beneficiaries the fake knows. */
+const AGENDAS: Record<string, { installments: unknown[] }> = {
+  'BEN-001': {
+    installments: [
+      {
+        installmentId: 'PAR-001',
+        agreementId: 'AGR-001',
+        amount: 450,
+        discountDate: '2026-12-05',
+        status: 'OPEN',
+      },
+      {
+        installmentId: 'PAR-002',
+        agreementId: 'AGR-001',
+        amount: 300,
+        discountDate: '2027-01-05',
+        status: 'OPEN',
+      },
+      {
+        installmentId: 'PAR-003',
+        agreementId: 'AGR-001',
+        amount: 120.5,
+        discountDate: '2026-11-20',
+        status: 'CLOSED',
+      },
+    ],
+  },
+  'BEN-EMPTY': { installments: [] },
+}
 
 /**
  * The fake of the public API.
@@ -102,5 +131,31 @@ export const handlers = [
       { ...authorization, beneficiaryId, agreementId },
       { status: 201 },
     )
+  }),
+
+  http.get(`${API_BASE_URL}/api/v1/beneficiaries/:beneficiaryId/agenda`, ({ params }) => {
+    const beneficiaryId = String(params.beneficiaryId)
+    const path = `/api/v1/beneficiaries/${beneficiaryId}/agenda`
+
+    if (beneficiaryId === 'BEN-FORBIDDEN') {
+      return errorResponse(
+        403,
+        'AUTHORIZATION_REQUIRED',
+        path,
+        'O beneficiário informado não tem consentimento registrado.',
+      )
+    }
+
+    const agenda = AGENDAS[beneficiaryId]
+
+    if (agenda === undefined) {
+      return notFound(
+        'BENEFICIARY_NOT_FOUND',
+        path,
+        'A Central não conhece o beneficiário informado.',
+      )
+    }
+
+    return HttpResponse.json({ beneficiaryId, installments: agenda.installments })
   }),
 ]
