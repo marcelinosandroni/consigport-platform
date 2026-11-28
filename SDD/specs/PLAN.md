@@ -71,7 +71,8 @@
 
 > Objetivo: core DDD/hexagonal na porta `8080`, com PostgreSQL, Flyway, ACL, i18n,
 > polling resiliente e Swagger.
-> Task em voo: **2.17 — Fechamento do backend**.
+> Task em voo: **nenhuma** — a Fase 2 terminou com a 2.18; o arquivamento da fase e a
+> tag `v0.3.0` vêm no fechamento, depois da promoção `develop` → `staging` → `main`.
 
 ### Tasks
 
@@ -133,7 +134,7 @@
 - [x] **2.17 — Gate de cobertura do núcleo**
       Domínio e aplicação com ≥ 80% de linhas e de branches; o build falha quando a
       cobertura cai; relatório anexado no CI.
-- [-] **2.18 — Fluxo completo com o banco real**
+- [x] **2.18 — Fluxo completo com o banco real**
       `CREATED` → `COMPLETED` e `CREATED` → `REJECTED` comprovados com o PostgreSQL real
       e a trilha completa de eventos.
 
